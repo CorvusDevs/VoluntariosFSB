@@ -29,14 +29,30 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   const ctx = crearContexto ? crearContexto(lienzo) : lienzo.getContext('2d')
   const imagenes = {}
   let plano = null
+  // vivo pasa a false al salir de la pantalla: sin esto la precarga de fotos
+  // sigue armando DOM huerfano y repintando un lienzo que ya nadie ve.
+  let vivo = true
+  // ocupado dura lo que dura una exportacion: mientras tanto los controles
+  // quedan bloqueados para que el PNG que baja sea el que estaba en pantalla.
+  let ocupado = false
 
   function calcular() {
     plano = maquetar(lista, roster, { saludo, despedida, medirTexto: medidorDesde(ctx) })
     return plano
   }
 
+  function planoCompacto() {
+    if (lista.opcionesImagen?.compacto) return plano
+    return maquetar(
+      { ...lista, opcionesImagen: { ...lista.opcionesImagen, compacto: true } },
+      roster,
+      { saludo, despedida, medirTexto: medidorDesde(ctx) },
+    )
+  }
+
   async function dibujar() {
     await esperarFuentes()
+    if (!vivo) return
     calcular()
     pintar(ctx, plano, imagenes, DENSIDAD)
   }
@@ -73,30 +89,56 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   function avisoRecorte() {
     if (!plano.recorteProbable) return null
     const caja = elemento('div', ['aviso-recorte'])
+    // Pasadas unas 35 filas el modo compacto tampoco alcanza. Recomendarlo
+    // igual deja a la coordinadora sin salida, asi que se lo dice de frente.
+    const salida = planoCompacto().recorteProbable
+      ? 'Ni siquiera el modo compacto alcanza para esta lista. Conviene exportar una imagen por ' +
+        'grupo, o dividir la lista en dos mensajes.'
+      : 'Si preferis evitarlo, activa el modo compacto.'
     caja.textContent =
       'La imagen es muy alta y WhatsApp probablemente le haga un recorte en la vista previa del ' +
-      'chat. Se sigue viendo entera al tocarla. Si preferis evitarlo, activa el modo compacto.'
+      `chat. Se sigue viendo entera al tocarla. ${salida}`
     return caja
+  }
+
+  function controles() {
+    return [...raiz.querySelectorAll('input[data-opcion]'), ...raiz.querySelectorAll('button')]
+  }
+
+  // El bloqueo se toma antes del primer await: entre el dibujado y el toBlob hay
+  // una ventana en la que tocar un interruptor cambiaba el lienzo, y el archivo
+  // que bajaba no era el que la coordinadora tenia delante.
+  async function conControlesBloqueados(tarea) {
+    if (ocupado) return
+    ocupado = true
+    controles().forEach((c) => { c.disabled = true })
+    try {
+      await tarea()
+    } finally {
+      ocupado = false
+      controles().forEach((c) => { c.disabled = false })
+    }
   }
 
   function acciones() {
     const caja = elemento('div', ['acciones-imagen'])
-    caja.appendChild(boton('Descargar PNG', async () => {
+    caja.appendChild(boton('Descargar PNG', () => conControlesBloqueados(async () => {
       await dibujar()
       await descargar(lienzo, nombreDeArchivo(lista))
-    }))
-    caja.appendChild(boton('Compartir', async () => {
+    })))
+    caja.appendChild(boton('Compartir', () => conControlesBloqueados(async () => {
       await dibujar()
       const texto = `Fútbol sin Barreras, ${formatearFechaLarga(lista.fecha)}`
       const compartido = await compartir(lienzo, nombreDeArchivo(lista), texto)
       if (!compartido) {
         alert('Este dispositivo no permite compartir el archivo directamente. Usa Descargar PNG.')
       }
-    }))
+    })))
     return caja
   }
 
   function redibujar() {
+    if (!vivo) return
     vaciar(raiz)
     calcular()
     raiz.appendChild(interruptores())
@@ -105,23 +147,37 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (aviso) raiz.appendChild(aviso)
     raiz.appendChild(acciones())
     raiz.appendChild(lienzo)
+    // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
+    // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.
+    if (ocupado) controles().forEach((c) => { c.disabled = true })
     dibujar()
   }
 
   // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
   // solo las fotos de los participantes necesitan ese lector.
+  const cerrar = (i) => { if (i && typeof i.close === 'function') i.close() }
+
   async function precargarFotos() {
     const logo = await (opciones.cargarLogo ?? cargarLogoReal)()
+    if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
     if (cargarFoto) {
       const claves = new Set()
       roster.participantes.forEach((p) => { if (p.foto) claves.add(p.foto) })
       for (const clave of claves) {
         const imagen = await cargarFoto(clave)
+        if (!vivo) return cerrar(imagen)
         if (imagen) imagenes[clave] = imagen
       }
     }
     redibujar()
+  }
+
+  // La llama app.js al cambiar de pantalla. Los mapas de bits decodificados
+  // ocupan memoria hasta que se los cierra a mano.
+  function destruir() {
+    vivo = false
+    Object.values(imagenes).forEach(cerrar)
   }
 
   redibujar()
@@ -132,5 +188,6 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     plano: () => plano,
     nombreDeArchivo: () => nombreDeArchivo(lista),
     redibujar,
+    destruir,
   }
 }

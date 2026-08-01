@@ -113,6 +113,100 @@ describe('pantalla de vista previa', () => {
     expect(r4.querySelector('.lienzo-vista-previa')).not.toBeNull()
   })
 
+  it('cuando el modo compacto no alcanza, propone otra salida', () => {
+    const enorme = structuredClone(lista)
+    for (let i = 0; i < 80; i += 1) {
+      enorme.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
+    }
+    document.body.innerHTML = '<div id="r7"></div>'
+    const r7 = document.getElementById('r7')
+    armar(r7, enorme)
+    expect(r7.querySelector('.aviso-recorte').textContent).toContain('por grupo')
+  })
+
+  it('con una lista que el modo compacto si arregla, sigue proponiendo el modo compacto', () => {
+    const larga = structuredClone(lista)
+    for (let i = 0; i < 25; i += 1) {
+      larga.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
+    }
+    document.body.innerHTML = '<div id="r8"></div>'
+    const r8 = document.getElementById('r8')
+    armar(r8, larga)
+    const aviso = r8.querySelector('.aviso-recorte')
+    expect(aviso).not.toBeNull()
+    expect(aviso.textContent).toContain('compacto')
+    expect(aviso.textContent).not.toContain('por grupo')
+  })
+
+  it('bloquea los interruptores mientras genera el archivo', async () => {
+    document.body.innerHTML = '<div id="r9"></div>'
+    const r9 = document.getElementById('r9')
+    const p = armar(r9, lista)
+    // Que termine la precarga y su repintado antes de tomar referencias.
+    await new Promise((r) => setTimeout(r, 0))
+    let entregarBlob = null
+    const toBlobOriginal = HTMLCanvasElement.prototype.toBlob
+    const crearUrlOriginal = URL.createObjectURL
+    const revocarUrlOriginal = URL.revokeObjectURL
+    HTMLCanvasElement.prototype.toBlob = function (cb) { entregarBlob = () => cb(new Blob(['x'])) }
+    URL.createObjectURL = () => 'blob:falso'
+    URL.revokeObjectURL = () => {}
+    try {
+      const botonDescargar = [...r9.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar'))
+      const compacto = r9.querySelector('[data-opcion="compacto"]')
+      expect(compacto.disabled).toBe(false)
+
+      botonDescargar.click()
+      // El bloqueo tiene que ocurrir antes del primer await, si no queda una
+      // ventana en la que se puede cambiar el plano que ya se dibujo.
+      expect(compacto.disabled).toBe(true)
+      expect(botonDescargar.disabled).toBe(true)
+
+      for (let i = 0; i < 20 && !entregarBlob; i += 1) {
+        await new Promise((r) => setTimeout(r, 0))
+      }
+      expect(entregarBlob).not.toBeNull()
+      expect(compacto.disabled).toBe(true)
+
+      // Un repintado en medio de la exportacion no puede soltar el bloqueo.
+      p.redibujar()
+      expect(r9.querySelector('[data-opcion="compacto"]').disabled).toBe(true)
+
+      entregarBlob()
+      for (let i = 0; i < 20 && r9.querySelector('[data-opcion="compacto"]').disabled; i += 1) {
+        await new Promise((r) => setTimeout(r, 0))
+      }
+      expect(r9.querySelector('[data-opcion="compacto"]').disabled).toBe(false)
+      const botonFinal = [...r9.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar'))
+      expect(botonFinal.disabled).toBe(false)
+    } finally {
+      HTMLCanvasElement.prototype.toBlob = toBlobOriginal
+      URL.createObjectURL = crearUrlOriginal
+      URL.revokeObjectURL = revocarUrlOriginal
+    }
+  })
+
+  it('deja de repintar despues de destruirse', async () => {
+    document.body.innerHTML = '<div id="r6"></div>'
+    const r6 = document.getElementById('r6')
+    let cerradas = 0
+    const p = crearPantallaVistaPrevia(r6, {
+      lista, roster: ROSTER, saludo: 'x', despedida: 'y', alCambiar: () => {},
+      crearContexto: () => contextoFalso(),
+      cargarLogo: async () => ({ close() { cerradas += 1 } }),
+      cargarFoto: async () => null,
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    p.destruir()
+    expect(cerradas).toBe(1)
+    const hijosAntes = r6.children.length
+    const primerHijo = r6.firstChild
+    p.redibujar()
+    expect(r6.children.length).toBe(hijosAntes)
+    // vaciar() habria reemplazado los nodos: si el primero es el mismo, no repinto.
+    expect(r6.firstChild).toBe(primerHijo)
+  })
+
   it('pide cada foto una sola vez aunque se repita en varias filas', async () => {
     document.body.innerHTML = '<div id="r5"></div>'
     const r5 = document.getElementById('r5')

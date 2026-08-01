@@ -16,6 +16,9 @@ let roster = await deposito.leerRoster()
 const sabado = proximoSabado()
 let lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
 let pantalla = 'lista'
+// La pantalla que se esta mostrando. Algunas tienen trabajo en curso (fotos que
+// se decodifican, un lienzo que se repinta) y hay que avisarles que se van.
+let vista = null
 
 function navegacion() {
   const nav = elemento('nav', ['navegacion'])
@@ -38,13 +41,15 @@ async function cargarFoto(clave) {
 }
 
 function dibujar() {
+  if (typeof vista?.destruir === 'function') vista.destruir()
+  vista = null
   vaciar(contenedor)
   contenedor.appendChild(navegacion())
   const cuerpo = elemento('div', ['cuerpo'])
   contenedor.appendChild(cuerpo)
 
   if (pantalla === 'lista') {
-    crearPantallaLista(cuerpo, {
+    vista = crearPantallaLista(cuerpo, {
       lista,
       roster,
       alCambiar: async (siguiente) => {
@@ -66,7 +71,7 @@ function dibujar() {
       },
     })
   } else if (pantalla === 'vista-previa') {
-    crearPantallaVistaPrevia(cuerpo, {
+    vista = crearPantallaVistaPrevia(cuerpo, {
       lista,
       roster,
       saludo: SALUDO,
@@ -78,7 +83,7 @@ function dibujar() {
       },
     })
   } else {
-    crearPantallaPersonas(cuerpo, {
+    vista = crearPantallaPersonas(cuerpo, {
       roster,
       almacen: deposito,
       alCambiar: async (siguiente) => {
