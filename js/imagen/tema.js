@@ -95,6 +95,9 @@ export const GRILLA = Object.freeze({
   margenInferior: 12,
   factorIniciales: 0.3,
   filasObjetivo: 2,
+  altoLlave: 12,
+  grosorLlave: 2,
+  aireLlave: 10,
 })
 
 export function anchoDeCeldaGrilla(margen, columnas = GRILLA.porFila, ancho = ANCHO) {

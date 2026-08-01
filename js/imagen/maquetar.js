@@ -267,6 +267,93 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 // Grilla: cinco por fila, foto vertical redondeada y el nombre debajo. La celda
 // mide lo mismo en todo el grupo, calculada a partir del nombre que mas renglones
 // necesita, para que las fotos queden alineadas y no escalonadas.
+const firmaDeVoluntarios = (fila) => (fila.voluntarios ?? []).join('|')
+
+// Los que comparten voluntario quedan contiguos, para poder nombrarlo una sola
+// vez entre ellos en lugar de repetirlo debajo de cada uno.
+export function agruparPorVoluntario(filas) {
+  const pendientes = [...filas]
+  const salida = []
+  while (pendientes.length > 0) {
+    const actual = pendientes.shift()
+    salida.push(actual)
+    const firma = firmaDeVoluntarios(actual)
+    if (!firma) continue
+    const arrastradas = []
+    for (let i = 0; i < pendientes.length; i += 1) {
+      if (firmaDeVoluntarios(pendientes[i]) === firma) arrastradas.push(i)
+    }
+    arrastradas.reverse().forEach((i) => salida.push(...pendientes.splice(i, 1)))
+  }
+  return salida
+}
+
+// Tramos de celdas contiguas con el mismo voluntario que caen en la misma fila
+// visual. Se corta en el borde de la fila: una llave no puede saltar de renglon.
+function tramosCompartidos(celdas, columnas) {
+  const tramos = []
+  let inicio = 0
+  while (inicio < celdas.length) {
+    const firma = firmaDeVoluntarios(celdas[inicio].fila)
+    let fin = inicio
+    while (
+      firma
+      && fin + 1 < celdas.length
+      && firmaDeVoluntarios(celdas[fin + 1].fila) === firma
+      && Math.floor((fin + 1) / columnas) === Math.floor(inicio / columnas)
+    ) fin += 1
+    tramos.push({ inicio, fin, compartido: Boolean(firma) && fin > inicio })
+    inicio = fin + 1
+  }
+  return tramos
+}
+
+function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto) {
+  tramosCompartidos(celdas, columnas).forEach((tramo) => {
+    const primera = celdas[tramo.inicio]
+    const clave = primera.fila.participantes[0]
+
+    if (!tramo.compartido) {
+      primera.lineasVoluntario.forEach((linea, n) => {
+        ordenes.push({
+          tipo: 'texto', texto: linea, x: primera.x + ancho / 2,
+          y: primera.yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
+          fuente, color: COLORES.magentaTexto,
+          alineacion: 'center', lineaBase: 'middle', fila: clave,
+        })
+      })
+      return
+    }
+
+    const abarcadas = celdas.slice(tramo.inicio, tramo.fin + 1)
+    const izquierda = primera.x + ancho / 2
+    const derecha = celdas[tramo.fin].x + ancho / 2
+    // La llave se apoya en la mas baja de las celdas que abarca, para que ninguna
+    // le quede por debajo cuando los nombres no ocupan lo mismo.
+    const yLinea = Math.max(...abarcadas.map((c) => c.yVoluntario)) + GRILLA.aireLlave
+    const texto = primera.lineasVoluntario.join(' ')
+    const hueco = medirTexto(texto, fuente) / 2 + 12
+    const medio = (izquierda + derecha) / 2
+
+    const trazo = (x1, y1, x2, y2) => ordenes.push({
+      tipo: 'linea', x1, y1, x2, y2,
+      color: COLORES.magentaTexto, grosor: GRILLA.grosorLlave, fila: clave,
+    })
+    // Ganchos en L que suben hacia cada celda, y la linea partida al medio para
+    // dejarle lugar al nombre.
+    trazo(izquierda, yLinea - GRILLA.altoLlave, izquierda, yLinea)
+    trazo(derecha, yLinea - GRILLA.altoLlave, derecha, yLinea)
+    trazo(izquierda, yLinea, medio - hueco, yLinea)
+    trazo(medio + hueco, yLinea, derecha, yLinea)
+
+    ordenes.push({
+      tipo: 'texto', texto, x: medio, y: yLinea,
+      fuente, color: COLORES.magentaTexto,
+      alineacion: 'center', lineaBase: 'middle', fila: clave,
+    })
+  })
+}
+
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const columnas = m.columnasGrilla ?? GRILLA.porFila
   const ancho = anchoDeCeldaGrilla(m.margen)
@@ -274,7 +361,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const fuenteNombre = FUENTES.titulo(GRILLA.pxNombre)
   const fuenteVoluntario = FUENTES.normal(GRILLA.pxVoluntario)
 
-  const celdas = grupo.filas.map((fila) => {
+  const celdas = agruparPorVoluntario(grupo.filas).map((fila) => {
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
     const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
@@ -332,20 +419,16 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     })
     // Pegado al nombre real de esta celda, no al alto uniforme del grupo: si se
     // usara maxNombre, un nombre de un renglon dejaba al voluntario flotando muy
-    // abajo, como si no fuera con el.
-    const yVoluntario = textoY + celda.lineasNombre.length * GRILLA.pxNombre
+    // abajo, como si no fuera con el. Se anota y se dibuja al final, cuando ya
+    // se sabe que celdas comparten voluntario.
+    celda.x = x
+    celda.yVoluntario = textoY + celda.lineasNombre.length * GRILLA.pxNombre
       + GRILLA.espacioBajoNombre
-    celda.lineasVoluntario.forEach((linea, n) => {
-      ordenes.push({
-        tipo: 'texto', texto: linea, x: x + ancho / 2,
-        y: yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
-        fuente: fuenteVoluntario, color: COLORES.magentaTexto,
-        alineacion: 'center', lineaBase: 'middle', fila: clave,
-      })
-    })
 
     if (columna === columnas - 1 || i === celdas.length - 1) cursor += altoCelda
   })
+
+  dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto)
   return cursor
 }
 

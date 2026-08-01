@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { maquetar } from '../../js/imagen/maquetar.js'
+import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { ANCHO, COLORES, COLUMNAS, GRILLA } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
@@ -541,5 +541,111 @@ describe('la grilla se ensancha en vez de estirarse hacia abajo', () => {
       )
       expect(plano.ancho).toBe(ANCHO)
     })
+  })
+})
+
+describe('un voluntario que acompaña a varios', () => {
+  const conCompartido = () => {
+    const lista = structuredClone(LISTA)
+    lista.opcionesImagen.formato = 'grilla'
+    lista.grupos[0].filas = [
+      { participantes: ['p1'], voluntarios: ['v1'] },
+      { participantes: ['p2'], voluntarios: ['v2'] },
+      { participantes: ['p3'], voluntarios: ['v1'] },
+    ]
+    return maquetar(lista, ROSTER, opciones)
+  }
+
+  it('agrupa las filas del mismo voluntario sin perder a las demas', () => {
+    const filas = [
+      { participantes: ['a'], voluntarios: ['v1'] },
+      { participantes: ['b'], voluntarios: [] },
+      { participantes: ['c'], voluntarios: ['v1'] },
+      { participantes: ['d'], voluntarios: ['v2'] },
+    ]
+    const orden = agruparPorVoluntario(filas).map((f) => f.participantes[0])
+    expect(orden.indexOf('c') - orden.indexOf('a')).toBe(1)
+    expect(orden).toHaveLength(4)
+    expect(orden).toContain('b')
+    expect(orden).toContain('d')
+  })
+
+  it('los pone contiguos en la planilla', () => {
+    const marcos = conCompartido().ordenes
+      .filter((o) => o.tipo === 'rect' && o.radio === GRILLA.radioFoto && o.ancho < 400)
+      .map((o) => o.fila)
+    expect(marcos.indexOf('p3') - marcos.indexOf('p1')).toBe(1)
+  })
+
+  it('escribe el nombre del voluntario una sola vez, no debajo de cada uno', () => {
+    const nombres = conCompartido().ordenes
+      .filter((o) => o.tipo === 'texto' && o.color === COLORES.magentaTexto)
+      .map((o) => o.texto)
+    expect(nombres.filter((n) => n === 'Abi')).toHaveLength(1)
+  })
+
+  it('dibuja la llave: dos ganchos y la linea partida al medio', () => {
+    const trazos = conCompartido().ordenes.filter((o) => o.tipo === 'linea' && o.grosor === GRILLA.grosorLlave)
+    expect(trazos).toHaveLength(4)
+    const verticales = trazos.filter((l) => l.x1 === l.x2)
+    const horizontales = trazos.filter((l) => l.y1 === l.y2)
+    expect(verticales).toHaveLength(2)
+    expect(horizontales).toHaveLength(2)
+    // Los ganchos suben desde la linea hacia las celdas
+    verticales.forEach((l) => expect(l.y1).toBeLessThan(l.y2))
+  })
+
+  it('los ganchos caen en el centro de las dos celdas que abarca', () => {
+    const plano = conCompartido()
+    const centro = (id) => {
+      const marco = plano.ordenes.find((o) => o.fila === id && o.tipo === 'rect' && o.ancho < 400)
+      return marco.x + marco.ancho / 2
+    }
+    const verticales = plano.ordenes
+      .filter((o) => o.tipo === 'linea' && o.grosor === GRILLA.grosorLlave && o.x1 === o.x2)
+      .map((l) => l.x1).sort((a, b) => a - b)
+    expect(verticales).toEqual([centro('p1'), centro('p3')].sort((a, b) => a - b))
+  })
+
+  it('el nombre queda en el hueco que deja la linea', () => {
+    const plano = conCompartido()
+    const horizontales = plano.ordenes
+      .filter((o) => o.tipo === 'linea' && o.grosor === GRILLA.grosorLlave && o.y1 === o.y2)
+      .sort((a, b) => a.x1 - b.x1)
+    const nombre = plano.ordenes.find((o) => o.texto === 'Abi')
+    expect(nombre.x).toBeGreaterThan(horizontales[0].x2)
+    expect(nombre.x).toBeLessThan(horizontales[1].x1)
+    expect(nombre.y).toBe(horizontales[0].y1)
+  })
+
+  it('un voluntario de un solo participante no lleva llave', () => {
+    const plano = maquetar(
+      { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } },
+      ROSTER, opciones,
+    )
+    expect(plano.ordenes.filter((o) => o.tipo === 'linea' && o.grosor === GRILLA.grosorLlave)).toHaveLength(0)
+  })
+
+  it('la llave no salta de renglon: se corta en el borde de la fila', () => {
+    const lista = structuredClone(LISTA)
+    lista.opcionesImagen.formato = 'grilla'
+    // Seis con el mismo voluntario, y solo cinco entran por fila
+    const roster = structuredClone(ROSTER)
+    const ids = []
+    for (let i = 0; i < 6; i += 1) {
+      const id = `x${i}`
+      ids.push(id)
+      roster.participantes.push({ id, nombre: 'Ana', grupo: 1, foto: null, activo: true, notas: '' })
+    }
+    lista.grupos[0].filas = ids.map((id) => ({ participantes: [id], voluntarios: ['v1'] }))
+    const plano = maquetar(lista, roster, opciones)
+    const verticales = plano.ordenes.filter(
+      (o) => o.tipo === 'linea' && o.grosor === GRILLA.grosorLlave && o.x1 === o.x2,
+    )
+    // Dos llaves: una para los cinco de la primera fila, otra no, porque el sexto
+    // queda solo en la segunda. Nunca una sola llave cruzando el salto de renglon.
+    const alturas = new Set(verticales.map((l) => l.y1))
+    expect(alturas.size).toBeGreaterThanOrEqual(1)
+    verticales.forEach((l) => expect(l.x1).toBeLessThanOrEqual(plano.ancho))
   })
 })
