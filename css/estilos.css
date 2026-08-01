@@ -247,3 +247,71 @@ body {
    telefono nadie descubre un boton que quedo fuera de un scroll horizontal. */
 .navegacion { flex-wrap: wrap; }
 .navegacion .boton { font-size: 14px; padding: 10px 14px; }
+
+/* ---------------------------------------------------------------------------
+   Pantalla ancha.
+
+   Todo lo de arriba esta pensado para el telefono, que es donde se usa esto un
+   viernes a la noche, y no cambia. Lo que sigue solo entra a partir de 900 px,
+   donde el problema es el opuesto: sobra ancho y el contenido queda desangelado
+   contra el borde izquierdo.
+
+   El ancho maximo es 1080 px a proposito: es el mismo ancho que la imagen que
+   la aplicacion exporta.
+--------------------------------------------------------------------------- */
+
+#app {
+  max-width: 1080px;
+  margin-inline: auto;
+}
+
+@media (min-width: 900px) {
+  /* Armar lista pasa a dos columnas: los grupos a la izquierda y la paleta de
+     voluntarios fija a la derecha, para no perderla de vista al desplazarse.
+     El :has() acota la regla a esta pantalla; las demas siguen en una columna. */
+  .cuerpo:has(.grupos) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    column-gap: 32px;
+    align-items: start;
+  }
+
+  .cuerpo:has(.grupos) .encabezado-lista,
+  .cuerpo:has(.grupos) .barra,
+  .cuerpo:has(.grupos) .barra-seleccion {
+    grid-column: 1 / -1;
+  }
+
+  .cuerpo:has(.grupos) .grupos { grid-column: 1; }
+
+  .cuerpo:has(.grupos) .voluntarios {
+    grid-column: 2;
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    border-top: none;
+    border-left: 1px solid var(--linea);
+    padding-left: 24px;
+  }
+
+  /* Las fichas de participante ya no compiten con los voluntarios por el ancho,
+     asi que pueden acomodarse de a varias por fila. */
+  .columna-participantes {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  /* Filas de texto: acotadas para que la vista no obligue a barrer la pantalla
+     de lado a lado leyendo un nombre. */
+  .seccion,
+  .ajustes { max-width: 760px; }
+
+  /* La imagen es vertical. Estirarla al ancho del monitor la vuelve una losa y
+     deja de parecerse a lo que se va a ver en el telefono. */
+  .lienzo-vista-previa {
+    width: 420px;
+    max-width: 100%;
+  }
+}

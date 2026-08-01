@@ -37,6 +37,16 @@ describe('pantalla de armado', () => {
     expect(titulos).toContain('Voluntarios')
   })
 
+  it('envuelve los grupos, que es de lo que cuelga la retícula de pantalla ancha', () => {
+    // El CSS separa grupos y voluntarios en dos columnas a partir de 900 px con
+    // .cuerpo:has(.grupos). Sin este envoltorio la regla no aplica y el escritorio
+    // vuelve a una sola columna, sin que falle ninguna otra prueba.
+    const grupos = raiz.querySelector('.grupos')
+    expect(grupos).not.toBeNull()
+    expect(grupos.querySelectorAll('.grupo')).toHaveLength(2)
+    expect(raiz.querySelector('.voluntarios').closest('.grupos')).toBeNull()
+  })
+
   it('tocar un participante lo selecciona', () => {
     porNombre('.columna-participantes .ficha', 'Gonzalo').click()
     expect(porNombre('.columna-participantes .ficha', 'Gonzalo').getAttribute('aria-pressed')).toBe('true')

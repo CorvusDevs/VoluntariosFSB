@@ -162,7 +162,11 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     vaciar(raiz)
     raiz.appendChild(encabezado())
     raiz.appendChild(barra())
-    estado().grupos.forEach((grupo) => raiz.appendChild(dibujarGrupo(grupo)))
+    // Los grupos van envueltos para poder ponerlos en una columna aparte de los
+    // voluntarios en pantalla ancha. En el telefono el envoltorio no hace nada.
+    const grupos = elemento('div', ['grupos'])
+    estado().grupos.forEach((grupo) => grupos.appendChild(dibujarGrupo(grupo)))
+    raiz.appendChild(grupos)
     areaVoluntarios = dibujarVoluntarios()
     raiz.appendChild(areaVoluntarios)
     if (seleccionado) raiz.appendChild(barraSeleccion())
