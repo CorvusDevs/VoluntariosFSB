@@ -125,7 +125,7 @@ export function crearPantallaIngreso(raiz, { alEntrar, leerArchivo, alSeguirSinI
     vaciar(raiz)
     const caja = elemento('section', ['ingreso'])
     caja.append(
-      elemento('h1', ['titulo-ingreso'], 'Futbol sin Barreras'),
+      elemento('h1', ['titulo-ingreso'], 'Fútbol sin Barreras'),
       elemento('p', ['ayuda-ingreso'],
         'La contraseña te la entrega quien administra la aplicación. No se elige: la genera la aplicación sola.'),
       formulario,
