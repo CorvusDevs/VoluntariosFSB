@@ -380,3 +380,53 @@ describe('apoyo del grupo', () => {
     expect(pantalla.lista().grupos[0].apoyo).toEqual([])
   })
 })
+
+describe('el elegidor se abre donde se tocó', () => {
+  it('cuelga los voluntarios del participante elegido, no del pie de la página', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    const elegidor = raiz.querySelector('.elegidor')
+    expect(elegidor).not.toBeNull()
+    // Dentro del grupo de Gonzalo, no en una sección aparte al final.
+    expect(elegidor.closest('.grupo')).not.toBeNull()
+    expect(elegidor.querySelectorAll('.ficha').length).toBeGreaterThan(0)
+  })
+
+  it('lo pone inmediatamente después de la ficha tocada', () => {
+    const ficha = porNombre('.columna-participantes .ficha', 'Gonzalo')
+    ficha.click()
+    const siguiente = porNombre('.columna-participantes .ficha', 'Gonzalo').nextElementSibling
+    expect(siguiente.classList.contains('elegidor')).toBe(true)
+  })
+
+  it('saca el plantel del pie mientras se asigna, para no repetir el mismo listado', () => {
+    expect(raiz.querySelector('.voluntarios')).not.toBeNull()
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    expect(raiz.querySelector('.voluntarios')).toBeNull()
+    expect(raiz.querySelectorAll('.columna-voluntarios')).toHaveLength(1)
+  })
+
+  it('asignar desde el elegidor empareja igual y lo cierra', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.elegidor .ficha', 'Abi').click()
+    expect(pantalla.lista().grupos[0].filas[0].voluntarios).toContain('v1')
+    expect(raiz.querySelector('.elegidor')).toBeNull()
+    expect(raiz.querySelector('.voluntarios')).not.toBeNull()
+  })
+
+  it('el apoyo también elige ahí mismo, dentro del área del grupo', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    const elegidor = raiz.querySelector('.elegidor')
+    expect(elegidor).not.toBeNull()
+    expect(elegidor.closest('.apoyo-grupo')).not.toBeNull()
+    porNombre('.elegidor .ficha', 'Abi').click()
+    expect(pantalla.lista().grupos[0].apoyo).toContain('v1')
+    expect(raiz.querySelector('.elegidor')).toBeNull()
+  })
+
+  it('cancelar la selección cierra el elegidor y devuelve el plantel al pie', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    raiz.querySelector('[data-accion="cancelar"]').click()
+    expect(raiz.querySelector('.elegidor')).toBeNull()
+    expect(raiz.querySelector('.voluntarios')).not.toBeNull()
+  })
+})

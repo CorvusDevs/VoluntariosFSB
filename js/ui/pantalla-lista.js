@@ -13,8 +13,6 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   // Cuando se esta eligiendo el apoyo de un grupo, guarda su numero. Reusa el
   // mismo gesto de dos toques que el resto: primero el destino, despues quien.
   let apoyoDe = null
-  let areaVoluntarios = null
-
   function estado() { return pila.actual() }
 
   function voluntariosAsignados() {
@@ -31,9 +29,13 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     apoyoDe = null
     seleccionado = seleccionado === id ? null : id
     dibujar()
-    // Con una sola columna en el telefono, los voluntarios quedan mas abajo:
-    // los acercamos para no obligar a buscarlos.
-    if (seleccionado) areaVoluntarios?.scrollIntoView?.({ block: 'nearest' })
+    if (seleccionado) acercarElegidor()
+  }
+
+  // El elegidor ya nace al lado de lo que se toco; esto solo lo termina de
+  // entrar en pantalla cuando quedo justo pisando el borde de abajo.
+  function acercarElegidor() {
+    raiz.querySelector('.elegidor')?.scrollIntoView?.({ block: 'nearest' })
   }
 
   function alTocarVoluntario(id) {
@@ -85,14 +87,16 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   function encabezado() {
     const caja = elemento('header', ['encabezado-lista'])
 
-    caja.appendChild(campo('Fecha', 'date', 'fecha', estado().fecha, (valor) => {
+    // Un solo campo de fecha. El rotulo lleva la fecha escrita en español porque
+    // el control nativo la muestra en el idioma del telefono, y en iOS sale en
+    // ingles. Asi no hacen falta dos campos para lo mismo.
+    caja.appendChild(campo(formatearFechaLarga(estado().fecha), 'date', 'fecha', estado().fecha, (valor) => {
       if (!valor) return
       // La lista se guarda por fecha, asi que cambiarla significa abrir otra lista.
       // Quien nos usa decide si hay una guardada o hay que empezar de cero.
       if (alCambiarFecha) alCambiarFecha(valor)
       else actualizar({ fecha: valor })
     }))
-    caja.appendChild(elemento('p', ['fecha-larga'], formatearFechaLarga(estado().fecha)))
 
     caja.appendChild(campo('Hora', 'time', 'hora', estado().hora, (valor) => actualizar({ hora: valor })))
     caja.appendChild(campo('Lugar', 'text', 'lugar', estado().lugar, (valor) => actualizar({ lugar: valor })))
@@ -193,6 +197,9 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
         const el = ficha(persona, { seleccionada: seleccionado === id, detalle })
         el.addEventListener('click', () => alTocarParticipante(id))
         columna.appendChild(el)
+        if (seleccionado === id) {
+          columna.appendChild(elegidor(`Elegí quién acompaña a ${persona?.nombre ?? ''}`))
+        }
       })
     })
 
@@ -226,20 +233,18 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       seleccionado = null
       apoyoDe = apoyoDe === grupo.numero ? null : grupo.numero
       dibujar()
-      if (apoyoDe !== null) areaVoluntarios?.scrollIntoView?.({ block: 'nearest' })
+      if (apoyoDe !== null) acercarElegidor()
     })
     sumar.dataset.accion = `sumar-apoyo-${grupo.numero}`
     if (apoyoDe === grupo.numero) sumar.classList.add('activo')
     caja.appendChild(sumar)
+    if (apoyoDe === grupo.numero) caja.appendChild(elegidor(`Elegí el apoyo de ${grupo.titulo}`))
     return caja
   }
 
-  // Una sola lista de voluntarios para toda la pantalla: repetirla en cada grupo
-  // obligaba a pasar dos veces por los mismos nombres en el telefono.
-  function dibujarVoluntarios() {
-    const caja = elemento('section', ['voluntarios'])
-    caja.appendChild(elemento('h2', [], 'Voluntarios'))
-
+  // Las fichas de voluntario se arman aparte porque salen en dos lugares: al pie
+  // como plantel completo, y colgadas del participante que se acaba de tocar.
+  function columnaDeVoluntarios() {
     const columna = elemento('div', ['columna', 'columna-voluntarios'])
     const asignados = voluntariosAsignados()
     // Quienes ya acompañan al participante seleccionado se marcan aparte y dicen
@@ -259,8 +264,24 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       el.addEventListener('click', () => alTocarVoluntario(voluntario.id))
       columna.appendChild(el)
     })
+    return columna
+  }
 
-    caja.appendChild(columna)
+  // El elegidor se abre justo debajo de lo que se toco. Antes habia que bajar
+  // hasta el final de la pagina por cada asignacion y volver a subir para la
+  // siguiente, que en el telefono era la mitad del trabajo.
+  function elegidor(titulo) {
+    const caja = elemento('div', ['elegidor'])
+    caja.appendChild(elemento('p', ['elegidor-titulo'], titulo))
+    caja.appendChild(columnaDeVoluntarios())
+    return caja
+  }
+
+  // El plantel completo al pie, para mirar quien esta libre sin elegir a nadie.
+  function dibujarVoluntarios() {
+    const caja = elemento('section', ['voluntarios'])
+    caja.appendChild(elemento('h2', [], 'Voluntarios'))
+    caja.appendChild(columnaDeVoluntarios())
     return caja
   }
 
@@ -342,8 +363,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     const grupos = elemento('div', ['grupos'])
     estado().grupos.forEach((grupo) => grupos.appendChild(dibujarGrupo(grupo)))
     raiz.appendChild(grupos)
-    areaVoluntarios = dibujarVoluntarios()
-    raiz.appendChild(areaVoluntarios)
+    if (!seleccionado && apoyoDe === null) raiz.appendChild(dibujarVoluntarios())
     const ausentes = dibujarAusentes()
     if (ausentes) raiz.appendChild(ausentes)
     if (seleccionado) raiz.appendChild(barraSeleccion())
