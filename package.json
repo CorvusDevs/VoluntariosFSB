@@ -1,0 +1,15 @@
+{
+  "name": "voluntarios-fsb",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Armado de asignaciones semanales de Futbol sin Barreras (Aletea)",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "servir": "python3 -m http.server 8765"
+  },
+  "devDependencies": {
+    "vitest": "^2.1.0"
+  }
+}

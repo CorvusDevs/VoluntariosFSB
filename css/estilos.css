@@ -1,0 +1,30 @@
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fuentes/poppins-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-weight: 500;
+  font-display: swap;
+  src: url('../assets/fuentes/poppins-500.woff2') format('woff2');
+}
+:root {
+  --violeta: #662D7D;
+  --magenta: #E9287F;
+  --turquesa: #5DCCC6;
+  --magenta-texto: #C11E6B;
+  --turquesa-texto: #0F6E56;
+  --texto: #2C2C2A;
+  --texto-suave: #5F5E5A;
+  --linea: #EFEBF1;
+  --fondo: #FFFFFF;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Poppins', system-ui, sans-serif;
+  color: var(--texto);
+  background: var(--fondo);
+}
