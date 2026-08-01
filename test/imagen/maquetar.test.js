@@ -475,3 +475,71 @@ describe('el voluntario va pegado al nombre', () => {
     expect(distancia('p1', 'Abi')).toBe(distancia('p3', 'Cris'))
   })
 })
+
+describe('la grilla se ensancha en vez de estirarse hacia abajo', () => {
+  const conParticipantes = (porGrupo) => {
+    const participantes = []
+    const filas = [[], []]
+    for (let i = 0; i < porGrupo; i += 1) {
+      ;[1, 2].forEach((grupo) => {
+        const id = `g${grupo}n${i}`
+        participantes.push({ id, nombre: 'Santiago', grupo, foto: null, activo: true, notas: '' })
+        filas[grupo - 1].push({ participantes: [id], voluntarios: [] })
+      })
+    }
+    const roster = { version: 1, participantes, voluntarios: ROSTER.voluntarios }
+    const lista = {
+      ...LISTA,
+      grupos: LISTA.grupos.map((g, i) => ({ ...g, filas: filas[i], apoyo: [] })),
+      opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' },
+    }
+    return maquetar(lista, roster, opciones)
+  }
+
+  it('con pocos participantes mantiene el ancho de siempre', () => {
+    expect(conParticipantes(9).ancho).toBeLessThanOrEqual(ANCHO)
+  })
+
+  it('con mas participantes la imagen se hace mas ancha', () => {
+    expect(conParticipantes(13).ancho).toBeGreaterThan(conParticipantes(9).ancho)
+  })
+
+  it('la foto no se achica al ensancharse: lo que crece es la planilla', () => {
+    const foto = (p) => p.ordenes.find((o) => o.tipo === 'rect' && o.radio === GRILLA.radioFoto && o.ancho < 400)
+    expect(foto(conParticipantes(20)).ancho).toBe(foto(conParticipantes(9)).ancho)
+  })
+
+  it('la altura deja de crecer porque se agregan columnas, no filas', () => {
+    expect(conParticipantes(13).alto).toBe(conParticipantes(9).alto)
+  })
+
+  it('nunca se recorta, por muchos que sean', () => {
+    ;[9, 15, 20].forEach((n) => {
+      expect(conParticipantes(n).recorteProbable).toBe(false)
+    })
+  })
+
+  it('nada se sale del lienzo, que ahora es mas ancho', () => {
+    const plano = conParticipantes(15)
+    plano.ordenes.forEach((o) => {
+      expect((o.x ?? 0) + (o.ancho ?? 0)).toBeLessThanOrEqual(plano.ancho)
+    })
+    expect(plano.desborde).toBe(false)
+  })
+
+  it('las bandas cubren el ancho nuevo de punta a punta', () => {
+    const plano = conParticipantes(15)
+    const banda = plano.ordenes.find((o) => o.tipo === 'rect' && o.y === 0)
+    expect(banda.ancho).toBe(plano.ancho)
+  })
+
+  it('los otros dos formatos conservan el ancho fijo', () => {
+    ;['filas', 'columnas'].forEach((formato) => {
+      const plano = maquetar(
+        { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato } },
+        ROSTER, opciones,
+      )
+      expect(plano.ancho).toBe(ANCHO)
+    })
+  })
+})

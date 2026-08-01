@@ -94,15 +94,30 @@ export const GRILLA = Object.freeze({
   espacioBajoNombre: 6,
   margenInferior: 12,
   factorIniciales: 0.3,
+  filasObjetivo: 2,
 })
 
-export function anchoDeCeldaGrilla(margen) {
-  const total = ANCHO - margen * 2 - GRILLA.separacion * (GRILLA.porFila - 1)
-  return Math.floor(total / GRILLA.porFila)
+export function anchoDeCeldaGrilla(margen, columnas = GRILLA.porFila, ancho = ANCHO) {
+  const total = ancho - margen * 2 - GRILLA.separacion * (columnas - 1)
+  return Math.floor(total / columnas)
 }
 
-export function anchoDeCelda(margen) {
-  return Math.floor((ANCHO - margen * 2 - COLUMNAS.separacion) / 2)
+// Cuantas columnas hacen falta para que el grupo mas numeroso entre en las filas
+// que buscamos. Nunca menos que el minimo, para que una lista chica no quede con
+// las fotos desparramadas a lo ancho.
+export function columnasNecesarias(maxPorGrupo) {
+  return Math.max(GRILLA.porFila, Math.ceil(maxPorGrupo / GRILLA.filasObjetivo))
+}
+
+// Ancho de imagen que hace falta para esa cantidad de columnas, manteniendo la
+// celda del mismo tamaño. Asi la foto no se achica: lo que crece es la planilla.
+export function anchoParaColumnas(columnas, margen) {
+  const celda = anchoDeCeldaGrilla(margen)
+  return margen * 2 + columnas * celda + (columnas - 1) * GRILLA.separacion
+}
+
+export function anchoDeCelda(margen, ancho = ANCHO) {
+  return Math.floor((ancho - margen * 2 - COLUMNAS.separacion) / 2)
 }
 
 export function medidas(compacto) {

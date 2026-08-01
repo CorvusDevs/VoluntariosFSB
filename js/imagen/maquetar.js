@@ -1,5 +1,6 @@
 import {
-  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, medidas,
+  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA,
+  anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas,
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { iniciales } from '../util/nombres.js'
@@ -14,8 +15,25 @@ export function maquetar(lista, roster, opciones = {}) {
 
   const compacto = Boolean(lista.opcionesImagen?.compacto)
   const conFotos = Boolean(lista.opcionesImagen?.fotos) && medidas(compacto).mostrarFotos
-  const m = medidas(compacto)
+  const base = medidas(compacto)
   const porId = indexar(roster)
+
+  // Tres formatos: apilado, una fila por participante; en columnas, dos por fila;
+  // y grilla, con la foto vertical y el nombre debajo. La cabecera, los titulos,
+  // los apoyos y las bandas son iguales en los tres: cambia el cuerpo del grupo.
+  const formato = ['filas', 'columnas', 'grilla'].includes(lista.opcionesImagen?.formato)
+    ? lista.opcionesImagen.formato
+    : 'filas'
+
+  // La grilla ensancha la imagen en vez de estirarla hacia abajo cuando hay mas
+  // participantes: se agregan columnas y la celda mantiene su tamaño, asi la cara
+  // no se achica dentro del archivo. Los otros dos formatos conservan el ancho fijo.
+  const masPobladoDelGrupo = Math.max(1, ...lista.grupos.map((g) => g.filas.length))
+  const columnasGrilla = columnasNecesarias(masPobladoDelGrupo)
+  const ancho = formato === 'grilla'
+    ? anchoParaColumnas(columnasGrilla, base.margen)
+    : ANCHO
+  const m = { ...base, ancho, columnasGrilla }
 
   const ordenes = []
   let y = 0
@@ -25,13 +43,6 @@ export function maquetar(lista, roster, opciones = {}) {
   if (lista.opcionesImagen?.saludo && saludo.trim()) {
     y = parrafo(ordenes, saludo, m, y, medirTexto)
   }
-
-  // Dos formatos: apilado, una fila por participante, y en columnas, dos por
-  // fila con la foto casi al doble. La cabecera, los titulos, los apoyos y las
-  // bandas son iguales en los dos: lo unico que cambia es el cuerpo del grupo.
-  const formato = ['filas', 'columnas', 'grilla'].includes(lista.opcionesImagen?.formato)
-    ? lista.opcionesImagen.formato
-    : 'filas'
 
   lista.grupos.forEach((grupo, i) => {
     if (i > 0) y += m.espacioEntreGrupos
@@ -56,7 +67,7 @@ export function maquetar(lista, roster, opciones = {}) {
   bandaInferior(ordenes, m, y, alto)
 
   const bordeDerecho = ordenes.reduce((maximo, o) => {
-    if (o.tipo === 'rect' && o.x === 0 && o.ancho === ANCHO) return maximo
+    if (o.tipo === 'rect' && o.x === 0 && o.ancho === m.ancho) return maximo
     if (o.tipo === 'texto') {
       const ancho = medirTexto(o.texto, o.fuente)
       const inicio = o.alineacion === 'right' ? o.x - ancho
@@ -70,11 +81,11 @@ export function maquetar(lista, roster, opciones = {}) {
     return maximo
   }, 0)
 
-  const relacion = alto / ANCHO
+  const relacion = alto / m.ancho
   return {
-    ancho: ANCHO, alto, ordenes, relacion,
+    ancho: m.ancho, alto, ordenes, relacion,
     recorteProbable: relacion > RELACION_RECORTE,
-    bordeDerecho, desborde: bordeDerecho > ANCHO - m.margen,
+    bordeDerecho, desborde: bordeDerecho > m.ancho - m.margen,
   }
 }
 
@@ -94,9 +105,9 @@ function buscar(porId, id) {
 // Convencion: cada ayudante agrega su propio espacio superior y devuelve el borde inferior ocupado. Quien llama nunca agrega relleno.
 function bandaSuperior(ordenes, lista, m, y) {
   const alto = m.altoBandaSuperior
-  ordenes.push({ tipo: 'rect', x: 0, y, ancho: ANCHO, alto, color: COLORES.violeta })
+  ordenes.push({ tipo: 'rect', x: 0, y, ancho: m.ancho, alto, color: COLORES.violeta })
   ordenes.push({
-    tipo: 'imagen', clave: 'logo', x: ANCHO - m.margen - m.logoAncho, y: y + m.logoY,
+    tipo: 'imagen', clave: 'logo', x: m.ancho - m.margen - m.logoAncho, y: y + m.logoY,
     ancho: m.logoAncho, alto: m.logoAlto, circular: false,
   })
   ordenes.push({
@@ -112,21 +123,21 @@ function bandaSuperior(ordenes, lista, m, y) {
 }
 
 function bandaInferior(ordenes, m, y, alto) {
-  ordenes.push({ tipo: 'rect', x: 0, y, ancho: ANCHO, alto: alto - y, color: COLORES.violeta })
+  ordenes.push({ tipo: 'rect', x: 0, y, ancho: m.ancho, alto: alto - y, color: COLORES.violeta })
   const centro = y + (alto - y) / 2
   ordenes.push({
     tipo: 'texto', texto: 'aletea.org', x: m.margen, y: centro,
     fuente: FUENTES.normal(m.pxBanda), color: COLORES.violetaClaro, lineaBase: 'middle',
   })
   ordenes.push({
-    tipo: 'texto', texto: '@futbol_sinbarreras', x: ANCHO - m.margen, y: centro,
+    tipo: 'texto', texto: '@futbol_sinbarreras', x: m.ancho - m.margen, y: centro,
     fuente: FUENTES.normal(m.pxBanda), color: COLORES.blanco,
     alineacion: 'right', lineaBase: 'middle',
   })
 }
 
 function parrafo(ordenes, texto, m, y, medirTexto) {
-  const anchoUtil = ANCHO - m.margen * 2
+  const anchoUtil = m.ancho - m.margen * 2
   const fuente = FUENTES.normal(m.pxParrafo)
   const lineas = quebrar(texto, anchoUtil, fuente, medirTexto)
   const altoLinea = Math.round(m.pxParrafo * 1.6)
@@ -187,7 +198,7 @@ function tituloGrupo(ordenes, grupo, m, y) {
   const alto = m.altoTituloGrupo
   const arriba = y + m.margen / 2
   ordenes.push({
-    tipo: 'rect', x: m.margen, y: arriba, ancho: ANCHO - m.margen * 2,
+    tipo: 'rect', x: m.margen, y: arriba, ancho: m.ancho - m.margen * 2,
     alto, color: c.tenue, radio: 16,
   })
   const centro = arriba + alto / 2
@@ -198,7 +209,7 @@ function tituloGrupo(ordenes, grupo, m, y) {
   })
   if (grupo.cancha) {
     ordenes.push({
-      tipo: 'texto', texto: grupo.cancha, x: ANCHO - m.margen - 24, y: centro,
+      tipo: 'texto', texto: grupo.cancha, x: m.ancho - m.margen - 24, y: centro,
       fuente: FUENTES.normal(m.pxTituloGrupo - 2), color: c.fuerte,
       alineacion: 'right', lineaBase: 'middle',
     })
@@ -247,7 +258,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 
   const abajo = y + m.altoFila
   ordenes.push({
-    tipo: 'linea', x1: m.margen, y1: abajo, x2: ANCHO - m.margen, y2: abajo,
+    tipo: 'linea', x1: m.margen, y1: abajo, x2: m.ancho - m.margen, y2: abajo,
     color: COLORES.linea, fila: clave,
   })
   return abajo
@@ -257,6 +268,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 // mide lo mismo en todo el grupo, calculada a partir del nombre que mas renglones
 // necesita, para que las fotos queden alineadas y no escalonadas.
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
+  const columnas = m.columnasGrilla ?? GRILLA.porFila
   const ancho = anchoDeCeldaGrilla(m.margen)
   const altoFoto = Math.round(ancho * GRILLA.proporcionFoto)
   const fuenteNombre = FUENTES.titulo(GRILLA.pxNombre)
@@ -285,7 +297,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 
   let cursor = y
   celdas.forEach((celda, i) => {
-    const columna = i % GRILLA.porFila
+    const columna = i % columnas
     const x = m.margen + columna * (ancho + GRILLA.separacion)
     const arriba = cursor
     const clave = celda.fila.participantes[0]
@@ -332,7 +344,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       })
     })
 
-    if (columna === GRILLA.porFila - 1 || i === celdas.length - 1) cursor += altoCelda
+    if (columna === columnas - 1 || i === celdas.length - 1) cursor += altoCelda
   })
   return cursor
 }
@@ -346,7 +358,7 @@ function cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 }
 
 function cuerpoEnColumnas(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
-  const ancho = anchoDeCelda(m.margen)
+  const ancho = anchoDeCelda(m.margen, m.ancho)
   let cursor = y
   grupo.filas.forEach((fila, i) => {
     const izquierda = i % 2 === 0
@@ -459,7 +471,7 @@ function lineaApoyo(ordenes, grupo, porId, m, y) {
   const alto = Math.round(m.altoFila * 0.7)
   const arriba = y + 16
   ordenes.push({
-    tipo: 'rect', x: m.margen, y: arriba, ancho: ANCHO - m.margen * 2,
+    tipo: 'rect', x: m.margen, y: arriba, ancho: m.ancho - m.margen * 2,
     alto, color: COLORES.violetaTenue, radio: 14,
   })
   const centro = arriba + alto / 2
