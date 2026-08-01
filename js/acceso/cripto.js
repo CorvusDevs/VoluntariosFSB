@@ -1,4 +1,5 @@
 export const ITERACIONES = 600000
+const MAX_ITERACIONES = 5000000
 const LARGO_SAL = 16
 const LARGO_IV = 12
 
@@ -58,9 +59,16 @@ export async function cifrar(texto, contrasena) {
 }
 
 export async function descifrar(registro, contrasena) {
+  const iteraciones = registro?.kdf?.iteraciones
+  if (!Number.isInteger(iteraciones) || iteraciones < ITERACIONES || iteraciones > MAX_ITERACIONES) {
+    throw new Error(`Registro invalido: iteraciones fuera de rango (${iteraciones}).`)
+  }
+  if (registro.kdf.algoritmo !== 'PBKDF2-SHA256' || registro.cifrado?.algoritmo !== 'AES-GCM') {
+    throw new Error('Registro invalido: algoritmo no reconocido.')
+  }
   const sal = desdeBase64(registro.kdf.sal)
   const iv = desdeBase64(registro.cifrado.iv)
-  const clave = await derivarClave(contrasena, sal, registro.kdf.iteraciones)
+  const clave = await derivarClave(contrasena, sal, iteraciones)
   const datos = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv }, clave, desdeBase64(registro.cifrado.datos),
   )

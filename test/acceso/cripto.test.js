@@ -77,4 +77,22 @@ describe('cifrar y descifrar', () => {
     roto.cifrado.datos = btoa(bytes.join(''))
     await expect(descifrar(roto, 'clave')).rejects.toThrow()
   })
+
+  it('rechaza un registro con demasiadas iteraciones', async () => {
+    const registro = await cifrar('token', 'clave')
+    registro.kdf.iteraciones = 500000000
+    await expect(descifrar(registro, 'clave')).rejects.toThrow(/iteraciones/)
+  })
+
+  it('rechaza un registro con menos iteraciones de las exigidas', async () => {
+    const registro = await cifrar('token', 'clave')
+    registro.kdf.iteraciones = 1000
+    await expect(descifrar(registro, 'clave')).rejects.toThrow(/iteraciones/)
+  })
+
+  it('rechaza un registro con un algoritmo desconocido', async () => {
+    const registro = await cifrar('token', 'clave')
+    registro.kdf.algoritmo = 'MD5'
+    await expect(descifrar(registro, 'clave')).rejects.toThrow(/algoritmo/)
+  })
 })
