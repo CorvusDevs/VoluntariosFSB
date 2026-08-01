@@ -5,6 +5,10 @@ import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombr
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 
+// El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
+// El archivo que se descarga mide, entonces, el doble que el plano.
+export const DENSIDAD = 2
+
 const OPCIONES = [
   ['saludo', 'Saludo'],
   ['despedida', 'Despedida'],
@@ -29,7 +33,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   async function dibujar() {
     await esperarFuentes()
     calcular()
-    pintar(ctx, plano, imagenes, 2)
+    pintar(ctx, plano, imagenes, DENSIDAD)
   }
 
   function interruptores() {
@@ -53,8 +57,11 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function informacion() {
     const caja = elemento('div', ['info-imagen'])
+    // La relacion no cambia con la densidad: es alto sobre ancho.
     const relacion = plano.relacion.toFixed(2).replace('.', ',')
-    caja.textContent = `${plano.ancho} por ${plano.alto} px, relacion ${relacion}.`
+    const ancho = plano.ancho * DENSIDAD
+    const alto = plano.alto * DENSIDAD
+    caja.textContent = `Archivo de ${ancho} por ${alto} px, relacion ${relacion}.`
     return caja
   }
 
@@ -96,15 +103,18 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     dibujar()
   }
 
+  // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
+  // solo las fotos de los participantes necesitan ese lector.
   async function precargarFotos() {
-    if (!cargarFoto) return
     const logo = await cargarImagen('assets/logo-aletea.png')
     if (logo) imagenes.logo = logo
-    const claves = new Set()
-    roster.participantes.forEach((p) => { if (p.foto) claves.add(p.foto) })
-    for (const clave of claves) {
-      const imagen = await cargarFoto(clave)
-      if (imagen) imagenes[clave] = imagen
+    if (cargarFoto) {
+      const claves = new Set()
+      roster.participantes.forEach((p) => { if (p.foto) claves.add(p.foto) })
+      for (const clave of claves) {
+        const imagen = await cargarFoto(clave)
+        if (imagen) imagenes[clave] = imagen
+      }
     }
     redibujar()
   }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { crearPantallaVistaPrevia } from '../../js/ui/pantalla-vista-previa.js'
+import { crearPantallaVistaPrevia, DENSIDAD } from '../../js/ui/pantalla-vista-previa.js'
 import { crearLista, asignarVoluntario } from '../../js/modelo/lista.js'
 import { ROSTER, medirFalso } from '../ayudas/datos.js'
 
@@ -55,9 +55,10 @@ describe('pantalla de vista previa', () => {
     expect(p.lista().opcionesImagen.compacto).toBe(true)
   })
 
-  it('informa el tamaño real de la imagen', () => {
+  it('informa el tamaño real del archivo, no el del lienzo logico', () => {
     const info = raiz.querySelector('.info-imagen').textContent
-    expect(info).toContain('1080')
+    expect(info).toContain(String(1080 * DENSIDAD))
+    expect(info).not.toContain('1080 por')
     expect(info).toContain('px')
   })
 
