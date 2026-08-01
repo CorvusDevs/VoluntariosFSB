@@ -10,7 +10,11 @@ function fetchFalso(respuestas) {
     return {
       ok: r.estado >= 200 && r.estado < 300,
       status: r.estado,
-      json: async () => r.cuerpo,
+      headers: { get: (n) => (r.cabeceras ?? {})[n] ?? null },
+      json: async () => {
+        if (r.cuerpoCrudo !== undefined) throw new SyntaxError('Unexpected token <')
+        return r.cuerpo
+      },
     }
   }
   fn.llamadas = llamadas
@@ -116,6 +120,57 @@ describe('escribirTexto', () => {
   it('lanza un error legible ante un 401', async () => {
     const f = fetchFalso({ [`PUT ${base}/x.json`]: { estado: 401, cuerpo: { message: 'Bad credentials' } } })
     await expect(cliente(f).escribirTexto('x.json', '{}', null, 'm')).rejects.toThrow(/token/i)
+  })
+
+  it('distingue un limite de peticiones de un token vencido', async () => {
+    const f = fetchFalso({
+      [`PUT ${base}/x.json`]: { estado: 403, cuerpo: { message: 'rate limit' }, cabeceras: { 'x-ratelimit-remaining': '0' } },
+    })
+    await expect(cliente(f).escribirTexto('x.json', '{}', null, 'm')).rejects.toThrow(/limitando/i)
+  })
+
+  it('un 403 sin limite agotado sigue reportando problema de token', async () => {
+    const f = fetchFalso({
+      [`PUT ${base}/y.json`]: { estado: 403, cuerpo: { message: 'forbidden' }, cabeceras: { 'x-ratelimit-remaining': '56' } },
+    })
+    await expect(cliente(f).escribirTexto('y.json', '{}', null, 'm')).rejects.toThrow(/token/i)
+  })
+
+  it('no explota cuando un 200 trae un cuerpo que no es JSON', async () => {
+    const f = fetchFalso({
+      [`PUT ${base}/x.json`]: { estado: 200, cuerpoCrudo: '<html>portal cautivo</html>' },
+    })
+    expect(await cliente(f).escribirTexto('x.json', '{}', null, 'm')).toEqual({ sha: null })
+  })
+})
+
+describe('verificarAcceso', () => {
+  it('pasa cuando el repositorio existe y el token llega', async () => {
+    const f = fetchFalso({ 'GET /repos/duenio/datos': { estado: 200, cuerpo: { name: 'datos' } } })
+    expect(await cliente(f).verificarAcceso()).toBe(true)
+  })
+
+  it('distingue un repositorio inalcanzable de un archivo que no existe', async () => {
+    const f = fetchFalso({})
+    await expect(cliente(f).verificarAcceso()).rejects.toThrow(/repositorio/i)
+    expect(await cliente(f).leerTexto('roster.json')).toBeNull()
+  })
+})
+
+describe('rutas', () => {
+  it('codifica el nombre del archivo sin perder la rama', async () => {
+    const f = fetchFalso({})
+    await cliente(f).leerTexto('fotos/a b.jpg')
+    expect(f.llamadas[0].url).toContain('a%20b.jpg')
+    expect(f.llamadas[0].url).toContain('ref=main')
+  })
+})
+
+describe('borrar', () => {
+  it('avisa cuando falta el sha en vez de hablar de un conflicto', async () => {
+    const f = fetchFalso({})
+    await expect(cliente(f).borrar('fotos/p1.jpg', null, 'baja')).rejects.toThrow(/sha/i)
+    expect(f.llamadas).toHaveLength(0)
   })
 })
 
