@@ -59,12 +59,15 @@ function imagen(ctx, o, imagenes) {
   const fuente = imagenes[o.clave]
   if (!fuente) return
   ctx.save()
-  if (o.circular) {
-    ctx.beginPath()
-    ctx.arc(o.x + o.ancho / 2, o.y + o.alto / 2, o.ancho / 2, 0, Math.PI * 2)
-    ctx.closePath()
-    ctx.clip()
+  try {
+    if (o.circular) {
+      ctx.beginPath()
+      ctx.arc(o.x + o.ancho / 2, o.y + o.alto / 2, o.ancho / 2, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.clip()
+    }
+    ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
+  } finally {
+    ctx.restore()
   }
-  ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
-  ctx.restore()
 }

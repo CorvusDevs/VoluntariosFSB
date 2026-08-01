@@ -206,20 +206,19 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 
   if (conFotos) {
     const primero = participantes[0]
+    ordenes.push({
+      tipo: 'circulo', x: x + m.avatar / 2, y: centro, radio: m.avatar / 2,
+      color: colorDeGrupo(numeroGrupo).tenue, fila: clave,
+    })
+    ordenes.push({
+      tipo: 'texto', texto: iniciales(primero.nombre), x: x + m.avatar / 2, y: centro,
+      fuente: FUENTES.titulo(Math.round(m.avatar * 0.36)), color: COLORES.violeta,
+      alineacion: 'center', lineaBase: 'middle', fila: clave,
+    })
     if (primero.foto) {
       ordenes.push({
         tipo: 'imagen', clave: primero.foto, x, y: centro - m.avatar / 2,
         ancho: m.avatar, alto: m.avatar, circular: true, fila: clave,
-      })
-    } else {
-      ordenes.push({
-        tipo: 'circulo', x: x + m.avatar / 2, y: centro, radio: m.avatar / 2,
-        color: colorDeGrupo(numeroGrupo).tenue, fila: clave,
-      })
-      ordenes.push({
-        tipo: 'texto', texto: iniciales(primero.nombre), x: x + m.avatar / 2, y: centro,
-        fuente: FUENTES.titulo(Math.round(m.avatar * 0.36)), color: COLORES.violeta,
-        alineacion: 'center', lineaBase: 'middle', fila: clave,
       })
     }
     x += m.avatar + 20

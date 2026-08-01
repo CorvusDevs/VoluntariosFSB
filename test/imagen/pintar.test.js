@@ -92,6 +92,15 @@ describe('pintar', () => {
     expect(() => pintar(ctx, plano([{ tipo: 'holograma' }]), {}, 1)).toThrow(/holograma/)
   })
 
+  it('restaura el contexto aunque drawImage falle', () => {
+    const ctx = contextoFalso()
+    ctx.drawImage = () => { throw new Error('imagen rota') }
+    expect(() => pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 10, alto: 10, circular: true },
+    ]), { 'f.jpg': {} }, 1)).toThrow('imagen rota')
+    expect(ctx.llamadas.some((l) => l.nombre === 'restore')).toBe(true)
+  })
+
   it('pinta un plano real de maquetar sin tirar excepciones, y maneja todos los tipos de orden que emite', () => {
     const opciones = { saludo: SALUDO, despedida: DESPEDIDA, medirTexto: medirFalso }
     const planoReal = maquetar(LISTA, ROSTER, opciones)

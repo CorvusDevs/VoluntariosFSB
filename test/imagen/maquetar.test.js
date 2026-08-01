@@ -108,6 +108,24 @@ describe('maquetar', () => {
     expect(t).toContain('GO')
   })
 
+  it('dibuja el circulo de respaldo tambien debajo de una foto', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const deThiago = plano.ordenes.filter((o) => o.fila === 'p3')
+    expect(deThiago.some((o) => o.tipo === 'circulo')).toBe(true)
+    expect(deThiago.some((o) => o.tipo === 'texto' && o.texto === 'TH')).toBe(true)
+    expect(deThiago.some((o) => o.tipo === 'imagen' && o.clave === 'p3.jpg')).toBe(true)
+  })
+
+  it('la foto se dibuja despues del circulo de respaldo', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const indices = plano.ordenes
+      .map((o, i) => ({ o, i }))
+      .filter(({ o }) => o.fila === 'p3' && (o.tipo === 'circulo' || o.tipo === 'imagen'))
+    const circulo = indices.find(({ o }) => o.tipo === 'circulo').i
+    const foto = indices.find(({ o }) => o.tipo === 'imagen').i
+    expect(foto).toBeGreaterThan(circulo)
+  })
+
   it('el circulo de iniciales toma el color de su grupo', () => {
     const plano = maquetar(LISTA, ROSTER, opciones)
     const circuloDe = (id) => plano.ordenes.find((o) => o.tipo === 'circulo' && o.fila === id)
