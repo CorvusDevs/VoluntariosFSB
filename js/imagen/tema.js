@@ -22,7 +22,7 @@ export const FUENTES = {
   normal: (px) => `400 ${px}px Poppins, sans-serif`,
 }
 
-const NORMAL = {
+const NORMAL = Object.freeze({
   mostrarFotos: true,
   margen: 56,
   altoBandaSuperior: 210,
@@ -37,9 +37,9 @@ const NORMAL = {
   pxParrafo: 28,
   pxBanda: 24,
   pxTitular: 52,
-}
+})
 
-const COMPACTO = {
+const COMPACTO = Object.freeze({
   ...NORMAL,
   mostrarFotos: false,
   margen: 44,
@@ -52,7 +52,7 @@ const COMPACTO = {
   pxNombre: 30,
   pxVoluntario: 28,
   pxTitular: 42,
-}
+})
 
 export function medidas(compacto) {
   return compacto ? COMPACTO : NORMAL
