@@ -12,7 +12,7 @@ const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
 // tiene que aparecer donde esta el error, no en una contrasena debil silenciosa.
 export function generarContrasena(longitud = LARGO_MINIMO_CONTRASENA) {
   if (!Number.isInteger(longitud) || longitud < LARGO_MINIMO_CONTRASENA) {
-    throw new Error(`La contrasena debe tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`)
+    throw new Error(`La contraseña debe tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`)
   }
   const limite = 256 - (256 % ALFABETO.length)
   let salida = ''

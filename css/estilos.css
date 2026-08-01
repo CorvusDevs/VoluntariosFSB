@@ -162,6 +162,11 @@ body {
   margin: 0 16px 12px; padding: 12px; border-radius: 10px;
   background: #FAEEDA; color: #633806; font-size: 14px; line-height: 1.5;
 }
+.aviso {
+  margin: 0 16px 12px; padding: 12px; border-radius: 10px;
+  background: #F1EAF5; color: var(--violeta);
+  font-size: 14px; line-height: 1.5;
+}
 .acciones-imagen { display: flex; gap: 8px; padding: 0 16px 16px; flex-wrap: wrap; }
 .lienzo-vista-previa {
   display: block; width: calc(100% - 32px); height: auto; margin: 0 16px 24px;

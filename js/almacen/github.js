@@ -47,17 +47,17 @@ export function crearClienteGitHub({ token, duenio, repo, rama = 'main', fetchFn
     // peticiones". La cabecera de sobrantes es lo unico que los distingue.
     const restantes = respuesta.headers?.get?.('x-ratelimit-remaining')
     if (respuesta.status === 429 || (respuesta.status === 403 && restantes === '0')) {
-      throw new Error('GitHub esta limitando las peticiones. Espera unos minutos y volve a intentar.')
+      throw new Error('GitHub está limitando las peticiones. Esperá unos minutos y volvé a intentar.')
     }
     if (respuesta.status === 409 || respuesta.status === 422) {
       throw new ConflictoError(
-        'Otra coordinadora modifico esto mientras trabajabas. Recarga para ver los cambios.',
+        'Otra coordinadora modificó esto mientras trabajabas. Recargá para ver los cambios.',
       )
     }
     if (respuesta.status === 401 || respuesta.status === 403) {
-      throw new Error(`El token de GitHub no tiene permiso o vencio. Detalle: ${detalle}`)
+      throw new Error(`El token de GitHub no tiene permiso o venció. Detalle: ${detalle}`)
     }
-    throw new Error(`GitHub respondio ${respuesta.status} al ${accion}. Detalle: ${detalle}`)
+    throw new Error(`GitHub respondió ${respuesta.status} al ${accion}. Detalle: ${detalle}`)
   }
 
   async function leerCrudo(ruta) {
@@ -98,8 +98,8 @@ export function crearClienteGitHub({ token, duenio, repo, rama = 'main', fetchFn
       })
       if (respuesta.status === 404) {
         throw new Error(
-          `No se encontro el repositorio ${duenio}/${repo}, o el token no tiene acceso. ` +
-          'Revisa el nombre en js/config.js y los permisos del token.',
+          `No se encontró el repositorio ${duenio}/${repo}, o el token no tiene acceso. ` +
+          'Revisá el nombre en js/config.js y los permisos del token.',
         )
       }
       if (!respuesta.ok) await fallar(respuesta, 'verificar el acceso al repositorio')

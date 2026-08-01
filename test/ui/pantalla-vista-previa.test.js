@@ -186,6 +186,44 @@ describe('pantalla de vista previa', () => {
     }
   })
 
+  it('cuando el dispositivo no puede compartir, lo dice en pantalla y no con un alert', async () => {
+    document.body.innerHTML = '<div id="r10"></div>'
+    const r10 = document.getElementById('r10')
+    armar(r10, lista)
+    await new Promise((r) => setTimeout(r, 0))
+    const toBlobOriginal = HTMLCanvasElement.prototype.toBlob
+    const alertOriginal = window.alert
+    let alertas = 0
+    HTMLCanvasElement.prototype.toBlob = function (cb) { cb(new Blob(['x'])) }
+    window.alert = () => { alertas += 1 }
+    try {
+      const botonCompartir = [...r10.querySelectorAll('button')].find((b) => b.textContent.includes('Compartir'))
+      botonCompartir.click()
+      for (let i = 0; i < 20 && !r10.querySelector('.aviso'); i += 1) {
+        await new Promise((r) => setTimeout(r, 0))
+      }
+      const aviso = r10.querySelector('.aviso')
+      expect(aviso).not.toBeNull()
+      expect(aviso.textContent).toContain('Descargar PNG')
+      expect(alertas).toBe(0)
+    } finally {
+      HTMLCanvasElement.prototype.toBlob = toBlobOriginal
+      window.alert = alertOriginal
+    }
+  })
+
+  it('las instrucciones estan en rioplatense y con acentos', () => {
+    const larga = structuredClone(lista)
+    for (let i = 0; i < 25; i += 1) {
+      larga.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
+    }
+    document.body.innerHTML = '<div id="r11"></div>'
+    const r11 = document.getElementById('r11')
+    armar(r11, larga)
+    expect(r11.querySelector('.aviso-recorte').textContent).toContain('preferís evitarlo, activá')
+    expect(r11.querySelector('.info-imagen').textContent).toContain('relación')
+  })
+
   it('deja de repintar despues de destruirse', async () => {
     document.body.innerHTML = '<div id="r6"></div>'
     const r6 = document.getElementById('r6')

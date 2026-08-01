@@ -35,6 +35,8 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // ocupado dura lo que dura una exportacion: mientras tanto los controles
   // quedan bloqueados para que el PNG que baja sea el que estaba en pantalla.
   let ocupado = false
+  // Aviso puntual para la coordinadora, por ejemplo cuando compartir no anda.
+  let mensaje = ''
 
   function calcular() {
     plano = maquetar(lista, roster, { saludo, despedida, medirTexto: medidorDesde(ctx) })
@@ -82,7 +84,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     const relacion = plano.relacion.toFixed(2).replace('.', ',')
     const ancho = plano.ancho * DENSIDAD
     const alto = plano.alto * DENSIDAD
-    caja.textContent = `Archivo de ${ancho} por ${alto} px, relacion ${relacion}.`
+    caja.textContent = `Archivo de ${ancho} por ${alto} px, relación ${relacion}.`
     return caja
   }
 
@@ -94,7 +96,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     const salida = planoCompacto().recorteProbable
       ? 'Ni siquiera el modo compacto alcanza para esta lista. Conviene exportar una imagen por ' +
         'grupo, o dividir la lista en dos mensajes.'
-      : 'Si preferis evitarlo, activa el modo compacto.'
+      : 'Si preferís evitarlo, activá el modo compacto.'
     caja.textContent =
       'La imagen es muy alta y WhatsApp probablemente le haga un recorte en la vista previa del ' +
       `chat. Se sigue viendo entera al tocarla. ${salida}`
@@ -120,6 +122,11 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     }
   }
 
+  function avisar(texto) {
+    mensaje = texto
+    redibujar()
+  }
+
   function acciones() {
     const caja = elemento('div', ['acciones-imagen'])
     caja.appendChild(boton('Descargar PNG', () => conControlesBloqueados(async () => {
@@ -127,11 +134,13 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       await descargar(lienzo, nombreDeArchivo(lista))
     })))
     caja.appendChild(boton('Compartir', () => conControlesBloqueados(async () => {
+      mensaje = ''
       await dibujar()
       const texto = `Fútbol sin Barreras, ${formatearFechaLarga(lista.fecha)}`
       const compartido = await compartir(lienzo, nombreDeArchivo(lista), texto)
+      // Nada de alert: es un modal que bloquea y que Safari en iOS puede tapar.
       if (!compartido) {
-        alert('Este dispositivo no permite compartir el archivo directamente. Usa Descargar PNG.')
+        avisar('Este dispositivo no permite compartir el archivo directamente. Usá Descargar PNG.')
       }
     })))
     return caja
@@ -145,6 +154,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     raiz.appendChild(informacion())
     const aviso = avisoRecorte()
     if (aviso) raiz.appendChild(aviso)
+    if (mensaje) raiz.appendChild(elemento('div', ['aviso'], mensaje))
     raiz.appendChild(acciones())
     raiz.appendChild(lienzo)
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
