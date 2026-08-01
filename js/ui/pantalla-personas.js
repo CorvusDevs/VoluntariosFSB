@@ -60,10 +60,13 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     fila.appendChild(elemento('span', ['fila-nombre'], persona.nombre))
     if (persona.nuevo) fila.appendChild(elemento('span', ['pastilla'], 'nuevo'))
 
+    // El control nativo de archivo dibuja su propio texto en ingles ("Choose File"),
+    // asi que lo escondemos sin sacarlo del arbol y le ponemos una etiqueta en español.
+    const etiquetaFoto = elemento('label', ['boton', 'boton-foto'], persona.foto ? 'Cambiar foto' : 'Foto')
     const foto = document.createElement('input')
     foto.type = 'file'
     foto.accept = 'image/*'
-    foto.className = 'entrada-foto'
+    foto.className = 'oculto-visualmente'
     foto.addEventListener('change', async () => {
       const archivo = foto.files?.[0]
       if (!archivo) return
@@ -72,7 +75,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
       await almacen.guardarFoto(clave, blob)
       await guardar(editarPersona(actual, persona.id, { foto: clave }))
     })
-    fila.appendChild(foto)
+    etiquetaFoto.appendChild(foto)
+    fila.appendChild(etiquetaFoto)
 
     fila.appendChild(boton('Quitar', async () => {
       if (!confirm(`¿Quitar a ${persona.nombre} de las listas nuevas? Las listas anteriores no cambian.`)) return

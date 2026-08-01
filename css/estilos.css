@@ -148,4 +148,25 @@ body {
   padding: 10px 0; border-bottom: 1px solid var(--linea);
 }
 .fila-nombre { flex: 1; }
-.entrada-foto { max-width: 180px; font-size: 13px; }
+
+/* Esconde el control sin sacarlo del arbol de accesibilidad. */
+.oculto-visualmente {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.boton-foto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+}
+.boton-foto:focus-within { outline: 2px solid var(--violeta); outline-offset: 2px; }
