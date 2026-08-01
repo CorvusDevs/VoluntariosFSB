@@ -427,3 +427,27 @@ describe('formato de grilla', () => {
     expect(plano.ordenes.filter((o) => o.tipo === 'circulo').length).toBeGreaterThan(0)
   })
 })
+
+describe('aire entre el rotulo del grupo y las fotos', () => {
+  // Se reporto que en la grilla las fotos tocaban el titulo. Pasaba solo ahi,
+  // porque la foto arranca justo arriba de la celda, mientras que los otros dos
+  // formatos heredaban unos 10 px de tener el contenido centrado.
+  const arribaDe = (plano, id) => {
+    const marco = plano.ordenes.find((o) => o.fila === id && (o.tipo === 'rect' || o.tipo === 'circulo'))
+    return marco.tipo === 'circulo' ? marco.y - marco.radio : marco.y
+  }
+  const finDelTitulo = (plano) => {
+    const titulo = plano.ordenes.find((o) => o.tipo === 'rect' && o.radio === 16 && o.ancho > 900)
+    return titulo.y + titulo.alto
+  }
+
+  ;['filas', 'columnas', 'grilla'].forEach((formato) => {
+    it(`el formato ${formato} deja aire bajo el rotulo`, () => {
+      const plano = maquetar(
+        { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato } },
+        ROSTER, opciones,
+      )
+      expect(arribaDe(plano, 'p1') - finDelTitulo(plano)).toBeGreaterThanOrEqual(16)
+    })
+  })
+})

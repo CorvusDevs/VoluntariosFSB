@@ -36,6 +36,11 @@ export function maquetar(lista, roster, opciones = {}) {
   lista.grupos.forEach((grupo, i) => {
     if (i > 0) y += m.espacioEntreGrupos
     y = tituloGrupo(ordenes, grupo, m, y)
+    // Aire entre el rotulo del grupo y la primera fila. Va aca y no adentro de
+    // cada cuerpo para que los tres formatos respiren igual: el apilado y el de
+    // columnas heredaban unos 10 px de tener el contenido centrado en la celda,
+    // y la grilla arrancaba pegada al titulo porque la foto empieza justo arriba.
+    y += m.espacioBajoTitulo
     y = CUERPOS[formato](ordenes, grupo, porId, m, y, conFotos, medirTexto)
     if (grupo.apoyo?.length) {
       y = lineaApoyo(ordenes, grupo, porId, m, y)
