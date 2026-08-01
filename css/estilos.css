@@ -190,3 +190,52 @@ body {
   font-size: 15px; color: var(--violeta); cursor: pointer;
 }
 .ayuda-token { margin: 4px 0 14px; font-size: 13px; line-height: 1.5; color: var(--texto-suave); }
+
+/* Pantalla de ajustes. */
+.ajustes { padding: 16px 16px 48px; }
+.ajustes h2 { font-size: 20px; font-weight: 500; margin: 0 0 4px; }
+.ajustes h3 { font-size: 16px; font-weight: 500; margin: 0 0 10px; }
+.ayuda-ajustes { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--texto-suave); }
+.error-ajustes { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--magenta-texto); }
+.error-ajustes:empty { display: none; }
+.campo select {
+  min-height: 44px; padding: 8px 12px; font: inherit; font-size: 15px;
+  color: var(--texto); background: var(--fondo);
+  border: 1px solid var(--linea); border-radius: 10px;
+}
+.fila-acceso {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--linea);
+}
+.fila-acceso .fila-nombre { flex: 1 1 auto; min-width: 100px; }
+.fila-usuario { font-size: 13px; color: var(--texto-suave); }
+.fila-acceso select {
+  min-height: 44px; padding: 8px 12px; font: inherit; font-size: 14px;
+  color: var(--texto); background: var(--fondo);
+  border: 1px solid var(--linea); border-radius: 10px;
+}
+.formulario-agregar, .formulario-rotar { display: flex; flex-direction: column; gap: 12px; }
+.aviso-admin {
+  margin: 0; padding: 10px 12px; border-radius: 10px;
+  background: #F1EAF5; color: var(--violeta); font-size: 13px; line-height: 1.5;
+}
+.aviso-rotar { margin: 0 0 12px; }
+
+/* Recuadro de la contraseña recien generada. Se ve una sola vez. */
+.contrasena-generada {
+  margin: 0 0 20px; padding: 14px; border-radius: 12px;
+  background: #FAEEDA; border: 1px solid #E4C892; color: #633806;
+}
+.contrasena-generada h3 { margin: 0 0 6px; color: #633806; }
+.aviso-una-vez { margin: 0 0 12px; font-size: 14px; line-height: 1.5; font-weight: 500; }
+.aviso-propagacion { margin: 12px 0; font-size: 13px; line-height: 1.5; }
+.contrasena-entrada {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px;
+}
+.contrasena-persona { font-size: 13px; flex: 1 1 100%; }
+.contrasena-valor {
+  flex: 1 1 auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 17px; letter-spacing: 0.5px; word-break: break-all;
+  padding: 10px 12px; border-radius: 8px; background: var(--fondo); color: var(--texto);
+}
