@@ -142,11 +142,16 @@ describe('maquetar', () => {
     expect(() => maquetar(rota, ROSTER, opciones)).toThrow(/p999/)
   })
 
-  it('deja separacion suficiente entre las dos lineas del encabezado', () => {
-    const plano = maquetar(LISTA, ROSTER, opciones)
-    const titulo = plano.ordenes.find((o) => o.texto === 'Fútbol sin Barreras')
-    const subtitulo = plano.ordenes.find((o) => o.texto?.includes('Sábado 8 de agosto'))
-    expect(subtitulo.y - titulo.y).toBeGreaterThanOrEqual(50)
+  it('el encabezado no se pisa en ninguno de los dos modos', () => {
+    ;[false, true].forEach((compacto) => {
+      const lista = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, compacto } }
+      const plano = maquetar(lista, ROSTER, opciones)
+      const logo = plano.ordenes.find((o) => o.clave === 'logo')
+      const titulo = plano.ordenes.find((o) => o.texto === 'Fútbol sin Barreras')
+      const subtitulo = plano.ordenes.find((o) => o.texto?.includes('Sábado 8 de agosto'))
+      expect(titulo.y).toBeGreaterThanOrEqual(logo.y + logo.alto)
+      expect(subtitulo.y - titulo.y).toBeGreaterThanOrEqual(50)
+    })
   })
 
   it('parte una palabra sola mas ancha que la columna', () => {
@@ -167,11 +172,44 @@ describe('maquetar', () => {
     expect(t).toContain('Segunda linea.')
   })
 
-  it('informa el borde derecho alcanzado y si invade el margen', () => {
+  it('informa el borde derecho sin contar las bandas a sangre', () => {
     const plano = maquetar(LISTA, ROSTER, opciones)
-    expect(plano.bordeDerecho).toBeGreaterThan(0)
-    expect(plano.bordeDerecho).toBeLessThanOrEqual(ANCHO)
-    expect(plano.desborde).toBe(plano.bordeDerecho > ANCHO - 56)
+    expect(plano.bordeDerecho).toBeLessThanOrEqual(ANCHO - 56)
+    expect(plano.desborde).toBe(false)
+  })
+
+  it('marca desborde cuando una fila invade el margen', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].nombre = 'Alfonsina Mariangeles'
+    roster.voluntarios[0].nombre = 'Francisco Planells'
+    roster.voluntarios[0].nuevo = true
+    roster.voluntarios[3].nombre = 'Mariangeles Alejandra'
+    const lista = structuredClone(LISTA)
+    lista.grupos[0].filas[0] = { participantes: ['p1'], voluntarios: ['v1', 'v4'] }
+    const plano = maquetar(lista, roster, opciones)
+    expect(plano.desborde).toBe(true)
+  })
+
+  it('el saludo y la despedida quedan a la misma distancia de lo que los rodea', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const banda = plano.ordenes.find((o) => o.tipo === 'rect' && o.y === 0)
+    const saludo = plano.ordenes.find((o) => o.texto?.includes('Buenas tardes'))
+    expect(saludo.y - (banda.y + banda.alto)).toBe(28)
+  })
+
+  it('un saludo de solo espacios no agrega altura', () => {
+    const conEspacios = maquetar(LISTA, ROSTER, { ...opciones, saludo: '   ' })
+    const sinSaludo = maquetar(
+      { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, saludo: false } },
+      ROSTER, opciones,
+    )
+    expect(conEspacios.alto).toBe(sinSaludo.alto)
+  })
+
+  it('una fila sin participantes falla con un mensaje de dominio', () => {
+    const rota = structuredClone(LISTA)
+    rota.grupos[0].filas.push({ participantes: [], voluntarios: ['v1'] })
+    expect(() => maquetar(rota, ROSTER, opciones)).toThrow(/participante/i)
   })
 
   it('ninguna fila supera el margen derecho con nombres largos reales', () => {

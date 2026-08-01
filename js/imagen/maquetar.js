@@ -44,6 +44,7 @@ export function maquetar(lista, roster, opciones = {}) {
   bandaInferior(ordenes, m, y, alto)
 
   const bordeDerecho = ordenes.reduce((maximo, o) => {
+    if (o.tipo === 'rect' && o.x === 0 && o.ancho === ANCHO) return maximo
     if (o.tipo === 'texto') {
       const ancho = medirTexto(o.texto, o.fuente)
       const inicio = o.alineacion === 'right' ? o.x - ancho
@@ -83,16 +84,16 @@ function bandaSuperior(ordenes, lista, m, y) {
   const alto = m.altoBandaSuperior
   ordenes.push({ tipo: 'rect', x: 0, y, ancho: ANCHO, alto, color: COLORES.violeta })
   ordenes.push({
-    tipo: 'imagen', clave: 'logo', x: m.margen, y: y + 28,
-    ancho: 200, alto: 75, circular: false,
+    tipo: 'imagen', clave: 'logo', x: m.logoX, y: y + m.logoY,
+    ancho: m.logoAncho, alto: m.logoAlto, circular: false,
   })
   ordenes.push({
-    tipo: 'texto', texto: 'Fútbol sin Barreras', x: m.margen, y: y + alto - 90,
+    tipo: 'texto', texto: 'Fútbol sin Barreras', x: m.margen, y: y + alto - m.yTituloDesdeAbajo,
     fuente: FUENTES.titulo(m.pxTitular), color: COLORES.blanco, lineaBase: 'top',
   })
   const sub = `${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`
   ordenes.push({
-    tipo: 'texto', texto: sub, x: m.margen, y: y + alto - 34,
+    tipo: 'texto', texto: sub, x: m.margen, y: y + alto - m.ySubtituloDesdeAbajo,
     fuente: FUENTES.normal(m.pxBanda), color: COLORES.violetaClaro, lineaBase: 'top',
   })
   return y + alto
