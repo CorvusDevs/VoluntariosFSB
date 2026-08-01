@@ -84,7 +84,7 @@ function bandaSuperior(ordenes, lista, m, y) {
   const alto = m.altoBandaSuperior
   ordenes.push({ tipo: 'rect', x: 0, y, ancho: ANCHO, alto, color: COLORES.violeta })
   ordenes.push({
-    tipo: 'imagen', clave: 'logo', x: m.logoX, y: y + m.logoY,
+    tipo: 'imagen', clave: 'logo', x: ANCHO - m.margen - m.logoAncho, y: y + m.logoY,
     ancho: m.logoAncho, alto: m.logoAlto, circular: false,
   })
   ordenes.push({

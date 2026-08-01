@@ -167,8 +167,10 @@ describe('maquetar', () => {
       const logo = plano.ordenes.find((o) => o.clave === 'logo')
       const titulo = plano.ordenes.find((o) => o.texto === 'Fútbol sin Barreras')
       const subtitulo = plano.ordenes.find((o) => o.texto?.includes('Sábado 8 de agosto'))
-      expect(titulo.y).toBeGreaterThanOrEqual(logo.y + logo.alto)
+      const finDelTitulo = titulo.x + medirFalso(titulo.texto, titulo.fuente)
+      expect(finDelTitulo).toBeLessThan(logo.x)
       expect(subtitulo.y - titulo.y).toBeGreaterThanOrEqual(50)
+      expect(logo.x + logo.ancho).toBe(ANCHO - (compacto ? 44 : 56))
     })
   })
 

@@ -25,12 +25,11 @@ export const FUENTES = {
 const NORMAL = Object.freeze({
   mostrarFotos: true,
   margen: 56,
-  logoX: 56,
-  logoY: 28,
+  logoY: 68,
   logoAncho: 200,
   logoAlto: 75,
-  yTituloDesdeAbajo: 90,
-  ySubtituloDesdeAbajo: 34,
+  yTituloDesdeAbajo: 156,
+  ySubtituloDesdeAbajo: 76,
   altoBandaSuperior: 210,
   altoBandaInferior: 72,
   altoFila: 76,
@@ -43,19 +42,18 @@ const NORMAL = Object.freeze({
   pxTituloGrupo: 28,
   pxParrafo: 28,
   pxBanda: 24,
-  pxTitular: 52,
+  pxTitular: 64,
 })
 
 const COMPACTO = Object.freeze({
   ...NORMAL,
   mostrarFotos: false,
   margen: 44,
-  logoX: 44,
-  logoY: 16,
+  logoY: 62,
   logoAncho: 128,
   logoAlto: 48,
-  yTituloDesdeAbajo: 92,
-  ySubtituloDesdeAbajo: 34,
+  yTituloDesdeAbajo: 128,
+  ySubtituloDesdeAbajo: 62,
   altoBandaSuperior: 172,
   altoBandaInferior: 56,
   altoFila: 58,
@@ -64,7 +62,7 @@ const COMPACTO = Object.freeze({
   espacioEntreGrupos: 28,
   pxNombre: 30,
   pxVoluntario: 28,
-  pxTitular: 42,
+  pxTitular: 52,
 })
 
 export function medidas(compacto) {
