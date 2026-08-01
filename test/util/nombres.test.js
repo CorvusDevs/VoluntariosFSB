@@ -22,6 +22,11 @@ describe('iniciales', () => {
     expect(iniciales('')).toBe('')
     expect(iniciales(null)).toBe('')
   })
+
+  it('no parte un par sustituto cuando el nombre empieza con emoji', () => {
+    expect(iniciales('🌻 Maria Lucia').isWellFormed()).toBe(true)
+    expect(iniciales('😀 😎').isWellFormed()).toBe(true)
+  })
 })
 
 describe('sinAcentos', () => {

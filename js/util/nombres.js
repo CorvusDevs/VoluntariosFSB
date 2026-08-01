@@ -5,7 +5,8 @@ export function iniciales(nombre) {
   if (palabras.length === 1) {
     return palabras[0].slice(0, 2).toUpperCase()
   }
-  return (palabras[0][0] + palabras[1][0]).toUpperCase()
+  const primeraLetra = (palabra) => [...palabra][0]
+  return (primeraLetra(palabras[0]) + primeraLetra(palabras[1])).toUpperCase()
 }
 
 export function sinAcentos(texto) {
