@@ -67,3 +67,42 @@ body {
   border: 1px solid var(--linea);
   border-radius: 8px;
 }
+
+.ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 1px solid var(--linea);
+  border-radius: 22px;
+  background: var(--fondo);
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  cursor: pointer;
+}
+.ficha.seleccionada {
+  border-color: var(--violeta);
+  background: #F3E9F7;
+  color: var(--violeta);
+}
+.ficha.atenuada { opacity: 0.45; }
+.pastilla {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #F3E9F7;
+  color: var(--violeta);
+}
+.boton {
+  min-height: 44px;
+  padding: 10px 18px;
+  border: 1px solid var(--violeta);
+  border-radius: 10px;
+  background: var(--fondo);
+  color: var(--violeta);
+  font: inherit;
+  cursor: pointer;
+}
+.boton:disabled { opacity: 0.4; cursor: default; }
