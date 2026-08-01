@@ -129,7 +129,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function acciones() {
     const caja = elemento('div', ['acciones-imagen'])
-    caja.appendChild(boton('Descargar PNG', () => conControlesBloqueados(async () => {
+    caja.appendChild(boton('Descargar planificación', () => conControlesBloqueados(async () => {
       await dibujar()
       await descargar(lienzo, nombreDeArchivo(lista))
     })))
@@ -140,7 +140,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       const compartido = await compartir(lienzo, nombreDeArchivo(lista), texto)
       // Nada de alert: es un modal que bloquea y que Safari en iOS puede tapar.
       if (!compartido) {
-        avisar('Este dispositivo no permite compartir el archivo directamente. Usá Descargar PNG.')
+        avisar('Este dispositivo no permite compartir el archivo directamente. Usá el botón Descargar planificación.')
       }
     })))
     return caja

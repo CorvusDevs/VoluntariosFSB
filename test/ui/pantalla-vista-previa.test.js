@@ -204,7 +204,7 @@ describe('pantalla de vista previa', () => {
       }
       const aviso = r10.querySelector('.aviso')
       expect(aviso).not.toBeNull()
-      expect(aviso.textContent).toContain('Descargar PNG')
+      expect(aviso.textContent).toContain('Descargar planificación')
       expect(alertas).toBe(0)
     } finally {
       HTMLCanvasElement.prototype.toBlob = toBlobOriginal
