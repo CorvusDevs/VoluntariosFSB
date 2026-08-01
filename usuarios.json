@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "usuarios": [
+    {
+      "usuario": "claudacravea",
+      "nombre": "Claudia Cravea",
+      "rol": "admin",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "xVo/czXeYcRIvdUXDH9uiA=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "0aW1iYOq8l5J1hXF",
+        "datos": "haJbS+FS7vhd9YvZ0Cm091KTfBRF3pp/iQwB6/CsLIratZfxsNyl/eNxlSUQ1KZ0UE51SIC1povnVbksu3oUCiP9AIIdKGAVg/Qbzi8CcPz4nBMqLdtXGOzk1gnfGDy8MjRte6M1fmyGjb68Fg=="
+      }
+    }
+  ]
+}
