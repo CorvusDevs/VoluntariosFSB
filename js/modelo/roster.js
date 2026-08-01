@@ -10,14 +10,14 @@ function nuevoId(prefijo) {
 
 function validarNombre(nombre) {
   if (typeof nombre !== 'string' || nombre.trim() === '') {
-    throw new Error('El nombre no puede estar vacio')
+    throw new Error('El nombre no puede estar vacío')
   }
   return nombre.trim()
 }
 
 function validarGrupo(grupo) {
   if (grupo !== 1 && grupo !== 2) {
-    throw new Error(`Grupo invalido: ${grupo}. Solo se admiten 1 y 2.`)
+    throw new Error(`Grupo inválido: ${grupo}. Solo se admiten 1 y 2.`)
   }
   return grupo
 }

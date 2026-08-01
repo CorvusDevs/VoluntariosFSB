@@ -77,7 +77,7 @@ function aLineal(canal) {
 function luminancia(hex) {
   const limpio = hex.replace('#', '')
   if (!/^[0-9a-fA-F]{6}$/.test(limpio)) {
-    throw new Error(`Color invalido: ${hex}. Se espera #RRGGBB.`)
+    throw new Error(`Color inválido: ${hex}. Se espera #RRGGBB.`)
   }
   const r = parseInt(limpio.slice(0, 2), 16)
   const g = parseInt(limpio.slice(2, 4), 16)
