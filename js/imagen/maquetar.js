@@ -212,7 +212,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
     })
     ordenes.push({
       tipo: 'texto', texto: iniciales(primero.nombre), x: x + m.avatar / 2, y: centro,
-      fuente: FUENTES.titulo(Math.round(m.avatar * 0.36)), color: COLORES.violeta,
+      fuente: FUENTES.titulo(Math.round(m.avatar * m.factorIniciales)), color: COLORES.violeta,
       alineacion: 'center', lineaBase: 'middle', fila: clave,
     })
     if (primero.foto) {
