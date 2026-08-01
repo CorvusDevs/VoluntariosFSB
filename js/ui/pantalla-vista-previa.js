@@ -4,7 +4,7 @@ import { pintar } from '../imagen/pintar.js'
 import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
-import { SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO } from '../modelo/lista.js'
+import { SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO } from '../modelo/lista.js'
 
 // El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
 // El archivo que se descarga mide, entonces, el doble que el plano.
@@ -86,7 +86,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       opcion.textContent = rotulo
       selector.appendChild(opcion)
     })
-    selector.value = lista.opcionesImagen?.formato ?? 'filas'
+    selector.value = lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO
     selector.addEventListener('change', () => {
       lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: selector.value } }
       alCambiar(lista)

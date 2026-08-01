@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { crearPantallaVistaPrevia, DENSIDAD } from '../../js/ui/pantalla-vista-previa.js'
-import { crearLista, asignarVoluntario } from '../../js/modelo/lista.js'
+import { crearLista, asignarVoluntario, FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import { ROSTER, medirFalso } from '../ayudas/datos.js'
 
 function contextoFalso() {
@@ -14,6 +14,12 @@ function contextoFalso() {
     set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {},
   }
 }
+
+// Formato apilado: estas pruebas son sobre como crece la imagen a lo alto y
+// sobre el aviso de recorte, que la grilla casi nunca dispara porque se ensancha.
+const apilada = (base) => ({
+  ...base, opcionesImagen: { ...base.opcionesImagen, formato: 'filas' },
+})
 
 const armar = (raiz, lista, alCambiar = () => {}) => crearPantallaVistaPrevia(raiz, {
   lista, roster: ROSTER, saludo: 'Buenas tardes.', despedida: 'Nos vemos.',
@@ -58,8 +64,9 @@ describe('pantalla de vista previa', () => {
 
   it('informa el tamaño real del archivo, no el del lienzo logico', () => {
     const info = raiz.querySelector('.info-imagen').textContent
-    expect(info).toContain(String(1080 * DENSIDAD))
-    expect(info).not.toContain('1080 por')
+    const logico = pantalla.plano().ancho
+    expect(info).toContain(String(logico * DENSIDAD))
+    expect(info).not.toContain(`${logico} por`)
     expect(info).toContain('px')
   })
 
@@ -70,7 +77,7 @@ describe('pantalla de vista previa', () => {
     }
     document.body.innerHTML = '<div id="r3"></div>'
     const r3 = document.getElementById('r3')
-    armar(r3, larga)
+    armar(r3, apilada(larga))
     expect(r3.querySelector('.aviso-recorte')).not.toBeNull()
     expect(r3.querySelector('.aviso-recorte').textContent).toContain('recorte')
   })
@@ -120,7 +127,7 @@ describe('pantalla de vista previa', () => {
     }
     document.body.innerHTML = '<div id="r7"></div>'
     const r7 = document.getElementById('r7')
-    armar(r7, enorme)
+    armar(r7, apilada(enorme))
     expect(r7.querySelector('.aviso-recorte').textContent).toContain('por grupo')
   })
 
@@ -131,7 +138,7 @@ describe('pantalla de vista previa', () => {
     }
     document.body.innerHTML = '<div id="r8"></div>'
     const r8 = document.getElementById('r8')
-    armar(r8, larga)
+    armar(r8, apilada(larga))
     const aviso = r8.querySelector('.aviso-recorte')
     expect(aviso).not.toBeNull()
     expect(aviso.textContent).toContain('compacto')
@@ -219,7 +226,7 @@ describe('pantalla de vista previa', () => {
     }
     document.body.innerHTML = '<div id="r11"></div>'
     const r11 = document.getElementById('r11')
-    armar(r11, larga)
+    armar(r11, apilada(larga))
     expect(r11.querySelector('.aviso-recorte').textContent).toContain('preferís evitarlo, activá')
     expect(r11.querySelector('.info-imagen').textContent).toContain('relación')
   })
@@ -317,11 +324,16 @@ describe('saludo y despedida editables', () => {
 })
 
 describe('selector de formato', () => {
-  it('ofrece los dos formatos y arranca en lista', () => {
+  it('ofrece los tres formatos y arranca en el por defecto', () => {
     const selector = raiz.querySelector('[data-campo="formato"]')
     expect(selector).not.toBeNull()
     expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas', 'grilla'])
-    expect(selector.value).toBe('filas')
+    expect(selector.value).toBe(FORMATO_POR_DEFECTO)
+  })
+
+  it('el formato por defecto es la grilla', () => {
+    expect(FORMATO_POR_DEFECTO).toBe('grilla')
+    expect(crearLista('2026-08-08', ROSTER).opcionesImagen.formato).toBe('grilla')
   })
 
   it('cambiar a columnas actualiza la lista y avisa', () => {
@@ -336,13 +348,16 @@ describe('selector de formato', () => {
     expect(p.lista().opcionesImagen.formato).toBe('columnas')
   })
 
-  it('en columnas la foto del plano es mas grande', () => {
-    const antes = pantalla.plano().ordenes.find((o) => o.tipo === 'circulo').radio
-    const selector = raiz.querySelector('[data-campo="formato"]')
+  it('cambiar de formato cambia el tamaño de la foto', () => {
+    document.body.innerHTML = '<div id="rc"></div>'
+    const rc = document.getElementById('rc')
+    const p = armar(rc, apilada(lista))
+    const chica = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
+    const selector = rc.querySelector('[data-campo="formato"]')
     selector.value = 'columnas'
     selector.dispatchEvent(new Event('change'))
-    const despues = pantalla.plano().ordenes.find((o) => o.tipo === 'circulo').radio
-    expect(despues).toBeGreaterThan(antes * 1.8)
+    const grande = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
+    expect(grande).toBeGreaterThan(chica * 1.8)
   })
 
   it('una lista guardada en columnas abre en columnas', () => {

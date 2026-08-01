@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
+import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import { ANCHO, COLORES, COLUMNAS, GRILLA } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
@@ -334,10 +335,15 @@ describe('formato de dos columnas', () => {
     expect(plano.recorteProbable).toBe(plano.relacion > 2.5)
   })
 
-  it('sin el formato declarado sigue saliendo apilado, como antes', () => {
-    const sinFormato = maquetar(LISTA, ROSTER, opciones)
-    const circulos = sinFormato.ordenes.filter((o) => o.tipo === 'circulo')
-    expect(circulos.find((o) => o.fila === 'p1').y).not.toBe(circulos.find((o) => o.fila === 'p2').y)
+  it('una lista sin formato declarado sale en el formato por defecto', () => {
+    const sinFormato = structuredClone(LISTA)
+    delete sinFormato.opcionesImagen.formato
+    const plano = maquetar(sinFormato, ROSTER, opciones)
+    const enGrilla = maquetar(
+      { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: FORMATO_POR_DEFECTO } },
+      ROSTER, opciones,
+    )
+    expect(plano.alto).toBe(enGrilla.alto)
   })
 })
 
@@ -421,10 +427,10 @@ describe('formato de grilla', () => {
     })
   })
 
-  it('un formato desconocido cae en el apilado, no rompe', () => {
+  it('un formato desconocido cae en el por defecto, no rompe', () => {
     const raro = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'inventado' } }
-    const plano = maquetar(raro, ROSTER, opciones)
-    expect(plano.ordenes.filter((o) => o.tipo === 'circulo').length).toBeGreaterThan(0)
+    const bueno = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: FORMATO_POR_DEFECTO } }
+    expect(maquetar(raro, ROSTER, opciones).alto).toBe(maquetar(bueno, ROSTER, opciones).alto)
   })
 })
 

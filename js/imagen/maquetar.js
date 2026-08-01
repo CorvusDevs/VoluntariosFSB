@@ -3,6 +3,7 @@ import {
   anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas,
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
+import { FORMATO_POR_DEFECTO } from '../modelo/lista.js'
 import { iniciales } from '../util/nombres.js'
 
 const RELACION_RECORTE = 2.5
@@ -21,9 +22,11 @@ export function maquetar(lista, roster, opciones = {}) {
   // Tres formatos: apilado, una fila por participante; en columnas, dos por fila;
   // y grilla, con la foto vertical y el nombre debajo. La cabecera, los titulos,
   // los apoyos y las bandas son iguales en los tres: cambia el cuerpo del grupo.
+  // Una lista guardada antes de que existieran los formatos, o con un valor que
+  // no reconocemos, sale en el formato por defecto en lugar de fallar.
   const formato = ['filas', 'columnas', 'grilla'].includes(lista.opcionesImagen?.formato)
     ? lista.opcionesImagen.formato
-    : 'filas'
+    : FORMATO_POR_DEFECTO
 
   // La grilla ensancha la imagen en vez de estirarla hacia abajo cuando hay mas
   // participantes: se agregan columnas y la celda mantiene su tamaño, asi la cara

@@ -1,5 +1,10 @@
 import { activos } from './roster.js'
 
+// Formato de la imagen con el que arranca una lista nueva. La grilla muestra la
+// cara mucho mas grande, que es lo que la coordinacion necesita para reconocer
+// a cada chico de un vistazo.
+export const FORMATO_POR_DEFECTO = 'grilla'
+
 export const SALUDO_POR_DEFECTO =
   'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
 export const DESPEDIDA_POR_DEFECTO = 'Nos vemos mañana. Gracias a todos.'
@@ -31,7 +36,9 @@ export function crearLista(fecha, roster, base = {}) {
     // no los devuelva a la planilla, que era el efecto de sacarlos sin registrarlo.
     ausentes: [],
     grupos,
-    opcionesImagen: { saludo: true, despedida: true, fotos: true, compacto: false },
+    opcionesImagen: {
+      saludo: true, despedida: true, fotos: true, compacto: false, formato: FORMATO_POR_DEFECTO,
+    },
   }
 }
 
