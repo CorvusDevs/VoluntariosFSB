@@ -1,11 +1,19 @@
 export const ITERACIONES = 600000
-const MAX_ITERACIONES = 5000000
+// Ningun registro legitimo pide mas vueltas de las que escribe la app, y cada
+// vuelta de mas es tiempo de espera en el telefono de la coordinadora.
+const MAX_ITERACIONES = ITERACIONES * 2
 const LARGO_SAL = 16
 const LARGO_IV = 12
+export const LARGO_MINIMO_CONTRASENA = 16
 
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
 
-export function generarContrasena(longitud = 16) {
+// Falla en vez de recortar: si quien llama pide un largo invalido, el error
+// tiene que aparecer donde esta el error, no en una contrasena debil silenciosa.
+export function generarContrasena(longitud = LARGO_MINIMO_CONTRASENA) {
+  if (!Number.isInteger(longitud) || longitud < LARGO_MINIMO_CONTRASENA) {
+    throw new Error(`La contrasena debe tener al menos ${LARGO_MINIMO_CONTRASENA} caracteres.`)
+  }
   const limite = 256 - (256 % ALFABETO.length)
   let salida = ''
   while (salida.length < longitud) {

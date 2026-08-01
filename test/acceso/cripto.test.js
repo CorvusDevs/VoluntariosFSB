@@ -20,6 +20,17 @@ describe('generarContrasena', () => {
     expect(juntas).not.toMatch(/[0OIl1]/)
   })
 
+  it('rechaza una longitud menor al minimo', () => {
+    expect(() => generarContrasena(8)).toThrow(/16/)
+    expect(() => generarContrasena(0)).toThrow()
+    expect(() => generarContrasena(-1)).toThrow()
+  })
+
+  it('rechaza una longitud que no sea un entero', () => {
+    expect(() => generarContrasena('16')).toThrow()
+    expect(() => generarContrasena(16.5)).toThrow()
+  })
+
   it('usa mas de un tipo de caracter', () => {
     const muestra = Array.from({ length: 50 }, () => generarContrasena()).join('')
     expect(muestra).toMatch(/[a-z]/)
