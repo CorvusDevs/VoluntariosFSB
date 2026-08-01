@@ -3268,3 +3268,39 @@ Se planifican en detalle en un documento aparte, una vez que el hito 1 esté a l
 | 14 Criterio 4, participante sin voluntario | Tareas 5 y 13, con pruebas dedicadas |
 | 14 Criterio 5, uno a varios y varios a uno | Tareas 5 y 9 |
 | 14 Criterio 9, navegadores | Verificación manual en el hito 4 |
+
+---
+
+# Cambios autorizados durante la ejecución
+
+El código que quedó en el repositorio difiere del que figura arriba en los puntos que siguen. Cada uno se autorizó explícitamente durante la implementación, con su motivo. Los bloques de código de las tareas de arriba NO se reescribieron, así que ante una diferencia manda esta sección.
+
+## Tarea 3, tema
+
+- `NORMAL` y `COMPACTO` se envuelven en `Object.freeze`. Motivo: `medidas()` devuelve el objeto compartido, y un consumidor que lo mutara corrompía el tema para todos los demás sin dejar rastro cerca de la causa.
+- Se agregan seis claves de geometría del encabezado: `logoX`, `logoY`, `logoAncho`, `logoAlto`, `yTituloDesdeAbajo`, `ySubtituloDesdeAbajo`, con valores propios en cada modo. Motivo: ver tarea 5.
+- `COMPACTO.altoBandaSuperior` pasa de 150 a 172. Motivo: la banda compacta no tenía altura para apilar logo, título y subtítulo sin superposición.
+
+## Tarea 4, nombres
+
+- `iniciales` toma el primer punto de código con `[...palabra][0]` en vez de la primera unidad UTF-16. Motivo: un nombre que empieza con emoji, habitual al pegar un contacto de WhatsApp, producía un sustituto suelto, una cadena inválida que se dibuja como un cuadrito roto en el círculo del avatar.
+
+## Tarea 5, maquetación
+
+- El círculo de iniciales usa `colorDeGrupo(numeroGrupo).tenue` en vez de la constante 1. Motivo: el plan contradecía la sección 9.3 de la especificación, que pide el color del grupo. Los chicos del grupo 2 sin foto salían con el tinte del grupo 1.
+- La separación entre las dos líneas del encabezado pasa de 40 a 56 px, y la altura de línea de los párrafos de 1,45 a 1,6 veces el tamaño. Motivo: `textBaseline: 'top'` no es portable. Chromium ubica la línea base 39 px por debajo para texto de 52 px, WebKit 55 px, así que en Safari de iOS el título se montaba sobre la fecha.
+- `quebrar` parte palabras más anchas que la columna y respeta los saltos de línea del texto. Motivo: un enlace pegado en el saludo se dibujaba 177 px fuera del lienzo, y un saludo de dos párrafos se aplastaba en uno solo.
+- `maquetar` devuelve además `bordeDerecho` y `desborde`. Motivo: la altura ya avisaba con `recorteProbable` pero el ancho no tenía ningún control, y con nombres reales largos el margen derecho queda a 35 px de agotarse.
+- Se elimina el medio margen duplicado antes de la despedida, y los guardas de saludo y despedida comparan la cadena recortada. Motivo: la despedida quedaba al doble de distancia que el saludo, y un saludo de solo espacios agregaba 28 px de nada.
+- `filaDeAsignacion` falla con un error de dominio si la fila no tiene participantes, en vez de un `TypeError`.
+- Se agregan pruebas de fila fusionada (varios a uno), de desborde derecho y de encabezado en los dos modos. La prueba original "ninguna orden se sale del lienzo" era casi vacía, porque las órdenes de texto no llevan campo `ancho`.
+
+## Conteos de pruebas corregidos
+
+El plan predecía 12 pruebas en la tarea 4 y 18 en la tarea 5. Los conteos reales son 12 y 29 respectivamente, tras las pruebas agregadas.
+
+## Diferido a la revisión visual de la tarea 7
+
+- Desactivar las fotos no reduce la altura de la imagen, porque `altoFila` no cambia. Quien destilde "fotos" esperando una imagen más corta no obtiene nada. Es una decisión de producto que conviene tomar viendo el render.
+- Con 19 filas o más, `recorteProbable` se enciende. Un sábado real tiene entre 17 y 20, así que el aviso va a aparecer seguido y el interruptor de compacto tiene que estar bien visible en la vista previa.
+- `buscar` aborta toda la maquetación ante un id colgado. Degradar con un marcador visible y una lista de problemas en el plano es mejor, pero corresponde a la pantalla de vista previa.
