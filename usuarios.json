@@ -15,6 +15,21 @@
         "iv": "0aW1iYOq8l5J1hXF",
         "datos": "haJbS+FS7vhd9YvZ0Cm091KTfBRF3pp/iQwB6/CsLIratZfxsNyl/eNxlSUQ1KZ0UE51SIC1povnVbksu3oUCiP9AIIdKGAVg/Qbzi8CcPz4nBMqLdtXGOzk1gnfGDy8MjRte6M1fmyGjb68Fg=="
       }
+    },
+    {
+      "usuario": "alejandroe",
+      "nombre": "Alejandro",
+      "rol": "admin",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "VgtwDKmOS7diuJZ6qmPiCg=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "F3bVUgnP6/D5CRJj",
+        "datos": "h+WzpIjzMLiU2BZHoQAjv84uikrD4p/t22lL9+1pOTW1X6uDO0Me8qOdrMfP0PM5+5FPVvhQT7exNDTDTgtatkmpBDiePxupUB0yUBV4htIiauJPT7t7VXN+Q60tu01XOvquQ1WH663MYiXAOg=="
+      }
     }
   ]
 }
