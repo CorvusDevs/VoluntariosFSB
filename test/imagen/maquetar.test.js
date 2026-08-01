@@ -141,4 +141,62 @@ describe('maquetar', () => {
     rota.grupos[0].filas.push({ participantes: ['p999'], voluntarios: [] })
     expect(() => maquetar(rota, ROSTER, opciones)).toThrow(/p999/)
   })
+
+  it('deja separacion suficiente entre las dos lineas del encabezado', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const titulo = plano.ordenes.find((o) => o.texto === 'Fútbol sin Barreras')
+    const subtitulo = plano.ordenes.find((o) => o.texto?.includes('Sábado 8 de agosto'))
+    expect(subtitulo.y - titulo.y).toBeGreaterThanOrEqual(50)
+  })
+
+  it('parte una palabra sola mas ancha que la columna', () => {
+    const largo = 'https://www.aletea.org.uy/programas/futbol-sin-barreras/asignaciones-semanales'
+    const lista = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, despedida: false } }
+    const plano = maquetar(lista, ROSTER, { ...opciones, saludo: largo })
+    const lineas = plano.ordenes.filter((o) => o.tipo === 'texto' && o.color === COLORES.textoSuave)
+    expect(lineas.length).toBeGreaterThan(1)
+    lineas.forEach((o) => {
+      expect(o.x + medirFalso(o.texto, o.fuente)).toBeLessThanOrEqual(ANCHO - 56)
+    })
+  })
+
+  it('respeta los saltos de linea del saludo', () => {
+    const plano = maquetar(LISTA, ROSTER, { ...opciones, saludo: 'Primera linea.\nSegunda linea.' })
+    const t = plano.ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
+    expect(t).toContain('Primera linea.')
+    expect(t).toContain('Segunda linea.')
+  })
+
+  it('informa el borde derecho alcanzado y si invade el margen', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    expect(plano.bordeDerecho).toBeGreaterThan(0)
+    expect(plano.bordeDerecho).toBeLessThanOrEqual(ANCHO)
+    expect(plano.desborde).toBe(plano.bordeDerecho > ANCHO - 56)
+  })
+
+  it('ninguna fila supera el margen derecho con nombres largos reales', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].nombre = 'Alfonsina'
+    roster.voluntarios[0].nombre = 'Francisco Planells'
+    roster.voluntarios[0].nuevo = true
+    const lista = structuredClone(LISTA)
+    lista.grupos[0].filas[0] = { participantes: ['p1'], voluntarios: ['v1', 'v4'] }
+    const plano = maquetar(lista, roster, opciones)
+    const deLaFila = plano.ordenes.filter((o) => o.fila === 'p1' && o.tipo === 'texto')
+    deLaFila.forEach((o) => {
+      expect(o.x + medirFalso(o.texto, o.fuente)).toBeLessThanOrEqual(ANCHO)
+    })
+  })
+
+  it('una fila con dos participantes y un voluntario se dibuja con barra', () => {
+    const lista = structuredClone(LISTA)
+    lista.grupos[0].filas = [{ participantes: ['p1', 'p3'], voluntarios: ['v1'] }]
+    const plano = maquetar(lista, ROSTER, opciones)
+    const t = plano.ordenes.filter((o) => o.fila === 'p1' && o.tipo === 'texto').map((o) => o.texto)
+    expect(t).toContain('Gonzalo')
+    expect(t).toContain('/')
+    expect(t).toContain('Thiago')
+    expect(t).toContain('-')
+    expect(t).toContain('Abi')
+  })
 })

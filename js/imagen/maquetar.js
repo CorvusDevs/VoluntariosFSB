@@ -20,7 +20,7 @@ export function maquetar(lista, roster, opciones = {}) {
 
   y = bandaSuperior(ordenes, lista, m, y)
 
-  if (lista.opcionesImagen?.saludo && saludo) {
+  if (lista.opcionesImagen?.saludo && saludo.trim()) {
     y = parrafo(ordenes, saludo, m, y, medirTexto)
   }
 
@@ -35,8 +35,7 @@ export function maquetar(lista, roster, opciones = {}) {
     }
   })
 
-  if (lista.opcionesImagen?.despedida && despedida) {
-    y += m.margen / 2
+  if (lista.opcionesImagen?.despedida && despedida.trim()) {
     y = parrafo(ordenes, despedida, m, y, medirTexto)
   }
 
@@ -44,8 +43,26 @@ export function maquetar(lista, roster, opciones = {}) {
   const alto = y + m.altoBandaInferior
   bandaInferior(ordenes, m, y, alto)
 
+  const bordeDerecho = ordenes.reduce((maximo, o) => {
+    if (o.tipo === 'texto') {
+      const ancho = medirTexto(o.texto, o.fuente)
+      const inicio = o.alineacion === 'right' ? o.x - ancho
+        : o.alineacion === 'center' ? o.x - ancho / 2
+        : o.x
+      return Math.max(maximo, inicio + ancho)
+    }
+    if (o.tipo === 'rect' || o.tipo === 'imagen') return Math.max(maximo, o.x + o.ancho)
+    if (o.tipo === 'circulo') return Math.max(maximo, o.x + o.radio)
+    if (o.tipo === 'linea') return Math.max(maximo, Math.max(o.x1, o.x2))
+    return maximo
+  }, 0)
+
   const relacion = alto / ANCHO
-  return { ancho: ANCHO, alto, ordenes, relacion, recorteProbable: relacion > RELACION_RECORTE }
+  return {
+    ancho: ANCHO, alto, ordenes, relacion,
+    recorteProbable: relacion > RELACION_RECORTE,
+    bordeDerecho, desborde: bordeDerecho > ANCHO - m.margen,
+  }
 }
 
 function indexar(roster) {
@@ -61,6 +78,7 @@ function buscar(porId, id) {
   return persona
 }
 
+// Convencion: cada ayudante agrega su propio espacio superior y devuelve el borde inferior ocupado. Quien llama nunca agrega relleno.
 function bandaSuperior(ordenes, lista, m, y) {
   const alto = m.altoBandaSuperior
   ordenes.push({ tipo: 'rect', x: 0, y, ancho: ANCHO, alto, color: COLORES.violeta })
@@ -69,7 +87,7 @@ function bandaSuperior(ordenes, lista, m, y) {
     ancho: 200, alto: 75, circular: false,
   })
   ordenes.push({
-    tipo: 'texto', texto: 'Fútbol sin Barreras', x: m.margen, y: y + alto - 74,
+    tipo: 'texto', texto: 'Fútbol sin Barreras', x: m.margen, y: y + alto - 90,
     fuente: FUENTES.titulo(m.pxTitular), color: COLORES.blanco, lineaBase: 'top',
   })
   const sub = `${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`
@@ -98,7 +116,7 @@ function parrafo(ordenes, texto, m, y, medirTexto) {
   const anchoUtil = ANCHO - m.margen * 2
   const fuente = FUENTES.normal(m.pxParrafo)
   const lineas = quebrar(texto, anchoUtil, fuente, medirTexto)
-  const altoLinea = Math.round(m.pxParrafo * 1.45)
+  const altoLinea = Math.round(m.pxParrafo * 1.6)
   let cursor = y + m.margen / 2
   lineas.forEach((linea) => {
     ordenes.push({
@@ -111,20 +129,38 @@ function parrafo(ordenes, texto, m, y, medirTexto) {
 }
 
 function quebrar(texto, anchoMaximo, fuente, medirTexto) {
-  const palabras = texto.split(/\s+/).filter(Boolean)
   const lineas = []
-  let actual = ''
-  palabras.forEach((palabra) => {
-    const intento = actual ? `${actual} ${palabra}` : palabra
-    if (actual && medirTexto(intento, fuente) > anchoMaximo) {
-      lineas.push(actual)
-      actual = palabra
-    } else {
-      actual = intento
-    }
+  texto.split('\n').forEach((parrafoSuelto) => {
+    const palabras = parrafoSuelto.split(/\s+/).filter(Boolean)
+    if (palabras.length === 0) return
+    let actual = ''
+    palabras.forEach((palabra) => {
+      const intento = actual ? `${actual} ${palabra}` : palabra
+      if (actual && medirTexto(intento, fuente) > anchoMaximo) {
+        lineas.push(...partirLarga(actual, anchoMaximo, fuente, medirTexto))
+        actual = palabra
+      } else {
+        actual = intento
+      }
+    })
+    if (actual) lineas.push(...partirLarga(actual, anchoMaximo, fuente, medirTexto))
   })
-  if (actual) lineas.push(actual)
   return lineas
+}
+
+function partirLarga(linea, anchoMaximo, fuente, medirTexto) {
+  if (medirTexto(linea, fuente) <= anchoMaximo) return [linea]
+  const partes = []
+  let resto = [...linea]
+  while (resto.length > 0) {
+    let corte = resto.length
+    while (corte > 1 && medirTexto(resto.slice(0, corte).join(''), fuente) > anchoMaximo) {
+      corte -= 1
+    }
+    partes.push(resto.slice(0, corte).join(''))
+    resto = resto.slice(corte)
+  }
+  return partes
 }
 
 function colorDeGrupo(numero) {
@@ -160,6 +196,9 @@ function tituloGrupo(ordenes, grupo, m, y) {
 function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, numeroGrupo) {
   const participantes = fila.participantes.map((id) => buscar(porId, id))
   const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
+  if (participantes.length === 0) {
+    throw new Error('Una fila no tiene ningun participante')
+  }
   const clave = fila.participantes[0]
   const centro = y + m.altoFila / 2
   let x = m.margen
