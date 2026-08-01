@@ -631,7 +631,7 @@ La eñe se preserva a propósito. La descomposición NFD separa la tilde de la e
 - [ ] **Step 4: Correr las pruebas**
 
 Run: `npx vitest run test/util/nombres.test.js`
-Expected: PASS, 12 pruebas.
+Expected: PASS, 11 pruebas.
 
 - [ ] **Step 5: Commit**
 
