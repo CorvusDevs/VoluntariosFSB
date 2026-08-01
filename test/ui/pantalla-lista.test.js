@@ -226,10 +226,21 @@ describe('pantalla de armado', () => {
     expect(pantalla.lista().grupos[1].cancha).toBe('Cancha B')
   })
 
-  it('el bloque de edicion viene plegado', () => {
-    const plegable = raiz.querySelector('.editar-grupo')
-    expect(plegable.tagName).toBe('DETAILS')
-    expect(plegable.open).toBe(false)
+  it('el rotulo se edita con un lapiz al lado del titulo, no con una palabra', () => {
+    const lapiz = raiz.querySelector('[data-accion="editar-grupo-1"]')
+    expect(lapiz).not.toBeNull()
+    expect(lapiz.querySelector('svg')).not.toBeNull()
+    expect(lapiz.textContent.trim()).toBe('')
+    expect(lapiz.getAttribute('aria-label')).toMatch(/editar/i)
+    // Al lado del titulo, en la misma linea
+    expect(lapiz.closest('.grupo-titulo').querySelector('h2')).not.toBeNull()
+  })
+
+  it('el bloque de edicion viene oculto y el lapiz lo abre', () => {
+    const panel = raiz.querySelector('.editar-grupo')
+    expect(panel.hidden).toBe(true)
+    raiz.querySelector('[data-accion="editar-grupo-1"]').click()
+    expect(raiz.querySelector('.editar-grupo').hidden).toBe(false)
   })
 
   // Cada cambio redibuja la pantalla entera, y el redibujado crea un <details>
@@ -237,29 +248,29 @@ describe('pantalla de armado', () => {
   // solo despues de escribir el primer campo y hay que volver a abrirlo para el
   // segundo, tres veces seguidas. Medido: open pasaba de true a false.
   it('el bloque de edicion sigue abierto despues de editar un campo', () => {
-    raiz.querySelector('.editar-grupo').open = true
+    raiz.querySelector('[data-accion="editar-grupo-1"]').click()
     const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
     entrada.value = 'Mayores'
     entrada.dispatchEvent(new Event('change'))
-    expect(raiz.querySelector('.editar-grupo').open).toBe(true)
+    expect(raiz.querySelector('.editar-grupo').hidden).toBe(false)
   })
 
   it('recordar el bloque abierto no abre el del otro grupo', () => {
-    raiz.querySelector('.editar-grupo').open = true
+    raiz.querySelector('[data-accion="editar-grupo-1"]').click()
     const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
     entrada.value = 'Mayores'
     entrada.dispatchEvent(new Event('change'))
-    expect([...raiz.querySelectorAll('.editar-grupo')].map((d) => d.open)).toEqual([true, false])
+    expect([...raiz.querySelectorAll('.editar-grupo')].map((d) => d.hidden)).toEqual([false, true])
   })
 
   it('el bloque que se cierra a mano queda cerrado', () => {
-    const plegable = raiz.querySelector('.editar-grupo')
-    plegable.open = true
-    plegable.open = false
+    const lapiz = raiz.querySelector('[data-accion="editar-grupo-1"]')
+    lapiz.click()
+    lapiz.click()
     const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
     entrada.value = 'Mayores'
     entrada.dispatchEvent(new Event('change'))
-    expect(raiz.querySelector('.editar-grupo').open).toBe(false)
+    expect(raiz.querySelector('.editar-grupo').hidden).toBe(true)
   })
 
   it('el titulo editado se ve en el encabezado del grupo', () => {
@@ -315,5 +326,57 @@ describe('ausencias desde la pantalla', () => {
     raiz.querySelector('[data-accion="sacar-de-lista"]').click()
     raiz.querySelector('[data-accion="deshacer"]').click()
     expect(porNombre('.columna-participantes .ficha', 'Gonzalo')).toBeDefined()
+  })
+})
+
+describe('apoyo del grupo', () => {
+  it('cada grupo ofrece sumar un apoyo', () => {
+    expect(raiz.querySelector('[data-accion="sumar-apoyo-1"]')).not.toBeNull()
+    expect(raiz.querySelector('[data-accion="sumar-apoyo-2"]')).not.toBeNull()
+  })
+
+  it('sumar apoyo y tocar un voluntario lo deja como apoyo de ese grupo', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    expect(pantalla.lista().grupos[0].apoyo).toEqual(['v1'])
+    expect(pantalla.lista().grupos[1].apoyo).toEqual([])
+  })
+
+  it('mientras se elige el apoyo la barra lo dice', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    const barra = raiz.querySelector('.barra-seleccion')
+    expect(barra.textContent).toMatch(/apoyo/i)
+    expect(raiz.querySelector('[data-accion="cancelar-apoyo"]')).not.toBeNull()
+  })
+
+  it('cancelar deja todo como estaba', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    raiz.querySelector('[data-accion="cancelar-apoyo"]').click()
+    expect(raiz.querySelector('.barra-seleccion')).toBeNull()
+    expect(pantalla.lista().grupos[0].apoyo).toEqual([])
+  })
+
+  it('el apoyo cargado se muestra y se puede quitar de un toque', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    const chip = raiz.querySelector('[data-accion="quitar-apoyo-1"]')
+    expect(chip.textContent).toContain('Abi')
+    chip.click()
+    expect(pantalla.lista().grupos[0].apoyo).toEqual([])
+  })
+
+  it('elegir un participante cancela el modo apoyo', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    expect(pantalla.lista().grupos[0].apoyo).toEqual([])
+    expect(pantalla.lista().grupos[0].filas[0].voluntarios).toEqual(['v1'])
+  })
+
+  it('deshacer revierte un apoyo', () => {
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    raiz.querySelector('[data-accion="deshacer"]').click()
+    expect(pantalla.lista().grupos[0].apoyo).toEqual([])
   })
 })

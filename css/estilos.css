@@ -500,3 +500,38 @@ input.fila-nombre:focus {
   border-radius: 10px;
   background: var(--fondo);
 }
+
+/* Rotulo del grupo con el lapiz al lado, para no gastar un renglon entero en
+   algo que casi nunca se toca. */
+.grupo-titulo { display: flex; align-items: center; gap: 4px; }
+.grupo-titulo h2 { margin: 0 0 4px; }
+.boton-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--texto-suave);
+  cursor: pointer;
+}
+.boton-icono:hover { border-color: var(--linea); color: var(--violeta); }
+.boton-icono.activo { border-color: var(--violeta); color: var(--violeta); background: #F3E9F7; }
+.boton-icono:focus-visible { outline: 2px solid var(--violeta); outline-offset: 2px; }
+.editar-grupo[hidden] { display: none; }
+
+/* Apoyo del grupo: no acompaña a nadie en particular, esta para toda la cancha. */
+.apoyo-grupo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--linea);
+}
+.apoyo-rotulo { font-size: 14px; color: var(--texto-suave); }
+.boton.activo { background: var(--violeta); color: var(--fondo); }
