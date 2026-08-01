@@ -1,3 +1,5 @@
+import { ConflictoError } from './github.js'
+
 const RUTA_ROSTER = 'roster.json'
 const rutaLista = (fecha) => `listas/${fecha}.json`
 const rutaFoto = (clave) => `fotos/${clave}`
@@ -21,12 +23,28 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
     return JSON.parse(datos.texto)
   }
 
+  // Tras un conflicto se refresca el sha desde el servidor y se vuelve a tirar
+  // el error igual. Sin esto, cada reintento manda el mismo sha viejo y falla
+  // identico, y la unica salida es recargar la pagina.
+  //
+  // OJO: esto habilita el reintento, no lo vuelve seguro. Reintentar a ciegas
+  // pisaria el trabajo de la otra coordinadora con datos viejos. Solo es seguro
+  // despues de releer y combinar. Nada de reintentos automaticos.
   async function escribirJson(ruta, valor, mensaje) {
     await asegurarAcceso()
     const texto = JSON.stringify(valor, null, 2)
-    const resultado = await cliente.escribirTexto(ruta, texto, shas.get(ruta) ?? null, mensaje)
-    shas.set(ruta, resultado.sha)
-    return resultado
+    try {
+      const resultado = await cliente.escribirTexto(ruta, texto, shas.get(ruta) ?? null, mensaje)
+      shas.set(ruta, resultado.sha)
+      return resultado
+    } catch (error) {
+      if (error instanceof ConflictoError) {
+        const actual = await cliente.leerTexto(ruta)
+        if (actual) shas.set(ruta, actual.sha)
+        else shas.delete(ruta)
+      }
+      throw error
+    }
   }
 
   return {
@@ -67,10 +85,20 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       await asegurarAcceso()
       const bytes = new Uint8Array(await blob.arrayBuffer())
       const ruta = rutaFoto(clave)
-      const resultado = await cliente.escribirBytes(
-        ruta, bytes, shas.get(ruta) ?? null, `Actualizar la foto ${clave}`,
-      )
-      shas.set(ruta, resultado.sha)
+      // Las fotos siguen el mismo camino que el JSON, con la misma salvedad.
+      try {
+        const resultado = await cliente.escribirBytes(
+          ruta, bytes, shas.get(ruta) ?? null, `Actualizar la foto ${clave}`,
+        )
+        shas.set(ruta, resultado.sha)
+      } catch (error) {
+        if (error instanceof ConflictoError) {
+          const actual = await cliente.leerBytes(ruta)
+          if (actual) shas.set(ruta, actual.sha)
+          else shas.delete(ruta)
+        }
+        throw error
+      }
     },
 
     async borrarFoto(clave) {

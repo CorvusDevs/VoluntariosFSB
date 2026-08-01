@@ -70,6 +70,19 @@ describe('roster', () => {
     await expect(almacen.guardarRoster(ROSTER)).rejects.toBeInstanceOf(ConflictoError)
   })
 
+  it('refresca el sha despues de un conflicto, para que el reintento pueda funcionar', async () => {
+    await almacen.guardarRoster(ROSTER)
+    cliente.archivos['roster.json'].sha = 'cambiado-por-otra'
+    await expect(almacen.guardarRoster(ROSTER)).rejects.toBeInstanceOf(ConflictoError)
+    await expect(almacen.guardarRoster(ROSTER)).resolves.toBeTruthy()
+  })
+
+  it('el conflicto igual se propaga, no se traga', async () => {
+    await almacen.guardarRoster(ROSTER)
+    cliente.archivos['roster.json'].sha = 'otra'
+    await expect(almacen.guardarRoster(ROSTER)).rejects.toBeInstanceOf(ConflictoError)
+  })
+
   it('conserva los acentos ida y vuelta', async () => {
     const conAcento = structuredClone(ROSTER)
     conAcento.participantes[0].nombre = 'Julián Begoña'
