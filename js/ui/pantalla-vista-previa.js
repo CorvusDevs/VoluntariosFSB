@@ -67,6 +67,34 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     pintar(ctx, plano, imagenes, DENSIDAD)
   }
 
+  // Dos formatos conviven a proposito: el apilado sirve los sabados sin fotos
+  // cargadas, donde una grilla de iniciales grandes se ve peor que una lista.
+  const FORMATOS = [
+    ['filas', 'Lista, uno por renglón'],
+    ['columnas', 'Dos columnas, foto grande'],
+  ]
+
+  function selectorDeFormato() {
+    const caja = elemento('label', ['campo', 'campo-formato'])
+    caja.appendChild(elemento('span', ['campo-rotulo'], 'Formato'))
+    const selector = document.createElement('select')
+    selector.dataset.campo = 'formato'
+    FORMATOS.forEach(([valor, rotulo]) => {
+      const opcion = document.createElement('option')
+      opcion.value = valor
+      opcion.textContent = rotulo
+      selector.appendChild(opcion)
+    })
+    selector.value = lista.opcionesImagen?.formato ?? 'filas'
+    selector.addEventListener('change', () => {
+      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: selector.value } }
+      alCambiar(lista)
+      redibujar()
+    })
+    caja.appendChild(selector)
+    return caja
+  }
+
   function interruptores() {
     const caja = elemento('div', ['opciones-imagen'])
     OPCIONES.forEach(([clave, etiqueta]) => {
@@ -188,6 +216,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (!vivo) return
     vaciar(raiz)
     calcular()
+    raiz.appendChild(selectorDeFormato())
     raiz.appendChild(interruptores())
     raiz.appendChild(mensajes())
     raiz.appendChild(informacion())

@@ -487,3 +487,16 @@ input.fila-nombre:focus {
   min-height: 44px;
 }
 .formulario label input[type=checkbox] { width: 20px; height: 20px; }
+
+/* Selector de formato de la imagen. */
+.campo-formato { padding: 16px 16px 0; }
+.campo-formato select {
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--texto);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  background: var(--fondo);
+}

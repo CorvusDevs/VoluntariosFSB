@@ -65,6 +65,22 @@ const COMPACTO = Object.freeze({
   pxTitular: 52,
 })
 
+// Formato de dos columnas: dos participantes por fila, con la foto mucho mas
+// grande. La celda es la mitad del ancho util menos la separacion entre columnas.
+export const COLUMNAS = Object.freeze({
+  separacion: 24,
+  avatar: 110,
+  espacioAvatar: 16,
+  altoCelda: 132,
+  pxNombre: 32,
+  pxVoluntario: 26,
+  factorIniciales: 0.4,
+})
+
+export function anchoDeCelda(margen) {
+  return Math.floor((ANCHO - margen * 2 - COLUMNAS.separacion) / 2)
+}
+
 export function medidas(compacto) {
   return compacto ? COMPACTO : NORMAL
 }

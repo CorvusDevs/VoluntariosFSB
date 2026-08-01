@@ -315,3 +315,41 @@ describe('saludo y despedida editables', () => {
     expect(rv.querySelector('[data-campo="despedida"]').value).toContain('Nos vemos')
   })
 })
+
+describe('selector de formato', () => {
+  it('ofrece los dos formatos y arranca en lista', () => {
+    const selector = raiz.querySelector('[data-campo="formato"]')
+    expect(selector).not.toBeNull()
+    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas'])
+    expect(selector.value).toBe('filas')
+  })
+
+  it('cambiar a columnas actualiza la lista y avisa', () => {
+    document.body.innerHTML = '<div id="rf"></div>'
+    const rf = document.getElementById('rf')
+    let avisos = 0
+    const p = armar(rf, lista, () => { avisos += 1 })
+    const selector = rf.querySelector('[data-campo="formato"]')
+    selector.value = 'columnas'
+    selector.dispatchEvent(new Event('change'))
+    expect(avisos).toBe(1)
+    expect(p.lista().opcionesImagen.formato).toBe('columnas')
+  })
+
+  it('en columnas la foto del plano es mas grande', () => {
+    const antes = pantalla.plano().ordenes.find((o) => o.tipo === 'circulo').radio
+    const selector = raiz.querySelector('[data-campo="formato"]')
+    selector.value = 'columnas'
+    selector.dispatchEvent(new Event('change'))
+    const despues = pantalla.plano().ordenes.find((o) => o.tipo === 'circulo').radio
+    expect(despues).toBeGreaterThan(antes * 1.8)
+  })
+
+  it('una lista guardada en columnas abre en columnas', () => {
+    const guardada = { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'columnas' } }
+    document.body.innerHTML = '<div id="rg"></div>'
+    const rg = document.getElementById('rg')
+    armar(rg, guardada)
+    expect(rg.querySelector('[data-campo="formato"]').value).toBe('columnas')
+  })
+})

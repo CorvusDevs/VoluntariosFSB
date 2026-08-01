@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { maquetar } from '../../js/imagen/maquetar.js'
-import { ANCHO, COLORES } from '../../js/imagen/tema.js'
+import { ANCHO, COLORES, COLUMNAS } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
 const opciones = { saludo: SALUDO, despedida: DESPEDIDA, medirTexto: medirFalso }
@@ -256,5 +256,87 @@ describe('maquetar', () => {
     expect(t).toContain('Thiago')
     expect(t).toContain('-')
     expect(t).toContain('Abi')
+  })
+})
+
+describe('formato de dos columnas', () => {
+  const enColumnas = (base = LISTA) => maquetar(
+    { ...base, opcionesImagen: { ...base.opcionesImagen, formato: 'columnas' } },
+    ROSTER, opciones,
+  )
+
+  it('dibuja a los mismos participantes que el formato apilado', () => {
+    const t = (p) => p.ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto).join(' ')
+    const col = t(enColumnas())
+    ;['Gonzalo', 'Sofi', 'Thiago', 'Nikita', 'Julián'].forEach((n) => expect(col).toContain(n))
+  })
+
+  it('pone dos participantes por fila, a la misma altura', () => {
+    const plano = enColumnas()
+    const circulos = plano.ordenes.filter((o) => o.tipo === 'circulo')
+    // p1 y p2 son los dos primeros del grupo 1: comparten renglon.
+    const a = circulos.find((o) => o.fila === 'p1')
+    const b = circulos.find((o) => o.fila === 'p2')
+    expect(a.y).toBe(b.y)
+    expect(b.x).toBeGreaterThan(a.x)
+  })
+
+  it('la tercera arranca un renglon mas abajo', () => {
+    const plano = enColumnas()
+    const circulos = plano.ordenes.filter((o) => o.tipo === 'circulo')
+    const a = circulos.find((o) => o.fila === 'p1')
+    const c = circulos.find((o) => o.fila === 'p3')
+    expect(c.y).toBeGreaterThan(a.y)
+    expect(c.x).toBe(a.x)
+  })
+
+  it('la foto es bastante mas grande que en el formato apilado', () => {
+    const grande = enColumnas().ordenes.find((o) => o.tipo === 'circulo').radio * 2
+    const chica = maquetar(LISTA, ROSTER, opciones).ordenes.find((o) => o.tipo === 'circulo').radio * 2
+    expect(grande).toBe(COLUMNAS.avatar)
+    expect(grande / chica).toBeGreaterThan(1.8)
+  })
+
+  it('el voluntario va debajo del nombre, no al lado', () => {
+    const plano = enColumnas()
+    const deGonzalo = plano.ordenes.filter((o) => o.fila === 'p1' && o.tipo === 'texto')
+    const nombre = deGonzalo.find((o) => o.texto === 'Gonzalo')
+    const voluntario = deGonzalo.find((o) => o.texto === 'Abi')
+    expect(voluntario).toBeTruthy()
+    expect(voluntario.y).toBeGreaterThan(nombre.y)
+    expect(voluntario.x).toBe(nombre.x)
+  })
+
+  it('un participante sin voluntario centra el nombre y no dibuja segunda linea', () => {
+    const plano = enColumnas()
+    const deSofi = plano.ordenes.filter((o) => o.fila === 'p2' && o.tipo === 'texto')
+    expect(deSofi.filter((o) => o.texto !== 'SO')).toHaveLength(1)
+  })
+
+  it('el voluntario nuevo se anuncia en el texto', () => {
+    const plano = enColumnas()
+    const t = plano.ordenes.filter((o) => o.fila === 'p4' && o.tipo === 'texto').map((o) => o.texto)
+    expect(t.join(' ')).toContain('nuevo')
+  })
+
+  it('nada se sale del lienzo ni invade el margen', () => {
+    const plano = enColumnas()
+    expect(plano.bordeDerecho).toBeLessThanOrEqual(ANCHO - 56)
+    expect(plano.desborde).toBe(false)
+    plano.ordenes.forEach((o) => {
+      expect((o.x ?? 0) + (o.ancho ?? 0)).toBeLessThanOrEqual(ANCHO)
+    })
+  })
+
+  it('sigue informando la relacion de aspecto y el recorte', () => {
+    const plano = enColumnas()
+    expect(plano.relacion).toBeCloseTo(plano.alto / plano.ancho, 5)
+    expect(plano.recorteProbable).toBe(plano.relacion > 2.5)
+  })
+
+  it('sin el formato declarado sigue saliendo apilado, como antes', () => {
+    const sinFormato = maquetar(LISTA, ROSTER, opciones)
+    const circulos = sinFormato.ordenes.filter((o) => o.tipo === 'circulo')
+    expect(circulos.find((o) => o.fila === 'p1').y).not.toBe(circulos.find((o) => o.fila === 'p2').y)
   })
 })

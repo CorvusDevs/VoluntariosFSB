@@ -1,4 +1,4 @@
-import { ANCHO, COLORES, FUENTES, medidas } from './tema.js'
+import { ANCHO, COLORES, COLUMNAS, FUENTES, anchoDeCelda, medidas } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { iniciales } from '../util/nombres.js'
 
@@ -24,12 +24,17 @@ export function maquetar(lista, roster, opciones = {}) {
     y = parrafo(ordenes, saludo, m, y, medirTexto)
   }
 
+  // Dos formatos: apilado, una fila por participante, y en columnas, dos por
+  // fila con la foto casi al doble. La cabecera, los titulos, los apoyos y las
+  // bandas son iguales en los dos: lo unico que cambia es el cuerpo del grupo.
+  const enColumnas = lista.opcionesImagen?.formato === 'columnas'
+
   lista.grupos.forEach((grupo, i) => {
     if (i > 0) y += m.espacioEntreGrupos
     y = tituloGrupo(ordenes, grupo, m, y)
-    grupo.filas.forEach((fila) => {
-      y = filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, grupo.numero)
-    })
+    y = enColumnas
+      ? cuerpoEnColumnas(ordenes, grupo, porId, m, y, conFotos, medirTexto)
+      : cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto)
     if (grupo.apoyo?.length) {
       y = lineaApoyo(ordenes, grupo, porId, m, y)
     }
@@ -239,6 +244,81 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
     color: COLORES.linea, fila: clave,
   })
   return abajo
+}
+
+function cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
+  let cursor = y
+  grupo.filas.forEach((fila) => {
+    cursor = filaDeAsignacion(ordenes, fila, porId, m, cursor, conFotos, medirTexto, grupo.numero)
+  })
+  return cursor
+}
+
+function cuerpoEnColumnas(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
+  const ancho = anchoDeCelda(m.margen)
+  let cursor = y
+  grupo.filas.forEach((fila, i) => {
+    const izquierda = i % 2 === 0
+    const x = izquierda ? m.margen : m.margen + ancho + COLUMNAS.separacion
+    if (izquierda) cursor += 0
+    celdaDeAsignacion(ordenes, fila, porId, m, x, cursor, ancho, conFotos, medirTexto, grupo.numero)
+    if (!izquierda || i === grupo.filas.length - 1) cursor += COLUMNAS.altoCelda
+  })
+  return cursor
+}
+
+function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medirTexto, numeroGrupo) {
+  const participantes = fila.participantes.map((id) => buscar(porId, id))
+  if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
+  const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
+  const clave = fila.participantes[0]
+  const centro = y + COLUMNAS.altoCelda / 2
+  let textoX = x
+
+  if (conFotos) {
+    const primero = participantes[0]
+    const arriba = centro - COLUMNAS.avatar / 2
+    ordenes.push({
+      tipo: 'circulo', x: x + COLUMNAS.avatar / 2, y: centro, radio: COLUMNAS.avatar / 2,
+      color: colorDeGrupo(numeroGrupo).tenue, fila: clave,
+    })
+    ordenes.push({
+      tipo: 'texto', texto: iniciales(primero.nombre), x: x + COLUMNAS.avatar / 2, y: centro,
+      fuente: FUENTES.titulo(Math.round(COLUMNAS.avatar * COLUMNAS.factorIniciales)),
+      color: COLORES.violeta, alineacion: 'center', lineaBase: 'middle', fila: clave,
+    })
+    if (primero.foto) {
+      ordenes.push({
+        tipo: 'imagen', clave: primero.foto, x, y: arriba,
+        ancho: COLUMNAS.avatar, alto: COLUMNAS.avatar, circular: true, fila: clave,
+      })
+    }
+    textoX = x + COLUMNAS.avatar + COLUMNAS.espacioAvatar
+  }
+
+  // Con la foto grande el renglon no entra al lado, asi que el nombre va arriba
+  // y quien lo acompaña justo debajo. Se sigue leyendo de a pares.
+  const hayVoluntarios = voluntarios.length > 0
+  const yNombre = hayVoluntarios ? centro - 16 : centro
+  ordenes.push({
+    tipo: 'texto', texto: participantes.map((p) => p.nombre).join(' / '),
+    x: textoX, y: yNombre,
+    fuente: FUENTES.titulo(COLUMNAS.pxNombre), color: COLORES.texto,
+    lineaBase: 'middle', fila: clave,
+  })
+  if (hayVoluntarios) {
+    const nombres = voluntarios.map((v) => v.nombre + (v.nuevo ? ' (nuevo)' : '')).join(' / ')
+    ordenes.push({
+      tipo: 'texto', texto: nombres, x: textoX, y: centro + 20,
+      fuente: FUENTES.normal(COLUMNAS.pxVoluntario), color: COLORES.magentaTexto,
+      lineaBase: 'middle', fila: clave,
+    })
+  }
+
+  ordenes.push({
+    tipo: 'linea', x1: x, y1: y + COLUMNAS.altoCelda, x2: x + ancho, y2: y + COLUMNAS.altoCelda,
+    color: COLORES.linea, fila: clave,
+  })
 }
 
 function escribirNombres(ordenes, gente, x, centro, m, fuente, color, clave, medirTexto, conPastilla = false) {
