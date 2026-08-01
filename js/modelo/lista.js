@@ -128,6 +128,20 @@ export function quitarApoyo(lista, numeroGrupo, voluntarioId) {
   return { ...lista, grupos }
 }
 
+// Los rotulos de cada grupo se editan desde la pantalla, con valores escritos por
+// una persona. La lista blanca es a proposito: solo se puede tocar el rotulo, y
+// ni las filas ni el numero ni el apoyo quedan al alcance de ese formulario.
+export function editarGrupo(lista, numeroGrupo, cambios) {
+  const permitidos = ['titulo', 'subtitulo', 'cancha']
+  const filtrados = Object.fromEntries(
+    Object.entries(cambios).filter(([clave]) => permitidos.includes(clave)),
+  )
+  const grupos = lista.grupos.map((grupo) => (
+    grupo.numero === numeroGrupo ? { ...grupo, ...filtrados } : grupo
+  ))
+  return { ...lista, grupos }
+}
+
 export function sincronizarConRoster(lista, roster) {
   const activos = new Map(roster.participantes.filter((p) => p.activo).map((p) => [p.id, p]))
   const yaEnLista = new Set()

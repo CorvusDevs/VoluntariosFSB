@@ -369,3 +369,32 @@ body {
   background: #A3231C;
   color: #FFFFFF;
 }
+
+/* Editar el rotulo de un grupo: el titulo, las edades y la cancha cambian una vez
+   por año, asi que el bloque va plegado y en gris, sin recuadro de color. No es una
+   zona de peligro, solo algo que casi nunca se toca y no tiene que competir con las
+   fichas, que son lo que se usa cada sabado. */
+.editar-grupo { margin: 0 0 12px; }
+.editar-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--texto-suave);
+  list-style: none;
+}
+.editar-grupo-titulo::-webkit-details-marker { display: none; }
+.editar-grupo-titulo::after {
+  content: '+';
+  font-size: 18px;
+  line-height: 1;
+  color: var(--texto-suave);
+}
+.editar-grupo[open] .editar-grupo-titulo::after { content: '\2212'; }
+.editar-grupo[open] {
+  border-left: 2px solid var(--linea);
+  padding-left: 12px;
+}
+.editar-grupo .campo { margin-bottom: 10px; max-width: 320px; }

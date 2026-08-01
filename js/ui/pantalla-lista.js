@@ -1,6 +1,8 @@
 import { ficha, boton, elemento, vaciar } from './componentes.js'
 import { activos } from '../modelo/roster.js'
-import { asignarVoluntario, quitarVoluntario, contarPendientes, filaDe } from '../modelo/lista.js'
+import {
+  asignarVoluntario, quitarVoluntario, contarPendientes, filaDe, editarGrupo,
+} from '../modelo/lista.js'
 import { crearPila } from '../modelo/deshacer.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 
@@ -101,6 +103,41 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     return barra
   }
 
+  function editarRotulo(numeroGrupo, cambios) {
+    const siguiente = editarGrupo(estado(), numeroGrupo, cambios)
+    pila.registrar(siguiente)
+    alCambiar(siguiente)
+    dibujar()
+  }
+
+  // Cada cambio redibuja la pantalla entera, y el <details> recreado nace cerrado.
+  // Anotamos cuales estaban abiertos leyendo el DOM vivo justo antes de vaciarlo,
+  // en vez de llevar una copia aparte que se pueda desincronizar: asi vale igual
+  // si el bloque se abrio con el dedo, con el teclado o buscando en la pagina.
+  let gruposAbiertos = new Set()
+
+  function recordarAbiertos() {
+    gruposAbiertos = new Set(
+      [...raiz.querySelectorAll('.editar-grupo[open]')].map((d) => Number(d.dataset.grupo)),
+    )
+  }
+
+  // Los rotulos casi nunca cambian, asi que van plegados: si estuvieran sueltos en
+  // el encabezado competirian con las fichas, que es lo que se toca todos los sabados.
+  function editorDeGrupo(grupo) {
+    const plegable = elemento('details', ['editar-grupo'])
+    plegable.dataset.grupo = String(grupo.numero)
+    plegable.open = gruposAbiertos.has(grupo.numero)
+    plegable.appendChild(elemento('summary', ['editar-grupo-titulo'], 'Editar grupo'))
+    plegable.appendChild(campo('Título', 'text', `titulo-grupo-${grupo.numero}`, grupo.titulo,
+      (valor) => editarRotulo(grupo.numero, { titulo: valor })))
+    plegable.appendChild(campo('Edades', 'text', `subtitulo-grupo-${grupo.numero}`, grupo.subtitulo,
+      (valor) => editarRotulo(grupo.numero, { subtitulo: valor })))
+    plegable.appendChild(campo('Cancha', 'text', `cancha-grupo-${grupo.numero}`, grupo.cancha,
+      (valor) => editarRotulo(grupo.numero, { cancha: valor })))
+    return plegable
+  }
+
   function dibujarGrupo(grupo) {
     const caja = elemento('section', ['grupo'])
     const encabezado = elemento('header', ['grupo-encabezado'])
@@ -109,6 +146,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     const cuenta = contarPendientes(estado(), grupo.numero, roster)
     encabezado.appendChild(elemento('p', ['pendientes'],
       `${cuenta.participantesSinVoluntario} sin acompañante · ${cuenta.voluntariosSinAsignar} voluntarios libres`))
+    encabezado.appendChild(editorDeGrupo(grupo))
     caja.appendChild(encabezado)
 
     const columna = elemento('div', ['columna', 'columna-participantes'])
@@ -159,6 +197,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   }
 
   function dibujar() {
+    recordarAbiertos()
     vaciar(raiz)
     raiz.appendChild(encabezado())
     raiz.appendChild(barra())

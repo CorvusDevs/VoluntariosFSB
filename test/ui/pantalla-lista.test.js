@@ -180,6 +180,69 @@ describe('pantalla de armado', () => {
     expect(avisos).toBe(1)
   })
 
+  it('permite editar el rotulo de cada grupo', () => {
+    const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
+    expect(entrada).not.toBeNull()
+    entrada.value = 'Mayores'
+    entrada.dispatchEvent(new Event('change'))
+    expect(pantalla.lista().grupos[0].titulo).toBe('Mayores')
+  })
+
+  it('editar el subtitulo y la cancha tambien actualiza la lista', () => {
+    const sub = raiz.querySelector('[data-campo="subtitulo-grupo-2"]')
+    sub.value = '5 a 9 años'
+    sub.dispatchEvent(new Event('change'))
+    const cancha = raiz.querySelector('[data-campo="cancha-grupo-2"]')
+    cancha.value = 'Cancha B'
+    cancha.dispatchEvent(new Event('change'))
+    expect(pantalla.lista().grupos[1].subtitulo).toBe('5 a 9 años')
+    expect(pantalla.lista().grupos[1].cancha).toBe('Cancha B')
+  })
+
+  it('el bloque de edicion viene plegado', () => {
+    const plegable = raiz.querySelector('.editar-grupo')
+    expect(plegable.tagName).toBe('DETAILS')
+    expect(plegable.open).toBe(false)
+  })
+
+  // Cada cambio redibuja la pantalla entera, y el redibujado crea un <details>
+  // nuevo, que nace cerrado. Sin memoria del estado abierto, el bloque se cierra
+  // solo despues de escribir el primer campo y hay que volver a abrirlo para el
+  // segundo, tres veces seguidas. Medido: open pasaba de true a false.
+  it('el bloque de edicion sigue abierto despues de editar un campo', () => {
+    raiz.querySelector('.editar-grupo').open = true
+    const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
+    entrada.value = 'Mayores'
+    entrada.dispatchEvent(new Event('change'))
+    expect(raiz.querySelector('.editar-grupo').open).toBe(true)
+  })
+
+  it('recordar el bloque abierto no abre el del otro grupo', () => {
+    raiz.querySelector('.editar-grupo').open = true
+    const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
+    entrada.value = 'Mayores'
+    entrada.dispatchEvent(new Event('change'))
+    expect([...raiz.querySelectorAll('.editar-grupo')].map((d) => d.open)).toEqual([true, false])
+  })
+
+  it('el bloque que se cierra a mano queda cerrado', () => {
+    const plegable = raiz.querySelector('.editar-grupo')
+    plegable.open = true
+    plegable.open = false
+    const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
+    entrada.value = 'Mayores'
+    entrada.dispatchEvent(new Event('change'))
+    expect(raiz.querySelector('.editar-grupo').open).toBe(false)
+  })
+
+  it('el titulo editado se ve en el encabezado del grupo', () => {
+    const entrada = raiz.querySelector('[data-campo="titulo-grupo-1"]')
+    entrada.value = 'Mayores'
+    entrada.dispatchEvent(new Event('change'))
+    const titulos = [...raiz.querySelectorAll('.grupo-encabezado h2')].map((e) => e.textContent)
+    expect(titulos[0]).toContain('Mayores')
+  })
+
   it('avisa al cambiar la lista', () => {
     let avisos = 0
     const p = crearPantallaLista(raiz, {

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   crearLista, asignarVoluntario, quitarVoluntario, fusionarParticipantes,
   separarParticipante, moverAGrupo, agregarApoyo, contarPendientes, filaDe,
-  sincronizarConRoster,
+  sincronizarConRoster, editarGrupo,
 } from '../../js/modelo/lista.js'
 import { ROSTER } from '../ayudas/datos.js'
 
@@ -195,5 +195,38 @@ describe('sincronizarConRoster', () => {
     sincronizarConRoster(l, ROSTER)
     expect(l).toEqual(copiaLista)
     expect(ROSTER).toEqual(copiaRoster)
+  })
+})
+
+describe('editarGrupo', () => {
+  it('cambia el titulo, el subtitulo y la cancha', () => {
+    const l = editarGrupo(crearLista('2026-08-08', ROSTER), 1, {
+      titulo: 'Mayores', subtitulo: '10 a 17 años', cancha: 'Cancha B',
+    })
+    expect(l.grupos[0].titulo).toBe('Mayores')
+    expect(l.grupos[0].subtitulo).toBe('10 a 17 años')
+    expect(l.grupos[0].cancha).toBe('Cancha B')
+  })
+
+  it('no toca el otro grupo', () => {
+    const original = crearLista('2026-08-08', ROSTER)
+    const l = editarGrupo(original, 1, { titulo: 'Mayores' })
+    expect(l.grupos[1].titulo).toBe(original.grupos[1].titulo)
+  })
+
+  it('no modifica la lista original', () => {
+    const original = crearLista('2026-08-08', ROSTER)
+    editarGrupo(original, 1, { titulo: 'Mayores' })
+    expect(original.grupos[0].titulo).toBe('Grupo 1')
+  })
+
+  it('ignora cualquier campo que no sea de rotulo', () => {
+    const l = editarGrupo(crearLista('2026-08-08', ROSTER), 1, {
+      titulo: 'Mayores', filas: [], numero: 9, apoyo: ['x'],
+    })
+    expect(l.grupos[0].titulo).toBe('Mayores')
+    expect(l.grupos[0].numero).toBe(1)
+    expect(l.grupos[0].filas.length).toBeGreaterThan(0)
+    expect(l.grupos[0].apoyo).toEqual([])
   })
 })
