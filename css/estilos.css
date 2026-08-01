@@ -193,3 +193,16 @@ body {
   cursor: pointer;
 }
 .boton-foto:focus-within { outline: 2px solid var(--violeta); outline-offset: 2px; }
+
+.opciones-imagen { display: flex; flex-wrap: wrap; gap: 16px; padding: 16px; }
+.opcion { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; }
+.info-imagen { padding: 0 16px 8px; font-size: 13px; color: var(--texto-suave); }
+.aviso-recorte {
+  margin: 0 16px 12px; padding: 12px; border-radius: 10px;
+  background: #FAEEDA; color: #633806; font-size: 14px; line-height: 1.5;
+}
+.acciones-imagen { display: flex; gap: 8px; padding: 0 16px 16px; flex-wrap: wrap; }
+.lienzo-vista-previa {
+  display: block; width: calc(100% - 32px); height: auto; margin: 0 16px 24px;
+  border: 1px solid var(--linea); border-radius: 12px;
+}

@@ -1,9 +1,13 @@
 import { almacen } from './almacen/indice.js'
 import { crearPantallaLista } from './ui/pantalla-lista.js'
 import { crearPantallaPersonas } from './ui/pantalla-personas.js'
+import { crearPantallaVistaPrevia } from './ui/pantalla-vista-previa.js'
 import { crearLista, sincronizarConRoster } from './modelo/lista.js'
 import { proximoSabado } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
+
+const SALUDO = 'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
+const DESPEDIDA = 'Nos vemos mañana. Gracias a todos.'
 
 const contenedor = document.getElementById('app')
 const deposito = await almacen()
@@ -21,8 +25,16 @@ function navegacion() {
     if (pantalla === destino) b.classList.add('activa')
     return b
   }
-  nav.append(ir('lista', 'Armar lista'), ir('personas', 'Personas'))
+  nav.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
   return nav
+}
+
+// El deposito guarda las fotos como blobs. El pintor necesita algo que
+// drawImage acepte, asi que las convertimos a mapa de bits una sola vez.
+async function cargarFoto(clave) {
+  const blob = await deposito.leerFoto(clave)
+  if (!blob) return null
+  return createImageBitmap(blob)
 }
 
 function dibujar() {
@@ -51,6 +63,18 @@ function dibujar() {
           coordinacion: lista.coordinacion,
         })
         dibujar()
+      },
+    })
+  } else if (pantalla === 'vista-previa') {
+    crearPantallaVistaPrevia(cuerpo, {
+      lista,
+      roster,
+      saludo: SALUDO,
+      despedida: DESPEDIDA,
+      cargarFoto,
+      alCambiar: async (siguiente) => {
+        lista = siguiente
+        await deposito.guardarLista(lista)
       },
     })
   } else {
