@@ -27,7 +27,7 @@ export const LISTA = {
     {
       numero: 1,
       titulo: 'Grupo 1',
-      subtitulo: '5 a 9 años',
+      subtitulo: '10 a 17 años',
       cancha: 'Cancha 1',
       filas: [
         { participantes: ['p1'], voluntarios: ['v1'] },
@@ -39,7 +39,7 @@ export const LISTA = {
     {
       numero: 2,
       titulo: 'Grupo 2',
-      subtitulo: '10 a 17 años',
+      subtitulo: '5 a 9 años',
       cancha: 'Cancha 2',
       filas: [
         { participantes: ['p4'], voluntarios: ['v2', 'v3'] },

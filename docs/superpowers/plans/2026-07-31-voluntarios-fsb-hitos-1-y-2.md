@@ -3304,3 +3304,13 @@ El plan predecía 12 pruebas en la tarea 4 y 18 en la tarea 5. Los conteos reale
 - Desactivar las fotos no reduce la altura de la imagen, porque `altoFila` no cambia. Quien destilde "fotos" esperando una imagen más corta no obtiene nada. Es una decisión de producto que conviene tomar viendo el render.
 - Con 19 filas o más, `recorteProbable` se enciende. Un sábado real tiene entre 17 y 20, así que el aviso va a aparecer seguido y el interruptor de compacto tiene que estar bien visible en la vista previa.
 - `buscar` aborta toda la maquetación ante un id colgado. Degradar con un marcador visible y una lista de problemas en el plano es mejor, pero corresponde a la pantalla de vista previa.
+
+## Corrección posterior a la puesta en uso: los rangos de edad estaban al revés
+
+El 1 de agosto de 2026, ya con la aplicación en uso real, la usuaria que coordina el programa avisó que los rangos de edad de `POR_DEFECTO` estaban invertidos. El grupo 1 es el de **10 a 17 años** y el grupo 2 el de **5 a 9 años**, no al revés como figura en la especificación y en los bloques de código de este plan. Manda lo que dijo la usuaria, que es quien lleva el programa.
+
+- `js/modelo/lista.js`, `POR_DEFECTO`: se intercambian los dos `subtitulo`. Los `titulo` y las `cancha` quedan como estaban, o sea el grupo 1 sigue siendo "Grupo 1" en la "Cancha 1".
+- Se acompaña el cambio en la fixture compartida `test/ayudas/datos.js` y en las afirmaciones de `test/modelo/lista.test.js` y `test/imagen/maquetar.test.js`.
+- La especificación (`docs/superpowers/specs/2026-07-31-voluntarios-fsb-design.md`) y los bloques de código de este plan **no** se tocan: registran lo que se creía en su momento. Ante la diferencia, manda esta entrada.
+
+Como el rango dejó de ser un dato de confianza, la misma corrección trajo la posibilidad de editar el rótulo de cada grupo desde la pantalla de armado, así un cambio futuro no vuelve a exigir tocar el código. Ver `editarGrupo` en `js/modelo/lista.js` y el bloque plegado `.editar-grupo` en `js/ui/pantalla-lista.js`.

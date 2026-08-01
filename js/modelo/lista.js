@@ -1,8 +1,8 @@
 import { activos } from './roster.js'
 
 const POR_DEFECTO = {
-  1: { titulo: 'Grupo 1', subtitulo: '5 a 9 años', cancha: 'Cancha 1' },
-  2: { titulo: 'Grupo 2', subtitulo: '10 a 17 años', cancha: 'Cancha 2' },
+  1: { titulo: 'Grupo 1', subtitulo: '10 a 17 años', cancha: 'Cancha 1' },
+  2: { titulo: 'Grupo 2', subtitulo: '5 a 9 años', cancha: 'Cancha 2' },
 }
 
 export function crearLista(fecha, roster, base = {}) {

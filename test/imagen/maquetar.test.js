@@ -26,9 +26,9 @@ describe('maquetar', () => {
 
   it('escribe los titulos y las canchas de los dos grupos', () => {
     const t = textos(maquetar(LISTA, ROSTER, opciones))
-    expect(t).toContain('Grupo 1 · 5 a 9 años')
+    expect(t).toContain('Grupo 1 · 10 a 17 años')
     expect(t).toContain('Cancha 1')
-    expect(t).toContain('Grupo 2 · 10 a 17 años')
+    expect(t).toContain('Grupo 2 · 5 a 9 años')
     expect(t).toContain('Cancha 2')
   })
 

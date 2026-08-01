@@ -30,8 +30,8 @@ describe('crearLista', () => {
 
   it('trae los subtitulos y canchas por defecto', () => {
     const l = crearLista('2026-08-08', ROSTER)
-    expect(l.grupos[0].subtitulo).toBe('5 a 9 años')
-    expect(l.grupos[1].subtitulo).toBe('10 a 17 años')
+    expect(l.grupos[0].subtitulo).toBe('10 a 17 años')
+    expect(l.grupos[1].subtitulo).toBe('5 a 9 años')
     expect(l.grupos[0].cancha).toBe('Cancha 1')
   })
 })
