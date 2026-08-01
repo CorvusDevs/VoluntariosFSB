@@ -315,3 +315,57 @@ body {
     max-width: 100%;
   }
 }
+
+/* Zona de peligro: rotar el token deja afuera a todo el mundo a la vez, asi que
+   va plegada y senalizada, no a un toque de las acciones de todos los dias.
+   Contraste verificado con la funcion contraste() de js/imagen/tema.js:
+   7,97 el texto y 7,46 el boton, ambos por encima de AA. */
+.zona-peligro {
+  border: 1px solid #F1B4AE;
+  border-radius: 12px;
+  background: #FDECEA;
+  padding: 0 16px;
+}
+.zona-peligro[open] { padding-bottom: 16px; }
+.zona-peligro-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 500;
+  color: #8C1D18;
+  list-style: none;
+}
+.zona-peligro-titulo::-webkit-details-marker { display: none; }
+.zona-peligro-titulo::after {
+  content: '+';
+  margin-left: auto;
+  font-size: 20px;
+  line-height: 1;
+  color: #8C1D18;
+}
+.zona-peligro[open] .zona-peligro-titulo::after { content: '\2212'; }
+.zona-peligro-marca {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 3px 8px;
+  border-radius: 20px;
+  background: #A3231C;
+  color: #FFFFFF;
+}
+.aviso-rotar {
+  background: transparent;
+  color: #8C1D18;
+  padding: 0 0 12px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.boton-peligro {
+  border-color: #A3231C;
+  background: #A3231C;
+  color: #FFFFFF;
+}

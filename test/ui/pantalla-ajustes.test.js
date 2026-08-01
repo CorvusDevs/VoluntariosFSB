@@ -238,8 +238,27 @@ describe('quitar a una persona', () => {
 })
 
 describe('rotar el token', () => {
-  it('advierte que las contraseñas actuales dejan de servir', () => {
-    expect(raiz.querySelector('.aviso-rotar').textContent).toMatch(/dejan de servir/i)
+  it('advierte que es destructivo y que deja a todas afuera', () => {
+    const aviso = raiz.querySelector('.aviso-rotar').textContent
+    expect(aviso).toMatch(/no se puede deshacer/i)
+    expect(aviso).toMatch(/dejan de funcionar/i)
+    expect(aviso).toMatch(/incluida la tuya/i)
+  })
+
+  it('viene plegado, para no quedar a un toque de las acciones de todos los dias', () => {
+    const plegable = raiz.querySelector('.zona-peligro')
+    expect(plegable).not.toBeNull()
+    expect(plegable.tagName).toBe('DETAILS')
+    expect(plegable.open).toBe(false)
+    expect(plegable.querySelector('summary').textContent).toMatch(/rotar el token/i)
+  })
+
+  it('el formulario y el aviso viven adentro del plegable', () => {
+    const plegable = raiz.querySelector('.zona-peligro')
+    expect(plegable.querySelector('.formulario-rotar')).not.toBeNull()
+    expect(plegable.querySelector('.aviso-rotar')).not.toBeNull()
+    expect(raiz.querySelector('[data-campo="token-nuevo"]').closest('.zona-peligro'))
+      .toBe(plegable)
   })
 
   it('vuelve a cifrar para todas y muestra todas las contraseñas nuevas', async () => {

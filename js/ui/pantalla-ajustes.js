@@ -158,13 +158,30 @@ export function crearPantallaAjustes(raiz, opciones) {
   }
 
   function seccionRotar() {
+    // Va plegada y con la advertencia adentro a proposito. Rotar el token deja
+    // afuera a todo el mundo a la vez, y no es algo que deba quedar a un toque
+    // de distancia de las acciones cotidianas.
     const seccion = elemento('section', ['seccion'])
-    seccion.appendChild(elemento('h3', [], 'Rotar el token'))
-    seccion.appendChild(elemento('p', ['aviso', 'aviso-rotar'],
-      'Al rotar el token, todas las contraseñas actuales dejan de servir. La aplicación genera una nueva para cada persona y hay que repartirlas.'))
+    const plegable = document.createElement('details')
+    plegable.className = 'zona-peligro'
+
+    const resumen = document.createElement('summary')
+    resumen.className = 'zona-peligro-titulo'
+    resumen.dataset.accion = 'abrir-rotar'
+    resumen.append(
+      elemento('span', ['zona-peligro-marca'], 'Cuidado'),
+      elemento('span', [], 'Rotar el token'),
+    )
+    plegable.appendChild(resumen)
+
+    plegable.appendChild(elemento('p', ['aviso', 'aviso-rotar'],
+      'Esto no se puede deshacer. Al rotar el token, las contraseñas de todas las '
+      + 'coordinadoras dejan de funcionar en el momento, incluida la tuya. La aplicación '
+      + 'genera una nueva para cada persona y las tenés que repartir una por una antes de '
+      + 'que alguien pueda volver a entrar. Hacelo solo si el token se filtró o venció.'))
 
     const token = campo('Token nuevo de GitHub', 'password', 'token-nuevo', { autocomplete: 'off' })
-    const enviar = elemento('button', ['boton'], 'Rotar el token')
+    const enviar = elemento('button', ['boton', 'boton-peligro'], 'Rotar el token')
     enviar.type = 'submit'
     enviar.dataset.accion = 'rotar'
 
@@ -196,7 +213,8 @@ export function crearPantallaAjustes(raiz, opciones) {
       })
     })
 
-    seccion.appendChild(formulario)
+    plegable.appendChild(formulario)
+    seccion.appendChild(plegable)
     return seccion
   }
 
