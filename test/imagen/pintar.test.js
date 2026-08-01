@@ -79,6 +79,27 @@ describe('pintar', () => {
     expect(ctx.llamadas.some((l) => l.nombre === 'drawImage')).toBe(true)
   })
 
+  it('recorta en rectangulo redondeado cuando la orden trae radio', () => {
+    const ctx = contextoFalso()
+    pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 30, alto: 40, radio: 8 },
+    ]), { 'f.jpg': {} }, 1)
+    const redondeado = ctx.llamadas.find((l) => l.nombre === 'roundRect')
+    expect(redondeado).toBeTruthy()
+    expect(redondeado.args).toEqual([0, 0, 30, 40, 8])
+    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(true)
+    expect(ctx.llamadas.some((l) => l.nombre === 'arc')).toBe(false)
+  })
+
+  it('una imagen sin radio ni circular se dibuja sin recorte', () => {
+    const ctx = contextoFalso()
+    pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 30, alto: 40 },
+    ]), { 'f.jpg': {} }, 1)
+    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(false)
+    expect(ctx.llamadas.some((l) => l.nombre === 'drawImage')).toBe(true)
+  })
+
   it('omite en silencio una imagen que no se pudo cargar', () => {
     const ctx = contextoFalso()
     expect(() => pintar(ctx, plano([

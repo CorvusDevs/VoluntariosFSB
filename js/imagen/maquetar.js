@@ -1,4 +1,6 @@
-import { ANCHO, COLORES, COLUMNAS, FUENTES, anchoDeCelda, medidas } from './tema.js'
+import {
+  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, medidas,
+} from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { iniciales } from '../util/nombres.js'
 
@@ -27,14 +29,14 @@ export function maquetar(lista, roster, opciones = {}) {
   // Dos formatos: apilado, una fila por participante, y en columnas, dos por
   // fila con la foto casi al doble. La cabecera, los titulos, los apoyos y las
   // bandas son iguales en los dos: lo unico que cambia es el cuerpo del grupo.
-  const enColumnas = lista.opcionesImagen?.formato === 'columnas'
+  const formato = ['filas', 'columnas', 'grilla'].includes(lista.opcionesImagen?.formato)
+    ? lista.opcionesImagen.formato
+    : 'filas'
 
   lista.grupos.forEach((grupo, i) => {
     if (i > 0) y += m.espacioEntreGrupos
     y = tituloGrupo(ordenes, grupo, m, y)
-    y = enColumnas
-      ? cuerpoEnColumnas(ordenes, grupo, porId, m, y, conFotos, medirTexto)
-      : cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto)
+    y = CUERPOS[formato](ordenes, grupo, porId, m, y, conFotos, medirTexto)
     if (grupo.apoyo?.length) {
       y = lineaApoyo(ordenes, grupo, porId, m, y)
     }
@@ -246,6 +248,86 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
   return abajo
 }
 
+// Grilla: cinco por fila, foto vertical redondeada y el nombre debajo. La celda
+// mide lo mismo en todo el grupo, calculada a partir del nombre que mas renglones
+// necesita, para que las fotos queden alineadas y no escalonadas.
+function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
+  const ancho = anchoDeCeldaGrilla(m.margen)
+  const altoFoto = Math.round(ancho * GRILLA.proporcionFoto)
+  const fuenteNombre = FUENTES.titulo(GRILLA.pxNombre)
+  const fuenteVoluntario = FUENTES.normal(GRILLA.pxVoluntario)
+
+  const celdas = grupo.filas.map((fila) => {
+    const participantes = fila.participantes.map((id) => buscar(porId, id))
+    if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
+    const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
+    const nombre = participantes.map((p) => p.nombre).join(' / ')
+    const acompanan = voluntarios.map((v) => v.nombre + (v.nuevo ? ' (nuevo)' : '')).join(' / ')
+    return {
+      fila,
+      participantes,
+      lineasNombre: quebrar(nombre, ancho, fuenteNombre, medirTexto),
+      lineasVoluntario: acompanan ? quebrar(acompanan, ancho, fuenteVoluntario, medirTexto) : [],
+    }
+  })
+
+  const maxNombre = Math.max(1, ...celdas.map((c) => c.lineasNombre.length))
+  const maxVoluntario = Math.max(0, ...celdas.map((c) => c.lineasVoluntario.length))
+  const altoTexto = maxNombre * GRILLA.pxNombre
+    + (maxVoluntario > 0 ? GRILLA.espacioBajoNombre + maxVoluntario * GRILLA.pxVoluntario : 0)
+  const altoCelda = (conFotos ? altoFoto + GRILLA.espacioBajoFoto : 0)
+    + altoTexto + GRILLA.margenInferior
+
+  let cursor = y
+  celdas.forEach((celda, i) => {
+    const columna = i % GRILLA.porFila
+    const x = m.margen + columna * (ancho + GRILLA.separacion)
+    const arriba = cursor
+    const clave = celda.fila.participantes[0]
+    let textoY = arriba
+
+    if (conFotos) {
+      const primero = celda.participantes[0]
+      ordenes.push({
+        tipo: 'rect', x, y: arriba, ancho, alto: altoFoto,
+        color: colorDeGrupo(grupo.numero).tenue, radio: GRILLA.radioFoto, fila: clave,
+      })
+      ordenes.push({
+        tipo: 'texto', texto: iniciales(primero.nombre), x: x + ancho / 2, y: arriba + altoFoto / 2,
+        fuente: FUENTES.titulo(Math.round(ancho * GRILLA.factorIniciales)), color: COLORES.violeta,
+        alineacion: 'center', lineaBase: 'middle', fila: clave,
+      })
+      if (primero.foto) {
+        ordenes.push({
+          tipo: 'imagen', clave: primero.foto, x, y: arriba, ancho, alto: altoFoto,
+          radio: GRILLA.radioFoto, fila: clave,
+        })
+      }
+      textoY = arriba + altoFoto + GRILLA.espacioBajoFoto
+    }
+
+    celda.lineasNombre.forEach((linea, n) => {
+      ordenes.push({
+        tipo: 'texto', texto: linea, x: x + ancho / 2, y: textoY + n * GRILLA.pxNombre + GRILLA.pxNombre / 2,
+        fuente: fuenteNombre, color: COLORES.texto,
+        alineacion: 'center', lineaBase: 'middle', fila: clave,
+      })
+    })
+    const yVoluntario = textoY + maxNombre * GRILLA.pxNombre + GRILLA.espacioBajoNombre
+    celda.lineasVoluntario.forEach((linea, n) => {
+      ordenes.push({
+        tipo: 'texto', texto: linea, x: x + ancho / 2,
+        y: yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
+        fuente: fuenteVoluntario, color: COLORES.magentaTexto,
+        alineacion: 'center', lineaBase: 'middle', fila: clave,
+      })
+    })
+
+    if (columna === GRILLA.porFila - 1 || i === celdas.length - 1) cursor += altoCelda
+  })
+  return cursor
+}
+
 function cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   let cursor = y
   grupo.filas.forEach((fila) => {
@@ -265,6 +347,12 @@ function cuerpoEnColumnas(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     if (!izquierda || i === grupo.filas.length - 1) cursor += COLUMNAS.altoCelda
   })
   return cursor
+}
+
+const CUERPOS = {
+  filas: cuerpoApilado,
+  columnas: cuerpoEnColumnas,
+  grilla: cuerpoEnGrilla,
 }
 
 function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medirTexto, numeroGrupo) {

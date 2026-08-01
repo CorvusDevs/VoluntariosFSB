@@ -65,6 +65,12 @@ function imagen(ctx, o, imagenes) {
       ctx.arc(o.x + o.ancho / 2, o.y + o.alto / 2, o.ancho / 2, 0, Math.PI * 2)
       ctx.closePath()
       ctx.clip()
+    } else if (o.radio) {
+      // Foto rectangular con esquinas redondeadas, para la grilla.
+      ctx.beginPath()
+      ctx.roundRect(o.x, o.y, o.ancho, o.alto, o.radio)
+      ctx.closePath()
+      ctx.clip()
     }
     ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
   } finally {

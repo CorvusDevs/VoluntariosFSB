@@ -320,7 +320,7 @@ describe('selector de formato', () => {
   it('ofrece los dos formatos y arranca en lista', () => {
     const selector = raiz.querySelector('[data-campo="formato"]')
     expect(selector).not.toBeNull()
-    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas'])
+    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas', 'grilla'])
     expect(selector.value).toBe('filas')
   })
 

@@ -77,6 +77,28 @@ export const COLUMNAS = Object.freeze({
   factorIniciales: 0.4,
 })
 
+// Grilla: cinco por fila, foto vertical con esquinas redondeadas y el nombre
+// debajo. Vertical porque es la forma de una cara, y de a cinco porque nueve
+// chicos en filas de cinco dan dos filas y no tres, que es lo que decide la
+// altura de la imagen.
+export const GRILLA = Object.freeze({
+  porFila: 5,
+  separacion: 16,
+  proporcionFoto: 4 / 3,   // alto sobre ancho
+  radioFoto: 16,
+  espacioBajoFoto: 10,
+  pxNombre: 32,
+  pxVoluntario: 26,
+  espacioBajoNombre: 6,
+  margenInferior: 12,
+  factorIniciales: 0.3,
+})
+
+export function anchoDeCeldaGrilla(margen) {
+  const total = ANCHO - margen * 2 - GRILLA.separacion * (GRILLA.porFila - 1)
+  return Math.floor(total / GRILLA.porFila)
+}
+
 export function anchoDeCelda(margen) {
   return Math.floor((ANCHO - margen * 2 - COLUMNAS.separacion) / 2)
 }

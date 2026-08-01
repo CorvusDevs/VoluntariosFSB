@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { maquetar } from '../../js/imagen/maquetar.js'
-import { ANCHO, COLORES, COLUMNAS } from '../../js/imagen/tema.js'
+import { ANCHO, COLORES, COLUMNAS, GRILLA } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
 const opciones = { saludo: SALUDO, despedida: DESPEDIDA, medirTexto: medirFalso }
@@ -338,5 +338,92 @@ describe('formato de dos columnas', () => {
     const sinFormato = maquetar(LISTA, ROSTER, opciones)
     const circulos = sinFormato.ordenes.filter((o) => o.tipo === 'circulo')
     expect(circulos.find((o) => o.fila === 'p1').y).not.toBe(circulos.find((o) => o.fila === 'p2').y)
+  })
+})
+
+describe('formato de grilla', () => {
+  const enGrilla = (base = LISTA) => maquetar(
+    { ...base, opcionesImagen: { ...base.opcionesImagen, formato: 'grilla' } },
+    ROSTER, opciones,
+  )
+
+  it('dibuja la foto como rectangulo redondeado, no como circulo', () => {
+    const plano = enGrilla()
+    expect(plano.ordenes.filter((o) => o.tipo === 'circulo')).toHaveLength(0)
+    const marco = plano.ordenes.find((o) => o.tipo === 'rect' && o.fila === 'p1')
+    expect(marco.radio).toBe(GRILLA.radioFoto)
+    expect(marco.alto).toBeGreaterThan(marco.ancho)
+  })
+
+  it('la foto es mas de tres veces mas ancha que en el formato apilado', () => {
+    const grande = enGrilla().ordenes.find((o) => o.tipo === 'rect' && o.fila === 'p1').ancho
+    const chica = maquetar(LISTA, ROSTER, opciones).ordenes.find((o) => o.tipo === 'circulo').radio * 2
+    expect(grande / chica).toBeGreaterThan(3)
+  })
+
+  it('pone hasta cinco por fila, todos a la misma altura', () => {
+    const plano = enGrilla()
+    const marcos = ['p1', 'p2', 'p3'].map((id) =>
+      plano.ordenes.find((o) => o.tipo === 'rect' && o.fila === id))
+    expect(marcos[0].y).toBe(marcos[1].y)
+    expect(marcos[0].y).toBe(marcos[2].y)
+    expect(marcos[1].x).toBeGreaterThan(marcos[0].x)
+    expect(marcos[2].x).toBeGreaterThan(marcos[1].x)
+  })
+
+  it('la imagen de la foto tambien lleva el radio, para recortarse redondeada', () => {
+    const foto = enGrilla().ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p3.jpg')
+    expect(foto.radio).toBe(GRILLA.radioFoto)
+    expect(foto.circular).toBeUndefined()
+  })
+
+  it('el nombre va debajo de la foto y centrado', () => {
+    const plano = enGrilla()
+    const marco = plano.ordenes.find((o) => o.tipo === 'rect' && o.fila === 'p1')
+    const nombre = plano.ordenes.find((o) => o.fila === 'p1' && o.texto === 'Gonzalo')
+    expect(nombre.y).toBeGreaterThan(marco.y + marco.alto)
+    expect(nombre.alineacion).toBe('center')
+    expect(Math.round(nombre.x)).toBe(Math.round(marco.x + marco.ancho / 2))
+  })
+
+  it('parte en dos renglones el nombre que no entra en la celda', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].nombre = 'Francisco Planells'
+    const plano = maquetar(
+      { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } },
+      roster, opciones,
+    )
+    const textos = plano.ordenes.filter((o) => o.fila === 'p1' && o.tipo === 'texto').map((o) => o.texto)
+    expect(textos).toContain('Francisco')
+    expect(textos).toContain('Planells')
+    expect(textos).not.toContain('Francisco Planells')
+  })
+
+  it('todas las celdas del grupo miden lo mismo aunque un nombre ocupe dos renglones', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].nombre = 'Francisco Planells'
+    const plano = maquetar(
+      { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } },
+      roster, opciones,
+    )
+    const marcos = ['p1', 'p2', 'p3'].map((id) =>
+      plano.ordenes.find((o) => o.tipo === 'rect' && o.fila === id))
+    expect(marcos[0].y).toBe(marcos[1].y)
+    expect(marcos[1].y).toBe(marcos[2].y)
+  })
+
+  it('nada se sale del lienzo ni invade el margen', () => {
+    const plano = enGrilla()
+    expect(plano.desborde).toBe(false)
+    plano.ordenes.forEach((o) => {
+      expect((o.x ?? 0) + (o.ancho ?? 0)).toBeLessThanOrEqual(ANCHO)
+      expect(o.x ?? 0).toBeGreaterThanOrEqual(0)
+    })
+  })
+
+  it('un formato desconocido cae en el apilado, no rompe', () => {
+    const raro = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'inventado' } }
+    const plano = maquetar(raro, ROSTER, opciones)
+    expect(plano.ordenes.filter((o) => o.tipo === 'circulo').length).toBeGreaterThan(0)
   })
 })

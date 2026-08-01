@@ -72,6 +72,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   const FORMATOS = [
     ['filas', 'Lista, uno por renglón'],
     ['columnas', 'Dos columnas, foto grande'],
+    ['grilla', 'Grilla, foto vertical'],
   ]
 
   function selectorDeFormato() {
