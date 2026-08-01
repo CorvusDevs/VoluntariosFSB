@@ -191,7 +191,7 @@ export function crearPantallaAjustes(raiz, opciones) {
         // El token viejo queda revocado: el almacén tiene que dejar de usarlo
         // o la próxima lista que se guarde falla con un 401.
         sesion.token = nuevo
-        if (alCambiarToken) alCambiarToken(nuevo)
+        if (alCambiarToken) await alCambiarToken(nuevo)
         generadas = nuevas
       })
     })
@@ -257,7 +257,7 @@ export function crearPantallaAjustes(raiz, opciones) {
     // se comprueba acá y además en la navegación, que ni siquiera la ofrece.
     if (!esAdmin(sesion)) {
       caja.appendChild(elemento('p', ['ayuda-ajustes'],
-        'Estos ajustes son de la administración de la aplicación. Si necesitás un cambio, pediselo a quien administra.'))
+        'Estos ajustes son de la administración de la aplicación. Si necesitás un cambio, pedíselo a quien administra.'))
       raiz.appendChild(caja)
       return
     }

@@ -1,4 +1,4 @@
-import { elemento, vaciar } from './componentes.js'
+import { boton, elemento, vaciar } from './componentes.js'
 import { ingresar } from '../acceso/sesion.js'
 
 // Quien pega el token crudo es, por definición, la persona dueña del
@@ -20,7 +20,7 @@ function campo(rotulo, tipo, nombre, atributos = {}) {
   return { caja, entrada }
 }
 
-export function crearPantallaIngreso(raiz, { alEntrar, leerArchivo }) {
+export function crearPantallaIngreso(raiz, { alEntrar, leerArchivo, alSeguirSinIngresar }) {
   // Un solo envío por vez. Deshabilitar el botón no alcanza: el formulario se
   // puede enviar con Enter mientras el foco está en un campo.
   let ocupado = false
@@ -132,6 +132,20 @@ export function crearPantallaIngreso(raiz, { alEntrar, leerArchivo }) {
       error,
       detalleToken,
     )
+    // Una sola persona en un solo teléfono no necesita nada de esto: la
+    // aplicación funciona igual guardando en el dispositivo. El ingreso es
+    // para compartir los datos, no un peaje para usarla.
+    if (alSeguirSinIngresar) {
+      const salida = elemento('div', ['sin-ingresar'])
+      const seguir = boton('Seguir sin ingresar', () => alSeguirSinIngresar())
+      seguir.dataset.accion = 'sin-ingresar'
+      salida.append(
+        seguir,
+        elemento('p', ['ayuda-token'],
+          'Los datos quedan solo en este dispositivo y no se comparten con nadie.'),
+      )
+      caja.appendChild(salida)
+    }
     raiz.appendChild(caja)
   }
 

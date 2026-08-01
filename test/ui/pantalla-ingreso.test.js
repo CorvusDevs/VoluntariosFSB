@@ -277,6 +277,27 @@ describe('secretos', () => {
   })
 })
 
+// La aplicacion sirve igual sin ninguna sesion, en el dispositivo y nada mas.
+// El ingreso es una puerta, no un peaje.
+describe('seguir sin ingresar', () => {
+  it('no se ofrece si quien nos usa no lo permite', () => {
+    expect(raiz.querySelector('[data-accion=sin-ingresar]')).toBeNull()
+  })
+
+  it('avisa hacia afuera cuando se elige', () => {
+    let veces = 0
+    crearPantallaIngreso(raiz, {
+      leerArchivo: async () => archivo,
+      alEntrar: () => {},
+      alSeguirSinIngresar: () => { veces += 1 },
+    })
+    const salida = raiz.querySelector('[data-accion=sin-ingresar]')
+    expect(salida.textContent).toBe('Seguir sin ingresar')
+    salida.click()
+    expect(veces).toBe(1)
+  })
+})
+
 describe('lista de usuarios todavia vacia', () => {
   it('da el mismo mensaje de siempre y deja el token como unica via', async () => {
     montar({ leerArchivo: async () => archivoVacio() })

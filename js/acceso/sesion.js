@@ -48,14 +48,14 @@ function operar(db, modo, accion) {
 // La clave se genera con extractable en false y se guarda como CryptoKey, que
 // IndexedDB clona sin exponer el material. Ni un script en la pagina puede
 // sacarla: solo puede pedirle al navegador que descifre.
-export async function recordar(token, nombre) {
+export async function recordar(token, nombre, { usuario = null, rol = null } = {}) {
   const clave = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const datos = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv }, clave, new TextEncoder().encode(token),
   )
   const db = await abrir()
-  await operar(db, 'readwrite', (d) => d.put({ clave, iv, datos, nombre }, CLAVE))
+  await operar(db, 'readwrite', (d) => d.put({ clave, iv, datos, nombre, usuario, rol }, CLAVE))
   db.close()
 }
 
@@ -68,7 +68,14 @@ export async function recuperarRecordado() {
     const datos = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: guardado.iv }, guardado.clave, guardado.datos,
     )
-    return { token: new TextDecoder().decode(datos), nombre: guardado.nombre }
+    return {
+      token: new TextDecoder().decode(datos),
+      nombre: guardado.nombre,
+      usuario: guardado.usuario ?? null,
+      // Sin rol guardado, el permiso mas bajo: que un registro viejo o
+      // manipulado abra los ajustes seria peor que pedir que entre de nuevo.
+      rol: guardado.rol ?? 'coordinacion',
+    }
   } catch {
     return null
   }

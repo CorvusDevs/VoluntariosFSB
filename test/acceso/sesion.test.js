@@ -63,4 +63,18 @@ describe('recordar y recuperar', () => {
     expect(crudo.clave.extractable).toBe(false)
     await expect(crypto.subtle.exportKey('raw', crudo.clave)).rejects.toThrow()
   })
+
+  // Sin el rol, al volver a abrir la aplicacion no se sabe si corresponde
+  // ofrecer los ajustes, y una administradora los perderia por recordarse.
+  it('recuerda tambien el usuario y el rol', async () => {
+    await recordar('ghp_token', 'Majo', { usuario: 'majo', rol: 'admin' })
+    const recordado = await recuperarRecordado()
+    expect(recordado.usuario).toBe('majo')
+    expect(recordado.rol).toBe('admin')
+  })
+
+  it('sin rol guardado asume el permiso mas bajo', async () => {
+    await recordar('ghp_token', 'Majo')
+    expect((await recuperarRecordado()).rol).toBe('coordinacion')
+  })
 })

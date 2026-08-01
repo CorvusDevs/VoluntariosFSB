@@ -239,3 +239,11 @@ body {
   font-size: 17px; letter-spacing: 0.5px; word-break: break-all;
   padding: 10px 12px; border-radius: 8px; background: var(--fondo); color: var(--texto);
 }
+.sin-ingresar { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--linea); }
+.sin-ingresar .ayuda-token { margin: 8px 0 0; }
+
+/* Con ajustes y cierre de sesion la navegacion pasa de tres botones a cinco y
+   en 375 px se salia de la pantalla. Envuelve en vez de esconder: en un
+   telefono nadie descubre un boton que quedo fuera de un scroll horizontal. */
+.navegacion { flex-wrap: wrap; }
+.navegacion .boton { font-size: 14px; padding: 10px 14px; }
