@@ -283,3 +283,37 @@ describe('pantalla de armado', () => {
     expect(p.lista()).toBeTruthy()
   })
 })
+
+describe('ausencias desde la pantalla', () => {
+  it('la barra de seleccion ofrece sacar al participante de la jornada', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    expect(raiz.querySelector('[data-accion="sacar-de-lista"]')).not.toBeNull()
+  })
+
+  it('sacarlo lo quita de su grupo y lo lista como ausente', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    raiz.querySelector('[data-accion="sacar-de-lista"]').click()
+    expect(porNombre('.columna-participantes .ficha', 'Gonzalo')).toBeUndefined()
+    expect(pantalla.lista().ausentes).toContain('p1')
+    expect(raiz.querySelector('.ausentes').textContent).toContain('Gonzalo')
+  })
+
+  it('tocar al ausente lo devuelve a la planilla', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    raiz.querySelector('[data-accion="sacar-de-lista"]').click()
+    porNombre('.columna-ausentes .ficha', 'Gonzalo').click()
+    expect(porNombre('.columna-participantes .ficha', 'Gonzalo')).toBeDefined()
+    expect(pantalla.lista().ausentes).not.toContain('p1')
+  })
+
+  it('sin ausentes no se dibuja la seccion', () => {
+    expect(raiz.querySelector('.ausentes')).toBeNull()
+  })
+
+  it('deshacer revierte una ausencia', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    raiz.querySelector('[data-accion="sacar-de-lista"]').click()
+    raiz.querySelector('[data-accion="deshacer"]').click()
+    expect(porNombre('.columna-participantes .ficha', 'Gonzalo')).toBeDefined()
+  })
+})

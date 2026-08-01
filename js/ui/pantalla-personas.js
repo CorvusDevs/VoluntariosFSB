@@ -57,8 +57,38 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
   function filaPersona(persona, tipo) {
     const fila = elemento('div', ['fila-persona'])
     fila.dataset.id = persona.id
-    fila.appendChild(elemento('span', ['fila-nombre'], persona.nombre))
-    if (persona.nuevo) fila.appendChild(elemento('span', ['pastilla'], 'nuevo'))
+
+    // El nombre es editable en el lugar: se escriben mal, cambian de apodo, y
+    // obligar a dar de baja y volver a crear perderia la foto y el historial.
+    const nombre = document.createElement('input')
+    nombre.type = 'text'
+    nombre.className = 'fila-nombre'
+    nombre.dataset.campo = 'nombre'
+    nombre.value = persona.nombre
+    nombre.setAttribute('aria-label', `Nombre de ${persona.nombre}`)
+    nombre.autocapitalize = 'words'
+    nombre.addEventListener('change', async () => {
+      const valor = nombre.value.trim()
+      if (!valor || valor === persona.nombre) {
+        nombre.value = persona.nombre
+        return
+      }
+      await guardar(editarPersona(actual, persona.id, { nombre: valor }))
+    })
+    fila.appendChild(nombre)
+
+    // Tanto voluntarios como participantes pueden ser nuevos: en la imagen sale
+    // la pastilla, que es lo que le avisa al resto que todavia no se conocen.
+    const marcaNueva = elemento('label', ['marca-nuevo'])
+    const casilla = document.createElement('input')
+    casilla.type = 'checkbox'
+    casilla.dataset.campo = 'nuevo'
+    casilla.checked = Boolean(persona.nuevo)
+    casilla.addEventListener('change', async () => {
+      await guardar(editarPersona(actual, persona.id, { nuevo: casilla.checked }))
+    })
+    marcaNueva.append(casilla, document.createTextNode(' Nuevo'))
+    fila.appendChild(marcaNueva)
 
     // El control nativo de archivo dibuja su propio texto en ingles ("Choose File"),
     // asi que lo escondemos sin sacarlo del arbol y le ponemos una etiqueta en español.

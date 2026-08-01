@@ -2,6 +2,7 @@ import { ficha, boton, elemento, vaciar } from './componentes.js'
 import { activos } from '../modelo/roster.js'
 import {
   asignarVoluntario, quitarVoluntario, contarPendientes, filaDe, editarGrupo,
+  quitarDeLista, volverALaLista,
 } from '../modelo/lista.js'
 import { crearPila } from '../modelo/deshacer.js'
 import { formatearFechaLarga } from '../util/fechas.js'
@@ -199,12 +200,54 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   function barraSeleccion() {
     const caja = elemento('div', ['barra-seleccion'])
     caja.appendChild(elemento('span', ['barra-seleccion-texto'], `Asignando a ${nombreDe(seleccionado)}`))
+
+    const acciones = elemento('div', ['barra-seleccion-acciones'])
+    // No siempre van los mismos chicos, asi que sacar a alguien de la jornada
+    // tiene que estar donde ya lo tenes elegido, no en otra pantalla.
+    const sacar = boton(`Hoy no viene`, () => {
+      const quien = seleccionado
+      const siguiente = quitarDeLista(estado(), quien)
+      pila.registrar(siguiente)
+      seleccionado = null
+      alCambiar(siguiente)
+      dibujar()
+    })
+    sacar.dataset.accion = 'sacar-de-lista'
+
     const cancelar = boton('Cancelar', () => {
       seleccionado = null
       dibujar()
     })
     cancelar.dataset.accion = 'cancelar'
-    caja.appendChild(cancelar)
+
+    acciones.append(sacar, cancelar)
+    caja.appendChild(acciones)
+    return caja
+  }
+
+  // Los que hoy no vienen quedan a la vista, para poder devolverlos de un toque
+  // si aparecen. Si no hay ninguno, la seccion no se dibuja.
+  function dibujarAusentes() {
+    const ausentes = (estado().ausentes ?? [])
+      .map((id) => roster.participantes.find((p) => p.id === id))
+      .filter((p) => p && p.activo)
+    if (ausentes.length === 0) return null
+
+    const caja = elemento('section', ['ausentes'])
+    caja.appendChild(elemento('h2', [], 'Hoy no vienen'))
+    const columna = elemento('div', ['columna', 'columna-ausentes'])
+    ausentes.forEach((persona) => {
+      const el = ficha(persona, { atenuada: true, detalle: 'Tocá para sumarlo' })
+      el.dataset.accion = 'volver-a-lista'
+      el.addEventListener('click', () => {
+        const siguiente = volverALaLista(estado(), persona.id, roster)
+        pila.registrar(siguiente)
+        alCambiar(siguiente)
+        dibujar()
+      })
+      columna.appendChild(el)
+    })
+    caja.appendChild(columna)
     return caja
   }
 
@@ -220,6 +263,8 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     raiz.appendChild(grupos)
     areaVoluntarios = dibujarVoluntarios()
     raiz.appendChild(areaVoluntarios)
+    const ausentes = dibujarAusentes()
+    if (ausentes) raiz.appendChild(ausentes)
     if (seleccionado) raiz.appendChild(barraSeleccion())
   }
 

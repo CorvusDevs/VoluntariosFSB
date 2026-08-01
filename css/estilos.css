@@ -414,3 +414,41 @@ body {
   font-size: 11px;
   opacity: 0.85;
 }
+
+/* Ausentes de la jornada. Van despues de los voluntarios, atenuados, porque son
+   informacion de contexto y no lo que se toca todo el tiempo. */
+.ausentes { padding: 8px 16px 24px; border-top: 1px solid var(--linea); }
+.ausentes h2 { font-size: 18px; font-weight: 500; margin: 0 0 12px; }
+.columna-ausentes { flex-direction: row; flex-wrap: wrap; align-items: center; }
+.barra-seleccion-acciones { display: flex; gap: 8px; align-items: center; }
+
+/* Nombre editable en la lista de personas. Se ve como texto hasta que lo tocás,
+   para que la lista siga leyendose como una lista y no como un formulario. */
+input.fila-nombre {
+  flex: 1;
+  min-width: 120px;
+  min-height: 44px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--texto);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+}
+input.fila-nombre:hover { border-color: var(--linea); }
+input.fila-nombre:focus {
+  background: var(--fondo);
+  border-color: var(--violeta);
+  outline: none;
+}
+.marca-nuevo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  font-size: 14px;
+  color: var(--texto-suave);
+  white-space: nowrap;
+}
+.marca-nuevo input { width: 20px; height: 20px; }
