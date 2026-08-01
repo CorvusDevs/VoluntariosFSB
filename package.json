@@ -10,6 +10,7 @@
     "servir": "python3 -m http.server 8765"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
     "vitest": "^2.1.0"
   }
 }
