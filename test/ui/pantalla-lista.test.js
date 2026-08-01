@@ -116,6 +116,60 @@ describe('pantalla de armado', () => {
     expect(raiz.querySelector('.barra-seleccion')).toBeNull()
   })
 
+  it('muestra la fecha en español y permite cambiarla', () => {
+    const etiqueta = raiz.querySelector('.encabezado-lista').textContent
+    expect(etiqueta).toContain('Sábado 8 de agosto')
+    expect(raiz.querySelector('[data-campo="fecha"]').value).toBe('2026-08-08')
+  })
+
+  it('avisa cuando cambia la fecha', () => {
+    let recibida = null
+    document.body.innerHTML = '<div id="raiz"></div>'
+    const r = document.getElementById('raiz')
+    crearPantallaLista(r, {
+      lista: crearLista('2026-08-08', ROSTER), roster: ROSTER,
+      alCambiar: () => {}, alCambiarFecha: (f) => { recibida = f },
+    })
+    const entrada = r.querySelector('[data-campo="fecha"]')
+    entrada.value = '2026-08-15'
+    entrada.dispatchEvent(new Event('change'))
+    expect(recibida).toBe('2026-08-15')
+  })
+
+  it('sin alCambiarFecha la fecha se actualiza en la lista local', () => {
+    const entrada = raiz.querySelector('[data-campo="fecha"]')
+    entrada.value = '2026-08-15'
+    entrada.dispatchEvent(new Event('change'))
+    expect(pantalla.lista().fecha).toBe('2026-08-15')
+    expect(raiz.querySelector('.encabezado-lista').textContent).toContain('Sábado 15 de agosto')
+  })
+
+  it('cambiar la hora y el lugar actualiza la lista', () => {
+    const hora = raiz.querySelector('[data-campo="hora"]')
+    hora.value = '10:30'
+    hora.dispatchEvent(new Event('change'))
+    expect(pantalla.lista().hora).toBe('10:30')
+
+    const lugar = raiz.querySelector('[data-campo="lugar"]')
+    lugar.value = 'Parque Batlle'
+    lugar.dispatchEvent(new Event('change'))
+    expect(pantalla.lista().lugar).toBe('Parque Batlle')
+  })
+
+  it('avisa al cambiar la hora', () => {
+    let avisos = 0
+    document.body.innerHTML = '<div id="raiz"></div>'
+    const r = document.getElementById('raiz')
+    crearPantallaLista(r, {
+      lista: crearLista('2026-08-08', ROSTER), roster: ROSTER,
+      alCambiar: () => { avisos += 1 },
+    })
+    const hora = r.querySelector('[data-campo="hora"]')
+    hora.value = '10:30'
+    hora.dispatchEvent(new Event('change'))
+    expect(avisos).toBe(1)
+  })
+
   it('avisa al cambiar la lista', () => {
     let avisos = 0
     const p = crearPantallaLista(raiz, {

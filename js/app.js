@@ -39,6 +39,19 @@ function dibujar() {
         lista = siguiente
         await deposito.guardarLista(lista)
       },
+      // Las listas se guardan por fecha: cambiar la fecha es abrir otra lista.
+      // Si no hay ninguna guardada para ese dia, empezamos una con los mismos
+      // datos de siempre (hora, lugar y coordinacion).
+      alCambiarFecha: async (nuevaFecha) => {
+        if (nuevaFecha === lista.fecha) return
+        const guardada = await deposito.leerLista(nuevaFecha)
+        lista = guardada ?? crearLista(nuevaFecha, roster, {
+          hora: lista.hora,
+          lugar: lista.lugar,
+          coordinacion: lista.coordinacion,
+        })
+        dibujar()
+      },
     })
   } else {
     crearPantallaPersonas(cuerpo, {

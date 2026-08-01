@@ -107,6 +107,29 @@ body {
 }
 .boton:disabled { opacity: 0.4; cursor: default; }
 
+.encabezado-lista {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--linea);
+}
+.campo { display: flex; flex-direction: column; gap: 4px; }
+.campo-rotulo { font-size: 12px; color: var(--texto-suave); }
+.campo input {
+  min-height: 44px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  background: var(--fondo);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+}
+.campo input[type=text] { min-width: 140px; }
+.fecha-larga { margin: 0 0 10px; font-size: 15px; color: var(--violeta); }
+
 .barra { display: flex; gap: 8px; padding: 12px 16px; }
 .grupo { padding: 8px 16px 24px; }
 .grupo-encabezado h2 { font-size: 18px; font-weight: 500; margin: 0 0 4px; }

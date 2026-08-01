@@ -2,8 +2,9 @@ import { ficha, boton, elemento, vaciar } from './componentes.js'
 import { activos } from '../modelo/roster.js'
 import { asignarVoluntario, quitarVoluntario, contarPendientes, filaDe } from '../modelo/lista.js'
 import { crearPila } from '../modelo/deshacer.js'
+import { formatearFechaLarga } from '../util/fechas.js'
 
-export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
+export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFecha }) {
   const pila = crearPila(lista)
   let seleccionado = null
   let areaVoluntarios = null
@@ -38,6 +39,42 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
     seleccionado = null
     alCambiar(siguiente)
     dibujar()
+  }
+
+  function actualizar(cambios) {
+    const siguiente = { ...estado(), ...cambios }
+    pila.registrar(siguiente)
+    alCambiar(siguiente)
+    dibujar()
+  }
+
+  function campo(rotulo, tipo, nombre, valor, alCambiarValor) {
+    const caja = elemento('label', ['campo'])
+    caja.appendChild(elemento('span', ['campo-rotulo'], rotulo))
+    const entrada = document.createElement('input')
+    entrada.type = tipo
+    entrada.dataset.campo = nombre
+    entrada.value = valor
+    entrada.addEventListener('change', () => alCambiarValor(entrada.value))
+    caja.appendChild(entrada)
+    return caja
+  }
+
+  function encabezado() {
+    const caja = elemento('header', ['encabezado-lista'])
+
+    caja.appendChild(campo('Fecha', 'date', 'fecha', estado().fecha, (valor) => {
+      if (!valor) return
+      // La lista se guarda por fecha, asi que cambiarla significa abrir otra lista.
+      // Quien nos usa decide si hay una guardada o hay que empezar de cero.
+      if (alCambiarFecha) alCambiarFecha(valor)
+      else actualizar({ fecha: valor })
+    }))
+    caja.appendChild(elemento('p', ['fecha-larga'], formatearFechaLarga(estado().fecha)))
+
+    caja.appendChild(campo('Hora', 'time', 'hora', estado().hora, (valor) => actualizar({ hora: valor })))
+    caja.appendChild(campo('Lugar', 'text', 'lugar', estado().lugar, (valor) => actualizar({ lugar: valor })))
+    return caja
   }
 
   function barra() {
@@ -123,6 +160,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
 
   function dibujar() {
     vaciar(raiz)
+    raiz.appendChild(encabezado())
     raiz.appendChild(barra())
     estado().grupos.forEach((grupo) => raiz.appendChild(dibujarGrupo(grupo)))
     areaVoluntarios = dibujarVoluntarios()
