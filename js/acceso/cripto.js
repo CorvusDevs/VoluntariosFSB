@@ -69,10 +69,10 @@ export async function cifrar(texto, contrasena) {
 export async function descifrar(registro, contrasena) {
   const iteraciones = registro?.kdf?.iteraciones
   if (!Number.isInteger(iteraciones) || iteraciones < ITERACIONES || iteraciones > MAX_ITERACIONES) {
-    throw new Error(`Registro invalido: iteraciones fuera de rango (${iteraciones}).`)
+    throw new Error(`Registro inválido: iteraciones fuera de rango (${iteraciones}).`)
   }
   if (registro.kdf.algoritmo !== 'PBKDF2-SHA256' || registro.cifrado?.algoritmo !== 'AES-GCM') {
-    throw new Error('Registro invalido: algoritmo no reconocido.')
+    throw new Error('Registro inválido: algoritmo no reconocido.')
   }
   const sal = desdeBase64(registro.kdf.sal)
   const iv = desdeBase64(registro.cifrado.iv)

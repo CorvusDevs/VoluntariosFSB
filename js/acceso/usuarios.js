@@ -16,7 +16,7 @@ export async function leerUsuarios({ duenio, repoPublico, rama, fetchFn }) {
   const respuesta = await pedir(urlUsuarios({ duenio, repoPublico, rama }), { cache: 'no-store' })
   if (respuesta.status === 404) return archivoVacio()
   if (!respuesta.ok) {
-    throw new Error(`No se pudo leer la lista de coordinadoras. GitHub respondio ${respuesta.status}.`)
+    throw new Error(`No se pudo leer la lista de coordinadoras. GitHub respondió ${respuesta.status}.`)
   }
   return respuesta.json()
 }
@@ -29,7 +29,7 @@ export function esAdmin(registro) {
 
 function validarRol(rol) {
   if (!ROLES.includes(rol)) {
-    throw new Error(`Rol invalido: ${rol}. Solo se admiten ${ROLES.join(' y ')}.`)
+    throw new Error(`Rol inválido: ${rol}. Solo se admiten ${ROLES.join(' y ')}.`)
   }
   return rol
 }
@@ -48,7 +48,7 @@ export function buscarUsuario(archivo, usuario) {
 
 export function agregarUsuario(archivo, { usuario, nombre, rol = 'coordinacion' }, registro) {
   const clave = normalizar(usuario)
-  if (!clave) throw new Error('El usuario no puede estar vacio.')
+  if (!clave) throw new Error('El usuario no puede estar vacío.')
   if (buscarUsuario(archivo, clave)) throw new Error(`El usuario ${clave} ya existe.`)
   validarRol(rol)
   const nuevo = { usuario: clave, nombre: String(nombre ?? clave).trim(), rol, ...registro }

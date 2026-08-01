@@ -6,7 +6,7 @@ const DEPOSITO = 'sesion'
 const CLAVE = 'actual'
 // El mismo mensaje para usuario inexistente y contrasena incorrecta, para no
 // revelar quien esta dado de alta.
-const MENSAJE_INVALIDO = 'Usuario o contrasena incorrectos.'
+const MENSAJE_INVALIDO = 'Usuario o contraseña incorrectos.'
 
 export async function ingresar({ archivo, usuario, contrasena }) {
   const registro = buscarUsuario(archivo, usuario)

@@ -2,7 +2,7 @@ const RUTA_ROSTER = 'roster.json'
 const rutaLista = (fecha) => `listas/${fecha}.json`
 const rutaFoto = (clave) => `fotos/${clave}`
 
-export function crearAlmacenRemoto({ cliente, autor = 'la aplicacion' }) {
+export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
   const shas = new Map()
   let verificado = null
 
