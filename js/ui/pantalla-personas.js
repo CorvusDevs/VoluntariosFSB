@@ -17,6 +17,9 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     const nombre = document.createElement('input')
     nombre.type = 'text'
     nombre.required = true
+    nombre.setAttribute('autocapitalize', 'words')
+    nombre.setAttribute('autocorrect', 'off')
+    nombre.setAttribute('spellcheck', 'false')
     nombre.placeholder = tipo === 'participante' ? 'Nombre del participante' : 'Nombre del voluntario'
     caja.appendChild(nombre)
 
@@ -66,7 +69,9 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     nombre.dataset.campo = 'nombre'
     nombre.value = persona.nombre
     nombre.setAttribute('aria-label', `Nombre de ${persona.nombre}`)
-    nombre.autocapitalize = 'words'
+    nombre.setAttribute('autocapitalize', 'words')
+    nombre.setAttribute('autocorrect', 'off')
+    nombre.setAttribute('spellcheck', 'false')
     nombre.addEventListener('change', async () => {
       const valor = nombre.value.trim()
       if (!valor || valor === persona.nombre) {

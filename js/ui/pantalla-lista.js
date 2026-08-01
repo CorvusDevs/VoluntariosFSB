@@ -57,6 +57,13 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     const entrada = document.createElement('input')
     entrada.type = tipo
     entrada.dataset.campo = nombre
+    // Lugares, titulos y canchas son nombres propios: en el telefono conviene
+    // que arranquen en mayuscula solos y que el corrector no los toque.
+    if (tipo === 'text') {
+      entrada.setAttribute('autocapitalize', 'words')
+      entrada.setAttribute('autocorrect', 'off')
+      entrada.setAttribute('spellcheck', 'false')
+    }
     entrada.value = valor
     entrada.addEventListener('change', () => alCambiarValor(entrada.value))
     caja.appendChild(entrada)

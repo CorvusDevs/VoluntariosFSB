@@ -470,3 +470,20 @@ input.fila-nombre:focus {
 }
 .campo-mensaje textarea:focus { border-color: var(--violeta); outline: none; }
 .campo-ayuda { font-size: 12px; line-height: 1.45; color: var(--texto-suave); }
+
+/* Correcciones tactiles medidas a 320 px.
+
+   La fila de personas no envolvia, asi que en un telefono angosto el boton
+   Quitar arrancaba en x=320 sobre un ancho de 320: quedaba entero fuera de la
+   pantalla y no habia forma de dar de baja a nadie. Medido, no estimado.
+
+   Y las casillas de los formularios median 24 px de alto, por debajo del
+   minimo tactil de 44. */
+.fila-persona { flex-wrap: wrap; row-gap: 4px; }
+.formulario label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
+.formulario label input[type=checkbox] { width: 20px; height: 20px; }

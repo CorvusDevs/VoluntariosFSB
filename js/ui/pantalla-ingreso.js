@@ -13,6 +13,14 @@ function campo(rotulo, tipo, nombre, atributos = {}) {
   const entrada = document.createElement('input')
   entrada.type = tipo
   entrada.dataset.campo = nombre
+  // Ningun campo de credencial debe pasar por el corrector ni por la
+  // mayuscula automatica del telefono: en iOS eso altera un token pegado
+  // sin que se note, y el ingreso falla sin explicacion visible.
+  if (tipo === 'password' || nombre === 'usuario') {
+    entrada.setAttribute('autocapitalize', 'none')
+    entrada.setAttribute('autocorrect', 'off')
+    entrada.setAttribute('spellcheck', 'false')
+  }
   // Solo atributos: el valor se toca por propiedad, nunca por atributo, para
   // que ninguna contraseña termine escrita en el HTML.
   Object.entries(atributos).forEach(([clave, valor]) => entrada.setAttribute(clave, valor))

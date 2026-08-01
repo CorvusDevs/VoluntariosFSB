@@ -309,3 +309,18 @@ describe('lista de usuarios todavia vacia', () => {
     expect(raiz.querySelector('details.ingreso-token')).not.toBeNull()
   })
 })
+
+describe('pistas de teclado en el telefono', () => {
+  it('los campos de credencial no se autocapitalizan ni se autocorrigen', () => {
+    // En iOS, la mayuscula automatica y el corrector alteran un token pegado sin
+    // que se note, y despues el ingreso falla sin explicacion. Estos tres
+    // atributos son lo unico que lo evita.
+    ;['contrasena', 'token', 'usuario'].forEach((campo) => {
+      const el = raiz.querySelector(`[data-campo="${campo}"]`)
+      expect(el, `falta el campo ${campo}`).not.toBeNull()
+      expect(el.getAttribute('autocapitalize'), `${campo} sin autocapitalize`).toBe('none')
+      expect(el.getAttribute('autocorrect'), `${campo} sin autocorrect`).toBe('off')
+      expect(el.getAttribute('spellcheck'), `${campo} sin spellcheck`).toBe('false')
+    })
+  })
+})

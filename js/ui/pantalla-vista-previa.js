@@ -91,6 +91,10 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     caja.appendChild(elemento('span', ['campo-rotulo'], rotulo))
     const entrada = document.createElement('textarea')
     entrada.dataset.campo = clave
+    // Texto libre en español: mayuscula al empezar cada oracion y corrector activo.
+    entrada.setAttribute('autocapitalize', 'sentences')
+    entrada.setAttribute('spellcheck', 'true')
+    entrada.lang = 'es'
     entrada.rows = 3
     entrada.value = valor
     entrada.addEventListener('change', () => {
