@@ -92,7 +92,7 @@ export function separarParticipante(lista, participanteId) {
     ...fila,
     participantes: fila.participantes.filter((id) => id !== participanteId),
   }
-  const nueva = { participantes: [participanteId], voluntarios: [] }
+  const nueva = { participantes: [participanteId], voluntarios: [...fila.voluntarios] }
   const filas = [...lista.grupos[g].filas]
   filas.splice(f, 1, restante, nueva)
   return conFilas(lista, g, filas)

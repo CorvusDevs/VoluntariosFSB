@@ -108,6 +108,15 @@ describe('separarParticipante', () => {
     expect(filaDe(l, 'p1').participantes).toEqual(['p1'])
     expect(filaDe(l, 'p2').participantes).toEqual(['p2'])
   })
+
+  it('el participante separado conserva los voluntarios de la fila', () => {
+    let l = crearLista('2026-08-08', ROSTER)
+    l = asignarVoluntario(l, 'p1', 'v1')
+    l = fusionarParticipantes(l, 'p1', 'p2')
+    l = separarParticipante(l, 'p2')
+    expect(filaDe(l, 'p1').voluntarios).toEqual(['v1'])
+    expect(filaDe(l, 'p2').voluntarios).toEqual(['v1'])
+  })
 })
 
 describe('moverAGrupo', () => {
