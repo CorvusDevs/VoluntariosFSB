@@ -1,0 +1,140 @@
+import { activos } from './roster.js'
+
+const POR_DEFECTO = {
+  1: { titulo: 'Grupo 1', subtitulo: '5 a 9 años', cancha: 'Cancha 1' },
+  2: { titulo: 'Grupo 2', subtitulo: '10 a 17 años', cancha: 'Cancha 2' },
+}
+
+export function crearLista(fecha, roster, base = {}) {
+  const gente = activos(roster.participantes)
+  const grupos = [1, 2].map((numero) => ({
+    numero,
+    ...POR_DEFECTO[numero],
+    filas: gente
+      .filter((p) => p.grupo === numero)
+      .map((p) => ({ participantes: [p.id], voluntarios: [] })),
+    apoyo: [],
+  }))
+  return {
+    version: 1,
+    fecha,
+    hora: base.hora ?? '11:00',
+    lugar: base.lugar ?? 'Tres Cruces',
+    coordinacion: base.coordinacion ?? [],
+    grupos,
+    opcionesImagen: { saludo: true, despedida: true, fotos: true, compacto: false },
+  }
+}
+
+function ubicar(lista, participanteId) {
+  for (let g = 0; g < lista.grupos.length; g += 1) {
+    const f = lista.grupos[g].filas.findIndex((fila) => fila.participantes.includes(participanteId))
+    if (f !== -1) return { g, f }
+  }
+  throw new Error(`El participante ${participanteId} no esta en la lista`)
+}
+
+export function filaDe(lista, participanteId) {
+  const { g, f } = ubicar(lista, participanteId)
+  return lista.grupos[g].filas[f]
+}
+
+function conFilas(lista, g, filas) {
+  const grupos = lista.grupos.map((grupo, i) => (i === g ? { ...grupo, filas } : grupo))
+  return { ...lista, grupos }
+}
+
+function cambiarFila(lista, participanteId, transformar) {
+  const { g, f } = ubicar(lista, participanteId)
+  const filas = lista.grupos[g].filas.map((fila, i) => (i === f ? transformar(fila) : fila))
+  return conFilas(lista, g, filas)
+}
+
+export function asignarVoluntario(lista, participanteId, voluntarioId) {
+  return cambiarFila(lista, participanteId, (fila) =>
+    fila.voluntarios.includes(voluntarioId)
+      ? fila
+      : { ...fila, voluntarios: [...fila.voluntarios, voluntarioId] })
+}
+
+export function quitarVoluntario(lista, participanteId, voluntarioId) {
+  return cambiarFila(lista, participanteId, (fila) => ({
+    ...fila,
+    voluntarios: fila.voluntarios.filter((id) => id !== voluntarioId),
+  }))
+}
+
+export function fusionarParticipantes(lista, destinoId, origenId) {
+  const destino = ubicar(lista, destinoId)
+  const origen = ubicar(lista, origenId)
+  if (destino.g !== origen.g) {
+    throw new Error('No se pueden fusionar participantes de grupo distinto')
+  }
+  if (destino.f === origen.f) return lista
+
+  const filaDestino = lista.grupos[destino.g].filas[destino.f]
+  const filaOrigen = lista.grupos[origen.g].filas[origen.f]
+  const fusionada = {
+    participantes: [...filaDestino.participantes, ...filaOrigen.participantes],
+    voluntarios: [...new Set([...filaDestino.voluntarios, ...filaOrigen.voluntarios])],
+  }
+  const filas = lista.grupos[destino.g].filas
+    .map((fila, i) => (i === destino.f ? fusionada : fila))
+    .filter((_, i) => i !== origen.f)
+  return conFilas(lista, destino.g, filas)
+}
+
+export function separarParticipante(lista, participanteId) {
+  const { g, f } = ubicar(lista, participanteId)
+  const fila = lista.grupos[g].filas[f]
+  if (fila.participantes.length === 1) return lista
+  const restante = {
+    ...fila,
+    participantes: fila.participantes.filter((id) => id !== participanteId),
+  }
+  const nueva = { participantes: [participanteId], voluntarios: [] }
+  const filas = [...lista.grupos[g].filas]
+  filas.splice(f, 1, restante, nueva)
+  return conFilas(lista, g, filas)
+}
+
+export function moverAGrupo(lista, participanteId, numeroDestino) {
+  const { g, f } = ubicar(lista, participanteId)
+  const destino = lista.grupos.findIndex((grupo) => grupo.numero === numeroDestino)
+  if (destino === -1) throw new Error(`No existe el grupo ${numeroDestino}`)
+  if (destino === g) return lista
+  const fila = lista.grupos[g].filas[f]
+  const grupos = lista.grupos.map((grupo, i) => {
+    if (i === g) return { ...grupo, filas: grupo.filas.filter((_, j) => j !== f) }
+    if (i === destino) return { ...grupo, filas: [...grupo.filas, fila] }
+    return grupo
+  })
+  return { ...lista, grupos }
+}
+
+export function agregarApoyo(lista, numeroGrupo, voluntarioId) {
+  const grupos = lista.grupos.map((grupo) =>
+    grupo.numero === numeroGrupo && !grupo.apoyo.includes(voluntarioId)
+      ? { ...grupo, apoyo: [...grupo.apoyo, voluntarioId] }
+      : grupo)
+  return { ...lista, grupos }
+}
+
+export function quitarApoyo(lista, numeroGrupo, voluntarioId) {
+  const grupos = lista.grupos.map((grupo) =>
+    grupo.numero === numeroGrupo
+      ? { ...grupo, apoyo: grupo.apoyo.filter((id) => id !== voluntarioId) }
+      : grupo)
+  return { ...lista, grupos }
+}
+
+export function contarPendientes(lista, numeroGrupo, roster) {
+  const grupo = lista.grupos.find((g) => g.numero === numeroGrupo)
+  if (!grupo) throw new Error(`No existe el grupo ${numeroGrupo}`)
+  const asignados = new Set(lista.grupos.flatMap((g) =>
+    [...g.filas.flatMap((f) => f.voluntarios), ...g.apoyo]))
+  return {
+    participantesSinVoluntario: grupo.filas.filter((f) => f.voluntarios.length === 0).length,
+    voluntariosSinAsignar: activos(roster.voluntarios).filter((v) => !asignados.has(v.id)).length,
+  }
+}
