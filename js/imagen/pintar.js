@@ -72,7 +72,23 @@ function imagen(ctx, o, imagenes) {
       ctx.closePath()
       ctx.clip()
     }
-    ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
+    // Recorte que cubre: la foto guardada es cuadrada y la celda puede no serlo,
+    // asi que en vez de estirarla se toma la porcion centrada que llena el hueco.
+    const anchoOrigen = fuente.naturalWidth ?? fuente.width ?? 0
+    const altoOrigen = fuente.naturalHeight ?? fuente.height ?? 0
+    if (anchoOrigen > 0 && altoOrigen > 0) {
+      const escala = Math.max(o.ancho / anchoOrigen, o.alto / altoOrigen)
+      const recorteAncho = o.ancho / escala
+      const recorteAlto = o.alto / escala
+      ctx.drawImage(
+        fuente,
+        (anchoOrigen - recorteAncho) / 2, (altoOrigen - recorteAlto) / 2,
+        recorteAncho, recorteAlto,
+        o.x, o.y, o.ancho, o.alto,
+      )
+    } else {
+      ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
+    }
   } finally {
     ctx.restore()
   }

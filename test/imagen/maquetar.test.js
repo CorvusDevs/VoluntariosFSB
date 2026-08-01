@@ -451,3 +451,27 @@ describe('aire entre el rotulo del grupo y las fotos', () => {
     })
   })
 })
+
+describe('el voluntario va pegado al nombre', () => {
+  it('queda a la misma distancia tenga el nombre uno o dos renglones', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].nombre = 'Francisco Planells'   // dos renglones
+    roster.participantes[2].nombre = 'Ana'                  // uno
+    const lista = structuredClone(LISTA)
+    lista.grupos[0].filas = [
+      { participantes: ['p1'], voluntarios: ['v1'] },
+      { participantes: ['p3'], voluntarios: ['v2'] },
+    ]
+    const plano = maquetar(
+      { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'grilla' } },
+      roster, opciones,
+    )
+    const distancia = (id, nombreVoluntario) => {
+      const textos = plano.ordenes.filter((o) => o.fila === id && o.tipo === 'texto')
+      const voluntario = textos.find((o) => o.texto === nombreVoluntario)
+      const ultimoNombre = textos.filter((o) => o.color === COLORES.texto).at(-1)
+      return voluntario.y - ultimoNombre.y
+    }
+    expect(distancia('p1', 'Abi')).toBe(distancia('p3', 'Cris'))
+  })
+})

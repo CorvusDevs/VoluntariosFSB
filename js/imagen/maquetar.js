@@ -318,7 +318,11 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         alineacion: 'center', lineaBase: 'middle', fila: clave,
       })
     })
-    const yVoluntario = textoY + maxNombre * GRILLA.pxNombre + GRILLA.espacioBajoNombre
+    // Pegado al nombre real de esta celda, no al alto uniforme del grupo: si se
+    // usara maxNombre, un nombre de un renglon dejaba al voluntario flotando muy
+    // abajo, como si no fuera con el.
+    const yVoluntario = textoY + celda.lineasNombre.length * GRILLA.pxNombre
+      + GRILLA.espacioBajoNombre
     celda.lineasVoluntario.forEach((linea, n) => {
       ordenes.push({
         tipo: 'texto', texto: linea, x: x + ancho / 2,

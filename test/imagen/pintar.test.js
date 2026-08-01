@@ -100,6 +100,39 @@ describe('pintar', () => {
     expect(ctx.llamadas.some((l) => l.nombre === 'drawImage')).toBe(true)
   })
 
+  it('recorta la foto en vez de estirarla cuando las proporciones no coinciden', () => {
+    const ctx = contextoFalso()
+    // Foto cuadrada de 400 en una celda vertical de 180 por 240.
+    pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 180, alto: 240, radio: 16 },
+    ]), { 'f.jpg': { naturalWidth: 400, naturalHeight: 400 } }, 1)
+    const dibujo = ctx.llamadas.find((l) => l.nombre === 'drawImage')
+    // Nueve argumentos: se recorta el origen, no se estira el destino.
+    expect(dibujo.args).toHaveLength(9)
+    const [, sx, sy, sw, sh] = dibujo.args
+    expect(sw).toBeCloseTo(300, 0)   // 400 * (180/240)
+    expect(sh).toBeCloseTo(400, 0)
+    expect(sx).toBeCloseTo(50, 0)    // centrado
+    expect(sy).toBeCloseTo(0, 0)
+  })
+
+  it('una foto ya proporcionada se dibuja entera', () => {
+    const ctx = contextoFalso()
+    pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 180, alto: 240 },
+    ]), { 'f.jpg': { naturalWidth: 300, naturalHeight: 400 } }, 1)
+    const [, sx, sy, sw, sh] = ctx.llamadas.find((l) => l.nombre === 'drawImage').args
+    expect([sx, sy, sw, sh]).toEqual([0, 0, 300, 400])
+  })
+
+  it('sin dimensiones conocidas cae en el dibujo simple', () => {
+    const ctx = contextoFalso()
+    pintar(ctx, plano([
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 10, alto: 10 },
+    ]), { 'f.jpg': {} }, 1)
+    expect(ctx.llamadas.find((l) => l.nombre === 'drawImage').args).toHaveLength(5)
+  })
+
   it('omite en silencio una imagen que no se pudo cargar', () => {
     const ctx = contextoFalso()
     expect(() => pintar(ctx, plano([
