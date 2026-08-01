@@ -128,6 +128,43 @@ export function quitarApoyo(lista, numeroGrupo, voluntarioId) {
   return { ...lista, grupos }
 }
 
+export function sincronizarConRoster(lista, roster) {
+  const activos = new Map(roster.participantes.filter((p) => p.activo).map((p) => [p.id, p]))
+  const yaEnLista = new Set()
+
+  const grupos = lista.grupos.map((grupo) => {
+    const filas = grupo.filas
+      .map((fila) => {
+        const participantes = fila.participantes.filter((id) => {
+          if (!activos.has(id)) return false
+          yaEnLista.add(id)
+          return true
+        })
+        return { ...fila, participantes }
+      })
+      .filter((fila) => fila.participantes.length > 0)
+    return { ...grupo, filas }
+  })
+
+  activos.forEach((persona) => {
+    if (yaEnLista.has(persona.id)) return
+    const destino = grupos.find((g) => g.numero === persona.grupo)
+    if (destino) destino.filas.push({ participantes: [persona.id], voluntarios: [] })
+  })
+
+  const voluntariosActivos = new Set(roster.voluntarios.filter((v) => v.activo).map((v) => v.id))
+  const limpios = grupos.map((grupo) => ({
+    ...grupo,
+    filas: grupo.filas.map((fila) => ({
+      ...fila,
+      voluntarios: fila.voluntarios.filter((id) => voluntariosActivos.has(id)),
+    })),
+    apoyo: grupo.apoyo.filter((id) => voluntariosActivos.has(id)),
+  }))
+
+  return { ...lista, grupos: limpios }
+}
+
 export function contarPendientes(lista, numeroGrupo, roster) {
   const grupo = lista.grupos.find((g) => g.numero === numeroGrupo)
   if (!grupo) throw new Error(`No existe el grupo ${numeroGrupo}`)

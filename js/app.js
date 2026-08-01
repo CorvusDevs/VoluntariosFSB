@@ -1,15 +1,16 @@
 import { almacen } from './almacen/indice.js'
 import { crearPantallaLista } from './ui/pantalla-lista.js'
 import { crearPantallaPersonas } from './ui/pantalla-personas.js'
-import { crearLista } from './modelo/lista.js'
-import { hoyISO } from './util/fechas.js'
+import { crearLista, sincronizarConRoster } from './modelo/lista.js'
+import { proximoSabado } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
 
 const contenedor = document.getElementById('app')
 const deposito = await almacen()
 
 let roster = await deposito.leerRoster()
-let lista = (await deposito.leerLista(hoyISO())) ?? crearLista(hoyISO(), roster)
+const sabado = proximoSabado()
+let lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
 let pantalla = 'lista'
 
 function navegacion() {
@@ -43,9 +44,10 @@ function dibujar() {
     crearPantallaPersonas(cuerpo, {
       roster,
       almacen: deposito,
-      alCambiar: (siguiente) => {
+      alCambiar: async (siguiente) => {
         roster = siguiente
-        lista = crearLista(lista.fecha, roster, lista)
+        lista = sincronizarConRoster(lista, roster)
+        await deposito.guardarLista(lista)
       },
     })
   }

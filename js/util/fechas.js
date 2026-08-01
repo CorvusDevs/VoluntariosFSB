@@ -30,3 +30,13 @@ export function hoyISO() {
   const p = (n) => String(n).padStart(2, '0')
   return `${ahora.getFullYear()}-${p(ahora.getMonth() + 1)}-${p(ahora.getDate())}`
 }
+
+export function proximoSabado(desdeISO) {
+  const base = desdeISO ?? hoyISO()
+  const { diaSemana } = partes(base)
+  if (diaSemana === 6) return base
+  const [a, m, d] = base.split('-').map(Number)
+  const fecha = new Date(Date.UTC(a, m - 1, d + (6 - diaSemana)))
+  const p = (n) => String(n).padStart(2, '0')
+  return `${fecha.getUTCFullYear()}-${p(fecha.getUTCMonth() + 1)}-${p(fecha.getUTCDate())}`
+}

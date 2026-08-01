@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatearFechaLarga, formatearFechaCorta, hoyISO } from '../../js/util/fechas.js'
+import { formatearFechaLarga, formatearFechaCorta, hoyISO, proximoSabado } from '../../js/util/fechas.js'
 
 describe('formatearFechaLarga', () => {
   it('devuelve el dia de la semana capitalizado y el mes en minuscula', () => {
@@ -36,5 +36,28 @@ describe('formatearFechaCorta', () => {
 describe('hoyISO', () => {
   it('devuelve una cadena AAAA-MM-DD', () => {
     expect(hoyISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('proximoSabado', () => {
+  it('desde un viernes devuelve el dia siguiente', () => {
+    expect(proximoSabado('2026-08-07')).toBe('2026-08-08')
+  })
+
+  it('desde un sabado devuelve el mismo dia', () => {
+    expect(proximoSabado('2026-08-08')).toBe('2026-08-08')
+  })
+
+  it('desde un domingo devuelve el sabado de esa semana', () => {
+    expect(proximoSabado('2026-08-09')).toBe('2026-08-15')
+  })
+
+  it('cruza el fin de mes correctamente', () => {
+    expect(proximoSabado('2026-08-28')).toBe('2026-08-29')
+    expect(proximoSabado('2026-12-31')).toBe('2027-01-02')
+  })
+
+  it('sin argumento usa hoy y devuelve un sabado', () => {
+    expect(formatearFechaLarga(proximoSabado()).startsWith('Sábado')).toBe(true)
   })
 })
