@@ -1,5 +1,9 @@
 import { activos } from './roster.js'
 
+export const SALUDO_POR_DEFECTO =
+  'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
+export const DESPEDIDA_POR_DEFECTO = 'Nos vemos mañana. Gracias a todos.'
+
 const POR_DEFECTO = {
   1: { titulo: 'Grupo 1', subtitulo: '10 a 17 años', cancha: 'Cancha 1' },
   2: { titulo: 'Grupo 2', subtitulo: '5 a 9 años', cancha: 'Cancha 2' },
@@ -20,6 +24,8 @@ export function crearLista(fecha, roster, base = {}) {
     fecha,
     hora: base.hora ?? '11:00',
     lugar: base.lugar ?? 'Tres Cruces',
+    saludo: base.saludo ?? SALUDO_POR_DEFECTO,
+    despedida: base.despedida ?? DESPEDIDA_POR_DEFECTO,
     coordinacion: base.coordinacion ?? [],
     // Quienes hoy no vienen. Se guardan aparte para que reconciliar con el roster
     // no los devuelva a la planilla, que era el efecto de sacarlos sin registrarlo.

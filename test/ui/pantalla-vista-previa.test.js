@@ -261,3 +261,57 @@ describe('pantalla de vista previa', () => {
     expect(pedidas.filter((c) => c === 'p3.jpg')).toHaveLength(1)
   })
 })
+
+describe('saludo y despedida editables', () => {
+  it('dibuja los dos campos con el texto actual de la lista', () => {
+    const s = raiz.querySelector('[data-campo="saludo"]')
+    const d = raiz.querySelector('[data-campo="despedida"]')
+    expect(s.tagName).toBe('TEXTAREA')
+    expect(d.tagName).toBe('TEXTAREA')
+    expect(s.value.length).toBeGreaterThan(0)
+    expect(d.value.length).toBeGreaterThan(0)
+  })
+
+  it('editar el saludo actualiza la lista y avisa', () => {
+    document.body.innerHTML = '<div id="rs"></div>'
+    const rs = document.getElementById('rs')
+    let avisos = 0
+    const p = armar(rs, lista, () => { avisos += 1 })
+    const s = rs.querySelector('[data-campo="saludo"]')
+    s.value = 'Buenas, mañana jugamos igual con lluvia.'
+    s.dispatchEvent(new Event('change'))
+    expect(avisos).toBe(1)
+    expect(p.lista().saludo).toBe('Buenas, mañana jugamos igual con lluvia.')
+  })
+
+  it('el texto editado llega a la imagen', () => {
+    const s = raiz.querySelector('[data-campo="saludo"]')
+    s.value = 'Texto propio de esta semana.'
+    s.dispatchEvent(new Event('change'))
+    const textos = pantalla.plano().ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
+    expect(textos.join(' ')).toContain('Texto propio de esta semana')
+  })
+
+  it('editar la despedida tambien llega a la imagen', () => {
+    const d = raiz.querySelector('[data-campo="despedida"]')
+    d.value = 'Gracias por bancar la lluvia.'
+    d.dispatchEvent(new Event('change'))
+    const textos = pantalla.plano().ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
+    expect(textos.join(' ')).toContain('Gracias por bancar la lluvia')
+  })
+
+  it('una lista vieja sin los campos usa los textos por defecto', () => {
+    // Las listas guardadas antes de este cambio no traen saludo ni despedida.
+    const vieja = structuredClone(lista)
+    delete vieja.saludo
+    delete vieja.despedida
+    document.body.innerHTML = '<div id="rv"></div>'
+    const rv = document.getElementById('rv')
+    crearPantallaVistaPrevia(rv, {
+      lista: vieja, roster: ROSTER, alCambiar: () => {},
+      crearContexto: () => contextoFalso(), cargarLogo: async () => null, cargarFoto: async () => null,
+    })
+    expect(rv.querySelector('[data-campo="saludo"]').value).toContain('Buenas tardes')
+    expect(rv.querySelector('[data-campo="despedida"]').value).toContain('Nos vemos')
+  })
+})

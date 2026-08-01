@@ -452,3 +452,21 @@ input.fila-nombre:focus {
   white-space: nowrap;
 }
 .marca-nuevo input { width: 20px; height: 20px; }
+
+/* Saludo y despedida. Van entre los interruptores y la imagen, para que el
+   efecto de lo que se escribe quede a la vista sin scrollear. */
+.mensajes-imagen { display: flex; flex-direction: column; gap: 16px; padding: 0 16px 16px; }
+.campo-mensaje textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.45;
+  color: var(--texto);
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  resize: vertical;
+}
+.campo-mensaje textarea:focus { border-color: var(--violeta); outline: none; }
+.campo-ayuda { font-size: 12px; line-height: 1.45; color: var(--texto-suave); }

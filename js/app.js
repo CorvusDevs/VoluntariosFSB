@@ -12,8 +12,6 @@ import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
 import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
 
-const SALUDO = 'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
-const DESPEDIDA = 'Nos vemos mañana. Gracias a todos.'
 const RUTA_USUARIOS = 'usuarios.json'
 
 const contenedor = document.getElementById('app')
@@ -121,8 +119,6 @@ function dibujar() {
     vista = crearPantallaVistaPrevia(cuerpo, {
       lista,
       roster,
-      saludo: SALUDO,
-      despedida: DESPEDIDA,
       cargarFoto,
       alCambiar: async (siguiente) => {
         lista = siguiente

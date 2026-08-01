@@ -4,6 +4,7 @@ import { pintar } from '../imagen/pintar.js'
 import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
+import { SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO } from '../modelo/lista.js'
 
 // El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
 // El archivo que se descarga mide, entonces, el doble que el plano.
@@ -22,7 +23,12 @@ const OPCIONES = [
 const cargarLogoReal = () => cargarImagen('assets/logo-aletea.png')
 
 export function crearPantallaVistaPrevia(raiz, opciones) {
-  const { roster, saludo, despedida, alCambiar, crearContexto, cargarFoto } = opciones
+  const { roster, alCambiar, crearContexto, cargarFoto } = opciones
+  // Los textos viven en la lista, no en la pantalla: cambian de una semana a otra
+  // y el historial tiene que conservar lo que realmente se mando ese sabado.
+  // Las opciones sueltas siguen aceptandose como respaldo para listas viejas.
+  const textoSaludo = () => lista.saludo ?? opciones.saludo ?? SALUDO_POR_DEFECTO
+  const textoDespedida = () => lista.despedida ?? opciones.despedida ?? DESPEDIDA_POR_DEFECTO
   let lista = opciones.lista
   const lienzo = document.createElement('canvas')
   lienzo.className = 'lienzo-vista-previa'
@@ -39,7 +45,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   let mensaje = ''
 
   function calcular() {
-    plano = maquetar(lista, roster, { saludo, despedida, medirTexto: medidorDesde(ctx) })
+    plano = maquetar(lista, roster, {
+      saludo: textoSaludo(), despedida: textoDespedida(), medirTexto: medidorDesde(ctx),
+    })
     return plano
   }
 
@@ -48,7 +56,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     return maquetar(
       { ...lista, opcionesImagen: { ...lista.opcionesImagen, compacto: true } },
       roster,
-      { saludo, despedida, medirTexto: medidorDesde(ctx) },
+      { saludo: textoSaludo(), despedida: textoDespedida(), medirTexto: medidorDesde(ctx) },
     )
   }
 
@@ -75,6 +83,32 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       marco.append(entrada, document.createTextNode(` ${etiqueta}`))
       caja.appendChild(marco)
     })
+    return caja
+  }
+
+  function campoTexto(rotulo, clave, valor, ayuda) {
+    const caja = elemento('label', ['campo', 'campo-mensaje'])
+    caja.appendChild(elemento('span', ['campo-rotulo'], rotulo))
+    const entrada = document.createElement('textarea')
+    entrada.dataset.campo = clave
+    entrada.rows = 3
+    entrada.value = valor
+    entrada.addEventListener('change', () => {
+      lista = { ...lista, [clave]: entrada.value }
+      alCambiar(lista)
+      redibujar()
+    })
+    caja.appendChild(entrada)
+    if (ayuda) caja.appendChild(elemento('span', ['campo-ayuda'], ayuda))
+    return caja
+  }
+
+  function mensajes() {
+    const caja = elemento('div', ['mensajes-imagen'])
+    caja.appendChild(campoTexto('Saludo', 'saludo', textoSaludo(),
+      'Aparece arriba de la lista. Se muestra solo si el interruptor Saludo está activado.'))
+    caja.appendChild(campoTexto('Despedida', 'despedida', textoDespedida(),
+      'Aparece al final de la imagen.'))
     return caja
   }
 
@@ -151,6 +185,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     vaciar(raiz)
     calcular()
     raiz.appendChild(interruptores())
+    raiz.appendChild(mensajes())
     raiz.appendChild(informacion())
     const aviso = avisoRecorte()
     if (aviso) raiz.appendChild(aviso)
