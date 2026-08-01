@@ -28,3 +28,42 @@ body {
   color: var(--texto);
   background: var(--fondo);
 }
+
+.demo {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.demo-opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 16px 0;
+}
+.demo-opciones label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#descargar {
+  font-family: inherit;
+  font-size: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--violeta);
+  color: #fff;
+  cursor: pointer;
+}
+#info {
+  color: var(--texto-suave);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.demo-lienzo {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+}
