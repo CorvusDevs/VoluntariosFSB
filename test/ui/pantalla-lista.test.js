@@ -27,9 +27,14 @@ describe('pantalla de armado', () => {
     expect(fichas('.columna-participantes .ficha')).toHaveLength(5)
   })
 
-  it('repite la lista completa de voluntarios en cada grupo', () => {
-    expect(fichas('.columna-voluntarios .ficha')).toHaveLength(10)
-    expect(raiz.querySelectorAll('.grupo')[0].querySelectorAll('.columna-voluntarios .ficha')).toHaveLength(5)
+  it('dibuja la lista de voluntarios una sola vez para toda la pantalla', () => {
+    expect(fichas('.columna-voluntarios .ficha')).toHaveLength(5)
+    expect(raiz.querySelectorAll('.columna-voluntarios')).toHaveLength(1)
+  })
+
+  it('rotula el area de voluntarios', () => {
+    const titulos = [...raiz.querySelectorAll('h2')].map((e) => e.textContent)
+    expect(titulos).toContain('Voluntarios')
   })
 
   it('tocar un participante lo selecciona', () => {
@@ -88,6 +93,27 @@ describe('pantalla de armado', () => {
     porNombre('.columna-participantes .ficha', 'Gonzalo').click()
     porNombre('.columna-voluntarios .ficha', 'Abi').click()
     expect(pantalla.lista().grupos[0].filas[0].voluntarios).toEqual([])
+  })
+
+  it('muestra una barra mientras hay un participante seleccionado', () => {
+    expect(raiz.querySelector('.barra-seleccion')).toBeNull()
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    const barra = raiz.querySelector('.barra-seleccion')
+    expect(barra).not.toBeNull()
+    expect(barra.textContent).toContain('Gonzalo')
+  })
+
+  it('cancelar limpia la seleccion sin emparejar', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    raiz.querySelector('[data-accion="cancelar"]').click()
+    expect(raiz.querySelector('.barra-seleccion')).toBeNull()
+    expect(pantalla.lista().grupos[0].filas[0].voluntarios).toEqual([])
+  })
+
+  it('la barra desaparece despues de emparejar', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    expect(raiz.querySelector('.barra-seleccion')).toBeNull()
   })
 
   it('avisa al cambiar la lista', () => {

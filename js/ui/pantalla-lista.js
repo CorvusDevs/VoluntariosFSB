@@ -6,6 +6,7 @@ import { crearPila } from '../modelo/deshacer.js'
 export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
   const pila = crearPila(lista)
   let seleccionado = null
+  let areaVoluntarios = null
 
   function estado() { return pila.actual() }
 
@@ -14,9 +15,17 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
       [...g.filas.flatMap((f) => f.voluntarios), ...g.apoyo]))
   }
 
+  function nombreDe(id) {
+    const gente = [...roster.participantes, ...roster.voluntarios]
+    return gente.find((p) => p.id === id)?.nombre ?? ''
+  }
+
   function alTocarParticipante(id) {
     seleccionado = seleccionado === id ? null : id
     dibujar()
+    // Con una sola columna en el telefono, los voluntarios quedan mas abajo:
+    // los acercamos para no obligar a buscarlos.
+    if (seleccionado) areaVoluntarios?.scrollIntoView?.({ block: 'nearest' })
   }
 
   function alTocarVoluntario(id) {
@@ -65,10 +74,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
       `${cuenta.participantesSinVoluntario} sin acompañante · ${cuenta.voluntariosSinAsignar} voluntarios libres`))
     caja.appendChild(encabezado)
 
-    const columnas = elemento('div', ['columnas'])
-    const izquierda = elemento('div', ['columna', 'columna-participantes'])
-    const derecha = elemento('div', ['columna', 'columna-voluntarios'])
-
+    const columna = elemento('div', ['columna', 'columna-participantes'])
     const porId = new Map([...roster.participantes, ...roster.voluntarios].map((p) => [p.id, p]))
 
     grupo.filas.forEach((fila) => {
@@ -77,19 +83,41 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
         const detalle = fila.voluntarios.map((v) => porId.get(v)?.nombre).filter(Boolean).join(' / ')
         const el = ficha(persona, { seleccionada: seleccionado === id, detalle })
         el.addEventListener('click', () => alTocarParticipante(id))
-        izquierda.appendChild(el)
+        columna.appendChild(el)
       })
     })
 
+    caja.appendChild(columna)
+    return caja
+  }
+
+  // Una sola lista de voluntarios para toda la pantalla: repetirla en cada grupo
+  // obligaba a pasar dos veces por los mismos nombres en el telefono.
+  function dibujarVoluntarios() {
+    const caja = elemento('section', ['voluntarios'])
+    caja.appendChild(elemento('h2', [], 'Voluntarios'))
+
+    const columna = elemento('div', ['columna', 'columna-voluntarios'])
     const asignados = voluntariosAsignados()
     activos(roster.voluntarios).forEach((voluntario) => {
       const el = ficha(voluntario, { atenuada: asignados.has(voluntario.id) })
       el.addEventListener('click', () => alTocarVoluntario(voluntario.id))
-      derecha.appendChild(el)
+      columna.appendChild(el)
     })
 
-    columnas.append(izquierda, derecha)
-    caja.appendChild(columnas)
+    caja.appendChild(columna)
+    return caja
+  }
+
+  function barraSeleccion() {
+    const caja = elemento('div', ['barra-seleccion'])
+    caja.appendChild(elemento('span', ['barra-seleccion-texto'], `Asignando a ${nombreDe(seleccionado)}`))
+    const cancelar = boton('Cancelar', () => {
+      seleccionado = null
+      dibujar()
+    })
+    cancelar.dataset.accion = 'cancelar'
+    caja.appendChild(cancelar)
     return caja
   }
 
@@ -97,6 +125,9 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar }) {
     vaciar(raiz)
     raiz.appendChild(barra())
     estado().grupos.forEach((grupo) => raiz.appendChild(dibujarGrupo(grupo)))
+    areaVoluntarios = dibujarVoluntarios()
+    raiz.appendChild(areaVoluntarios)
+    if (seleccionado) raiz.appendChild(barraSeleccion())
   }
 
   dibujar()
