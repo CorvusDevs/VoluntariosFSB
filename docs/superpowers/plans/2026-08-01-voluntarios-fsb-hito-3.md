@@ -840,16 +840,16 @@ export function crearClienteGitHub({ token, duenio, repo, rama = 'main', fetchFn
 }
 ```
 
-La conversión a base64 pasa por `TextEncoder` a propósito. `btoa(JSON.stringify(...))` explota con el primer nombre acentuado, y este proyecto está lleno de Julián, Rocío y Eloísa. La prueba de acentos existe exactamente por eso.
+La conversión a base64 pasa por `TextEncoder` a propósito, y la razón es peor que un error ruidoso. `btoa(JSON.stringify(...))` **no lanza** ante un nombre acentuado: `á` es U+00E1, entra en un byte, así que `btoa` emite en silencio el byte latin1 `0xE1`, que no es UTF-8 válido. El archivo se escribiría con bytes inválidos y el nombre volvería con un carácter de reemplazo. No falla nada: ni la escritura, ni la lectura, ni las pruebas. Medido contra el módulo, `{"n":"Julián"}` vuelve como `{"n":"Juli?n"}` por el camino ingenuo y como `{"n":"Julián"}` por el camino con `TextEncoder`. Esa corrupción silenciosa es la razón por la que existe el camino con `TextEncoder`, y la prueba de acentos existe exactamente por eso: este proyecto está lleno de Julián, Rocío y Eloísa, y un error que no se anuncia se descubre semanas después, con los datos ya rotos.
 
-El `.replace(/\s/g, '')` al decodificar tampoco es adorno: la API de contenidos devuelve el base64 partido en líneas, y `atob` falla ante un salto de línea.
+El `.replace(/\s/g, '')` al decodificar es defensivo, no imprescindible. La API de contenidos sí devuelve el base64 con saltos de línea, verificado contra la API real: hasta un archivo de 13 bytes vuelve como `"SGVsbG8gV29ybGQhCg==\n"`, y uno grande viene cortado cada 60 caracteres. Pero `atob` implementa el "forgiving-base64 decode", que descarta los espacios en blanco ASCII antes de decodificar, así que tolera esos saltos por su cuenta. El `replace` se conserva para que el decodificador no dependa de que el runtime cumpla la especificación.
 
 El 422 se trata como conflicto porque GitHub lo usa cuando el sha enviado no coincide, que es justamente el caso de dos coordinadoras escribiendo a la vez.
 
 - [ ] **Step 5: Correr las pruebas**
 
 Run: `npx vitest run test/almacen/github.test.js`
-Expected: PASS, 14 pruebas.
+Expected: PASS, 13 pruebas.
 
 - [ ] **Step 6: Verificar la forma real de la respuesta, sin token y sin escribir nada**
 
