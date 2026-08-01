@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   crearLista, asignarVoluntario, quitarVoluntario, fusionarParticipantes,
   separarParticipante, moverAGrupo, agregarApoyo, contarPendientes, filaDe,
-  sincronizarConRoster, editarGrupo,
+  sincronizarConRoster, editarGrupo, quitarDeLista, volverALaLista,
 } from '../../js/modelo/lista.js'
 import { ROSTER } from '../ayudas/datos.js'
 
@@ -228,5 +228,61 @@ describe('editarGrupo', () => {
     expect(l.grupos[0].numero).toBe(1)
     expect(l.grupos[0].filas.length).toBeGreaterThan(0)
     expect(l.grupos[0].apoyo).toEqual([])
+  })
+})
+
+describe('ausencias de una jornada', () => {
+  it('quitarDeLista saca al participante de la planilla', () => {
+    const l = quitarDeLista(crearLista('2026-08-08', ROSTER), 'p1')
+    expect(() => filaDe(l, 'p1')).toThrow()
+    expect(l.ausentes).toContain('p1')
+  })
+
+  it('no toca al resto ni a la lista original', () => {
+    const original = crearLista('2026-08-08', ROSTER)
+    const l = quitarDeLista(original, 'p1')
+    expect(filaDe(l, 'p2')).toBeTruthy()
+    expect(filaDe(original, 'p1')).toBeTruthy()
+    expect(original.ausentes).toEqual([])
+  })
+
+  it('el ausente NO vuelve solo al reconciliar con el roster', () => {
+    // Este es el punto del registro: sin el, sacar a alguien duraba hasta la
+    // proxima reconciliacion y volvia a aparecer sin que nadie lo pidiera.
+    const l = sincronizarConRoster(quitarDeLista(crearLista('2026-08-08', ROSTER), 'p1'), ROSTER)
+    expect(() => filaDe(l, 'p1')).toThrow()
+    expect(l.ausentes).toContain('p1')
+  })
+
+  it('volverALaLista lo devuelve a su grupo, sin voluntarios', () => {
+    let l = quitarDeLista(crearLista('2026-08-08', ROSTER), 'p1')
+    l = volverALaLista(l, 'p1', ROSTER)
+    expect(filaDe(l, 'p1').voluntarios).toEqual([])
+    expect(l.ausentes).not.toContain('p1')
+    expect(l.grupos[0].filas.some((f) => f.participantes.includes('p1'))).toBe(true)
+  })
+
+  it('quitar a alguien no arrastra a su compañero de fila', () => {
+    let l = fusionarParticipantes(crearLista('2026-08-08', ROSTER), 'p1', 'p2')
+    l = quitarDeLista(l, 'p2')
+    expect(filaDe(l, 'p1').participantes).toEqual(['p1'])
+    expect(() => filaDe(l, 'p2')).toThrow()
+  })
+
+  it('quitar dos veces no duplica la ausencia', () => {
+    let l = quitarDeLista(crearLista('2026-08-08', ROSTER), 'p1')
+    l = quitarDeLista(l, 'p1')
+    expect(l.ausentes.filter((id) => id === 'p1')).toHaveLength(1)
+  })
+
+  it('dar de baja a un ausente lo saca tambien de las ausencias', () => {
+    const l = quitarDeLista(crearLista('2026-08-08', ROSTER), 'p1')
+    const roster = structuredClone(ROSTER)
+    roster.participantes.find((p) => p.id === 'p1').activo = false
+    expect(sincronizarConRoster(l, roster).ausentes).not.toContain('p1')
+  })
+
+  it('volverALaLista falla si el participante no existe', () => {
+    expect(() => volverALaLista(crearLista('2026-08-08', ROSTER), 'p999', ROSTER)).toThrow(/p999/)
   })
 })

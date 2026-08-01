@@ -174,8 +174,20 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
 
     const columna = elemento('div', ['columna', 'columna-voluntarios'])
     const asignados = voluntariosAsignados()
+    // Quienes ya acompañan al participante seleccionado se marcan aparte y dicen
+    // que tocarlos los quita. Sin esto se veian igual que los asignados a otro
+    // chico, nadie adivinaba que el segundo toque desasigna, y se terminaba
+    // apilando voluntarios sobre el mismo participante sin poder deshacerlo.
+    const delSeleccionado = seleccionado
+      ? new Set(filaDe(estado(), seleccionado).voluntarios)
+      : new Set()
+
     activos(roster.voluntarios).forEach((voluntario) => {
-      const el = ficha(voluntario, { atenuada: asignados.has(voluntario.id) })
+      const acompania = delSeleccionado.has(voluntario.id)
+      const el = ficha(voluntario, acompania
+        ? { seleccionada: true, detalle: 'Tocá para quitar' }
+        : { atenuada: asignados.has(voluntario.id) })
+      if (acompania) el.classList.add('quitable')
       el.addEventListener('click', () => alTocarVoluntario(voluntario.id))
       columna.appendChild(el)
     })

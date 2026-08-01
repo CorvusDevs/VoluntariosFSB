@@ -105,6 +105,33 @@ describe('pantalla de armado', () => {
     expect(pantalla.lista().grupos[0].filas[0].voluntarios).toEqual([])
   })
 
+  it('avisa en pantalla que al voluntario ya asignado se lo puede quitar', () => {
+    // Sin esta marca, quitar era invisible: el voluntario ya asignado se veia
+    // igual que uno ocupado con otro chico, y la coordinacion apilaba nombres
+    // sobre el mismo participante sin encontrar como sacarlos.
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    const abi = porNombre('.columna-voluntarios .ficha', 'Abi')
+    expect(abi.classList.contains('quitable')).toBe(true)
+    expect(abi.textContent).toContain('quitar')
+  })
+
+  it('un voluntario ocupado con OTRO participante no se ofrece como quitable', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    porNombre('.columna-participantes .ficha', 'Sofi').click()
+    const abi = porNombre('.columna-voluntarios .ficha', 'Abi')
+    expect(abi.classList.contains('quitable')).toBe(false)
+    expect(abi.classList.contains('atenuada')).toBe(true)
+  })
+
+  it('sin nadie seleccionado ningun voluntario aparece como quitable', () => {
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    expect(fichas('.columna-voluntarios .ficha.quitable')).toHaveLength(0)
+  })
+
   it('muestra una barra mientras hay un participante seleccionado', () => {
     expect(raiz.querySelector('.barra-seleccion')).toBeNull()
     porNombre('.columna-participantes .ficha', 'Gonzalo').click()

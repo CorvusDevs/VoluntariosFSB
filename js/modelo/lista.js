@@ -21,6 +21,9 @@ export function crearLista(fecha, roster, base = {}) {
     hora: base.hora ?? '11:00',
     lugar: base.lugar ?? 'Tres Cruces',
     coordinacion: base.coordinacion ?? [],
+    // Quienes hoy no vienen. Se guardan aparte para que reconciliar con el roster
+    // no los devuelva a la planilla, que era el efecto de sacarlos sin registrarlo.
+    ausentes: [],
     grupos,
     opcionesImagen: { saludo: true, despedida: true, fotos: true, compacto: false },
   }
@@ -144,6 +147,7 @@ export function editarGrupo(lista, numeroGrupo, cambios) {
 
 export function sincronizarConRoster(lista, roster) {
   const activos = new Map(roster.participantes.filter((p) => p.activo).map((p) => [p.id, p]))
+  const ausentes = new Set(lista.ausentes ?? [])
   const yaEnLista = new Set()
 
   const grupos = lista.grupos.map((grupo) => {
@@ -161,7 +165,7 @@ export function sincronizarConRoster(lista, roster) {
   })
 
   activos.forEach((persona) => {
-    if (yaEnLista.has(persona.id)) return
+    if (yaEnLista.has(persona.id) || ausentes.has(persona.id)) return
     const destino = grupos.find((g) => g.numero === persona.grupo)
     if (destino) destino.filas.push({ participantes: [persona.id], voluntarios: [] })
   })
@@ -176,7 +180,38 @@ export function sincronizarConRoster(lista, roster) {
     apoyo: grupo.apoyo.filter((id) => voluntariosActivos.has(id)),
   }))
 
-  return { ...lista, grupos: limpios }
+  // Alguien dado de baja del roster deja de ser una ausencia de esta lista: ya no
+  // esta en ninguna parte, y guardar su id para siempre no ayudaria a nadie.
+  const ausentesVigentes = [...ausentes].filter((id) => activos.has(id))
+  return { ...lista, ausentes: ausentesVigentes, grupos: limpios }
+}
+
+export function quitarDeLista(lista, participanteId) {
+  const grupos = lista.grupos.map((grupo) => ({
+    ...grupo,
+    filas: grupo.filas
+      .map((fila) => ({
+        ...fila,
+        participantes: fila.participantes.filter((id) => id !== participanteId),
+      }))
+      .filter((fila) => fila.participantes.length > 0),
+  }))
+  const ausentes = [...new Set([...(lista.ausentes ?? []), participanteId])]
+  return { ...lista, ausentes, grupos }
+}
+
+export function volverALaLista(lista, participanteId, roster) {
+  const persona = roster.participantes.find((p) => p.id === participanteId)
+  if (!persona) throw new Error(`No existe el participante ${participanteId}`)
+  const ausentes = (lista.ausentes ?? []).filter((id) => id !== participanteId)
+  const yaEsta = lista.grupos.some((g) => g.filas.some((f) => f.participantes.includes(participanteId)))
+  if (yaEsta) return { ...lista, ausentes }
+  const grupos = lista.grupos.map((grupo) => (
+    grupo.numero === persona.grupo
+      ? { ...grupo, filas: [...grupo.filas, { participantes: [participanteId], voluntarios: [] }] }
+      : grupo
+  ))
+  return { ...lista, ausentes, grupos }
 }
 
 export function contarPendientes(lista, numeroGrupo, roster) {

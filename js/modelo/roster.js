@@ -31,6 +31,7 @@ export function agregarParticipante(roster, datos) {
     id: nuevoId('p'),
     nombre: validarNombre(datos.nombre),
     grupo: validarGrupo(datos.grupo),
+    nuevo: Boolean(datos.nuevo),
     foto: datos.foto ?? null,
     activo: true,
     notas: datos.notas ?? '',

@@ -97,3 +97,20 @@ describe('buscarPersonas', () => {
     expect(buscarPersonas(r.participantes, 'roci').map((p) => p.nombre)).toEqual(['Rocío'])
   })
 })
+
+describe('participantes nuevos', () => {
+  it('por defecto un participante no es nuevo', () => {
+    const r = agregarParticipante(rosterVacio(), { nombre: 'Gonzalo', grupo: 1 })
+    expect(r.participantes[0].nuevo).toBe(false)
+  })
+
+  it('se puede marcar como nuevo al darlo de alta', () => {
+    const r = agregarParticipante(rosterVacio(), { nombre: 'Lautaro', grupo: 2, nuevo: true })
+    expect(r.participantes[0].nuevo).toBe(true)
+  })
+
+  it('la marca se puede cambiar despues', () => {
+    const r = agregarParticipante(rosterVacio(), { nombre: 'Lautaro', grupo: 2, nuevo: true })
+    expect(editarPersona(r, r.participantes[0].id, { nuevo: false }).participantes[0].nuevo).toBe(false)
+  })
+})

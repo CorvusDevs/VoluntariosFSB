@@ -398,3 +398,19 @@ body {
   padding-left: 12px;
 }
 .editar-grupo .campo { margin-bottom: 10px; max-width: 320px; }
+
+/* Voluntario que ya acompaña al participante seleccionado. Se marca distinto de
+   .seleccionada (violeta, que significa "este es el participante elegido") para
+   que se entienda que el toque siguiente lo QUITA, no que lo agrega otra vez.
+   El par #C11E6B sobre #FBEAF0 da 4,95 de contraste, verificado con contraste(). */
+.ficha.quitable,
+.ficha.quitable.seleccionada {
+  border-color: var(--magenta-texto);
+  background: #FBEAF0;
+  color: var(--magenta-texto);
+}
+.ficha.quitable .ficha-detalle {
+  color: var(--magenta-texto);
+  font-size: 11px;
+  opacity: 0.85;
+}

@@ -225,7 +225,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
   }
 
   x = escribirNombres(ordenes, participantes, x, centro, m,
-    FUENTES.titulo(m.pxNombre), COLORES.texto, clave, medirTexto)
+    FUENTES.titulo(m.pxNombre), COLORES.texto, clave, medirTexto, true)
 
   if (voluntarios.length > 0) {
     x = escribirSeparador(ordenes, '-', x, centro, m, clave, medirTexto)
