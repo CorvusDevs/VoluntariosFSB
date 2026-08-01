@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { maquetar } from '../../js/imagen/maquetar.js'
-import { ANCHO } from '../../js/imagen/tema.js'
+import { ANCHO, COLORES } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
 const opciones = { saludo: SALUDO, despedida: DESPEDIDA, medirTexto: medirFalso }
@@ -106,6 +106,13 @@ describe('maquetar', () => {
   it('dibuja iniciales cuando no hay foto', () => {
     const t = textos(maquetar(LISTA, ROSTER, opciones))
     expect(t).toContain('GO')
+  })
+
+  it('el circulo de iniciales toma el color de su grupo', () => {
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const circuloDe = (id) => plano.ordenes.find((o) => o.tipo === 'circulo' && o.fila === id)
+    expect(circuloDe('p1').color).toBe(COLORES.turquesaTenue)
+    expect(circuloDe('p4').color).toBe(COLORES.magentaTenue)
   })
 
   it('el modo compacto es mas bajo y no pide fotos de personas', () => {

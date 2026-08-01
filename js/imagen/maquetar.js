@@ -28,7 +28,7 @@ export function maquetar(lista, roster, opciones = {}) {
     if (i > 0) y += m.espacioEntreGrupos
     y = tituloGrupo(ordenes, grupo, m, y)
     grupo.filas.forEach((fila) => {
-      y = filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto)
+      y = filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, grupo.numero)
     })
     if (grupo.apoyo?.length) {
       y = lineaApoyo(ordenes, grupo, porId, m, y)
@@ -157,7 +157,7 @@ function tituloGrupo(ordenes, grupo, m, y) {
   return arriba + alto
 }
 
-function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto) {
+function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, numeroGrupo) {
   const participantes = fila.participantes.map((id) => buscar(porId, id))
   const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
   const clave = fila.participantes[0]
@@ -174,7 +174,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto) {
     } else {
       ordenes.push({
         tipo: 'circulo', x: x + m.avatar / 2, y: centro, radio: m.avatar / 2,
-        color: colorDeGrupo(1).tenue, fila: clave,
+        color: colorDeGrupo(numeroGrupo).tenue, fila: clave,
       })
       ordenes.push({
         tipo: 'texto', texto: iniciales(primero.nombre), x: x + m.avatar / 2, y: centro,
