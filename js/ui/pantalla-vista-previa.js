@@ -16,6 +16,11 @@ const OPCIONES = [
   ['compacto', 'Modo compacto'],
 ]
 
+// Se puede inyectar porque el Image de jsdom, con la carga de recursos apagada,
+// no dispara ni onload ni onerror: la promesa queda colgada para siempre y sin
+// inyeccion esta rama no se podria probar.
+const cargarLogoReal = () => cargarImagen('assets/logo-aletea.png')
+
 export function crearPantallaVistaPrevia(raiz, opciones) {
   const { roster, saludo, despedida, alCambiar, crearContexto, cargarFoto } = opciones
   let lista = opciones.lista
@@ -106,7 +111,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
   // solo las fotos de los participantes necesitan ese lector.
   async function precargarFotos() {
-    const logo = await cargarImagen('assets/logo-aletea.png')
+    const logo = await (opciones.cargarLogo ?? cargarLogoReal)()
     if (logo) imagenes.logo = logo
     if (cargarFoto) {
       const claves = new Set()

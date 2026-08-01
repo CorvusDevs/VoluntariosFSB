@@ -18,6 +18,7 @@ function contextoFalso() {
 const armar = (raiz, lista, alCambiar = () => {}) => crearPantallaVistaPrevia(raiz, {
   lista, roster: ROSTER, saludo: 'Buenas tardes.', despedida: 'Nos vemos.',
   alCambiar, crearContexto: () => contextoFalso(), cargarFoto: async () => null,
+  cargarLogo: async () => null,
 })
 
 let raiz, pantalla, lista
@@ -94,5 +95,37 @@ describe('pantalla de vista previa', () => {
     compacto.checked = true
     compacto.dispatchEvent(new Event('change'))
     expect(pantalla.plano().alto).toBeLessThan(altoNormal)
+  })
+
+  it('precarga el logo y las fotos, y repinta al terminar', async () => {
+    document.body.innerHTML = '<div id="r4"></div>'
+    const r4 = document.getElementById('r4')
+    const pedidas = []
+    const roster = structuredClone(ROSTER)
+    crearPantallaVistaPrevia(r4, {
+      lista, roster, saludo: 'x', despedida: 'y', alCambiar: () => {},
+      crearContexto: () => contextoFalso(),
+      cargarLogo: async () => ({ marca: 'logo' }),
+      cargarFoto: async (clave) => { pedidas.push(clave); return { marca: clave } },
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pedidas).toContain('p3.jpg')
+    expect(r4.querySelector('.lienzo-vista-previa')).not.toBeNull()
+  })
+
+  it('pide cada foto una sola vez aunque se repita en varias filas', async () => {
+    document.body.innerHTML = '<div id="r5"></div>'
+    const r5 = document.getElementById('r5')
+    const pedidas = []
+    const dosFilas = structuredClone(lista)
+    dosFilas.grupos[0].filas.push({ participantes: ['p3'], voluntarios: [] })
+    crearPantallaVistaPrevia(r5, {
+      lista: dosFilas, roster: ROSTER, saludo: 'x', despedida: 'y', alCambiar: () => {},
+      crearContexto: () => contextoFalso(),
+      cargarLogo: async () => null,
+      cargarFoto: async (clave) => { pedidas.push(clave); return null },
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pedidas.filter((c) => c === 'p3.jpg')).toHaveLength(1)
   })
 })
