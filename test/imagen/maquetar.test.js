@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import {
-  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, anchoDeCeldaRetratos,
+  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, esMontado,
+  TAMANOS_VOLUNTARIO, ASOMOS_VOLUNTARIO, medidasRetratos, anchoDeCeldaRetratos,
 } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
@@ -769,25 +770,85 @@ describe('formato retratos', () => {
     expect((w * h - interior) / (w * h)).toBeLessThan(0.15)
   })
 
-  it('nunca deja el medallon fuera de la celda, en ninguna de las cuatro esquinas', () => {
-    // Anclado al centro de la franja, el medallon sobresalia por debajo del borde
-    // y se metia en la fila siguiente de la grilla.
+  it('los medallones apoyados nunca se salen de su celda', () => {
     const ancho = anchoDeCeldaRetratos(56)
     const alto = Math.round(ancho * RETRATOS.proporcionCelda)
     const lado = Math.round(ancho * RETRATOS.factorMedallon)
     const altoMed = Math.round(lado * RETRATOS.proporcionMedallon)
-    ESQUINAS.forEach((esquina) => {
+    ESQUINAS.filter((e) => !esMontado(e)).forEach((esquina) => {
       const plano = maquetar(enRetratos({ esquinaVoluntario: esquina }), ROSTER, opciones)
       const celdas = celdasDe(plano)
       const marcos = plano.ordenes.filter(
         (o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === lado)
-      expect(marcos.length).toBeGreaterThan(0)
+      expect(marcos.length, esquina).toBeGreaterThan(0)
       marcos.forEach((marco) => {
         const celda = celdas.find((c) => marco.x >= c.x - 1 && marco.x + lado <= c.x + c.ancho + 1
           && marco.y >= c.y - 1 && marco.y + altoMed <= c.y + c.alto + 1)
         expect(celda, `${esquina}: el medallon en (${marco.x}, ${marco.y}) se sale de toda celda`).toBeDefined()
       })
     })
+  })
+
+  it('el montado sale del marco por arriba y por el costado, a proposito', () => {
+    const medidas = medidasRetratos({ margen: 56, esquina: 'montado-derecha' })
+    const plano = maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha' }), ROSTER, opciones)
+    const celdas = celdasDe(plano)
+    const marcos = plano.ordenes.filter(
+      (o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === medidas.anchoMed)
+    expect(marcos.length).toBeGreaterThan(0)
+    const celda = celdas[0]
+    const marco = marcos[0]
+    expect(marco.y).toBeLessThan(celda.y)
+    expect(marco.x + medidas.anchoMed).toBeGreaterThan(celda.x + celda.ancho)
+  })
+
+  it('dos medallones montados nunca se pisan entre columnas', () => {
+    // La separacion entre columnas crece lo necesario. Sin eso, el medallon que
+    // asoma se metia adentro de la foto del chico de al lado.
+    Object.keys(TAMANOS_VOLUNTARIO).forEach((tamano) => {
+      const medidas = medidasRetratos({ margen: 56, esquina: 'montado-derecha', tamano })
+      const plano = maquetar(
+        enRetratos({ esquinaVoluntario: 'montado-derecha', tamanoVoluntario: tamano }), ROSTER, opciones)
+      const marcos = plano.ordenes
+        .filter((o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === medidas.anchoMed)
+        .sort((a, b) => a.y - b.y || a.x - b.x)
+      for (let i = 1; i < marcos.length; i += 1) {
+        if (marcos[i].y !== marcos[i - 1].y) continue
+        expect(marcos[i].x, `${tamano}: se pisan`).toBeGreaterThanOrEqual(marcos[i - 1].x + medidas.anchoMed)
+      }
+    })
+  })
+
+  it('la imagen se ensancha con el medallon montado, para hacerle lugar', () => {
+    const angosta = maquetar(enRetratos(), ROSTER, opciones)
+    const ancha = maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha' }), ROSTER, opciones)
+    expect(ancha.ancho).toBeGreaterThan(angosta.ancho)
+    // Y crece de alto, porque cada fila le deja lugar arriba al medallon.
+    expect(ancha.alto).toBeGreaterThan(angosta.alto)
+  })
+
+  it('los tres tamaños se distinguen y el mas grande manda', () => {
+    const areas = Object.keys(TAMANOS_VOLUNTARIO).map((tamano) =>
+      medidasRetratos({ margen: 56, esquina: 'montado-derecha', tamano }).anchoMed)
+    expect(new Set(areas).size).toBe(3)
+    expect(areas[0]).toBeLessThan(areas[2])
+  })
+
+  it('los tres asomos cambian cuanto crece la fila', () => {
+    const altos = Object.keys(ASOMOS_VOLUNTARIO).map((asomo) =>
+      maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha', asomoVoluntario: asomo }), ROSTER, opciones).alto)
+    expect(new Set(altos).size).toBe(3)
+    expect(altos[0]).toBeLessThan(altos[2])
+  })
+
+  it('el tamaño y el asomo no tocan nada cuando el medallon va apoyado', () => {
+    // Solo aplican al montado: cambiarlos con la esquina de abajo no puede mover
+    // ni un pixel, o el selector confundiria en vez de ayudar.
+    const base = maquetar(enRetratos(), ROSTER, opciones)
+    const otro = maquetar(
+      enRetratos({ tamanoVoluntario: 'enorme', asomoVoluntario: 'alto' }), ROSTER, opciones)
+    expect(otro.ancho).toBe(base.ancho)
+    expect(otro.alto).toBe(base.alto)
   })
 
   it('ensancha la imagen cuando hay mas participantes, en vez de achicar la cara', () => {

@@ -5,7 +5,7 @@ import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombr
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import {
-  SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO,
+  SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO, TAMANO_VOLUNTARIO_POR_DEFECTO, ASOMO_VOLUNTARIO_POR_DEFECTO,
 } from '../modelo/lista.js'
 
 // El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
@@ -81,10 +81,25 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // Solo tiene sentido en "retratos": es el unico formato donde el voluntario
   // aparece como medallon sobre la foto del chico.
   const ESQUINAS_VOLUNTARIO = [
-    ['arriba-derecha', 'Arriba a la derecha'],
-    ['arriba-izquierda', 'Arriba a la izquierda'],
     ['abajo-derecha', 'Abajo a la derecha'],
     ['abajo-izquierda', 'Abajo a la izquierda'],
+    ['arriba-derecha', 'Arriba a la derecha'],
+    ['arriba-izquierda', 'Arriba a la izquierda'],
+    ['montado-derecha', 'Montado sobre la esquina derecha'],
+    ['montado-izquierda', 'Montado sobre la esquina izquierda'],
+  ]
+
+  // Los dos de abajo solo cambian algo con el medallon montado, asi que aparecen
+  // unicamente ahi: mostrarlos siempre haria creer que hacen algo cuando no.
+  const TAMANOS_VOLUNTARIO = [
+    ['mediano', 'Mediano, el doble de cara'],
+    ['grande', 'Grande, casi el triple'],
+    ['enorme', 'Muy grande, casi el cuádruple'],
+  ]
+  const ASOMOS_VOLUNTARIO = [
+    ['apenas', 'Apenas asomando'],
+    ['montado', 'Montado, más de la mitad afuera'],
+    ['alto', 'Bien arriba, casi entero afuera'],
   ]
 
   function selectorDeFormato() {
@@ -123,6 +138,30 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     selector.value = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
     selector.addEventListener('change', () => {
       lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, esquinaVoluntario: selector.value } }
+      alCambiar(lista)
+      redibujar()
+    })
+    caja.appendChild(selector)
+    return caja
+  }
+
+  // Un selector chico para las opciones que solo valen con el medallon montado.
+  function selectorMontado(campo, rotulo, valores, porDefecto) {
+    const esquina = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
+    if (!String(esquina).startsWith('montado-')) return null
+    const caja = elemento('label', ['campo', 'campo-formato'])
+    caja.appendChild(elemento('span', ['campo-rotulo'], rotulo))
+    const selector = document.createElement('select')
+    selector.dataset.campo = campo
+    valores.forEach(([valor, texto]) => {
+      const opcion = document.createElement('option')
+      opcion.value = valor
+      opcion.textContent = texto
+      selector.appendChild(opcion)
+    })
+    selector.value = lista.opcionesImagen?.[campo] ?? porDefecto
+    selector.addEventListener('change', () => {
+      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, [campo]: selector.value } }
       alCambiar(lista)
       redibujar()
     })
@@ -254,6 +293,12 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     raiz.appendChild(selectorDeFormato())
     const esquina = selectorDeEsquina()
     if (esquina) raiz.appendChild(esquina)
+    const tamano = selectorMontado(
+      'tamanoVoluntario', 'Tamaño del voluntario', TAMANOS_VOLUNTARIO, TAMANO_VOLUNTARIO_POR_DEFECTO)
+    if (tamano) raiz.appendChild(tamano)
+    const asomo = selectorMontado(
+      'asomoVoluntario', 'Cuánto asoma', ASOMOS_VOLUNTARIO, ASOMO_VOLUNTARIO_POR_DEFECTO)
+    if (asomo) raiz.appendChild(asomo)
     raiz.appendChild(interruptores())
     raiz.appendChild(mensajes())
     raiz.appendChild(informacion())

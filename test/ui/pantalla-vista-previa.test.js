@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { crearPantallaVistaPrevia, DENSIDAD } from '../../js/ui/pantalla-vista-previa.js'
 import {
   crearLista, asignarVoluntario, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO,
+  TAMANO_VOLUNTARIO_POR_DEFECTO, ASOMO_VOLUNTARIO_POR_DEFECTO,
 } from '../../js/modelo/lista.js'
 import { ROSTER, medirFalso } from '../ayudas/datos.js'
 
@@ -342,9 +343,33 @@ describe('selector de formato', () => {
     formato.dispatchEvent(new Event('change'))
     const esquina = raiz.querySelector('[data-campo="esquina-voluntario"]')
     expect(esquina).not.toBeNull()
-    expect([...esquina.options].map((o) => o.value))
-      .toEqual(['arriba-derecha', 'arriba-izquierda', 'abajo-derecha', 'abajo-izquierda'])
+    expect([...esquina.options].map((o) => o.value)).toEqual([
+      'abajo-derecha', 'abajo-izquierda', 'arriba-derecha', 'arriba-izquierda',
+      'montado-derecha', 'montado-izquierda',
+    ])
     expect(esquina.value).toBe(ESQUINA_VOLUNTARIO_POR_DEFECTO)
+  })
+
+  it('el tamaño y el asomo solo aparecen con el medallon montado', () => {
+    // Con el medallon apoyado no cambian nada, asi que mostrarlos haria creer
+    // que hacen algo cuando no.
+    const formato = raiz.querySelector('[data-campo="formato"]')
+    formato.value = 'retratos'
+    formato.dispatchEvent(new Event('change'))
+    expect(raiz.querySelector('[data-campo="tamanoVoluntario"]')).toBeNull()
+    expect(raiz.querySelector('[data-campo="asomoVoluntario"]')).toBeNull()
+
+    const esquina = raiz.querySelector('[data-campo="esquina-voluntario"]')
+    esquina.value = 'montado-derecha'
+    esquina.dispatchEvent(new Event('change'))
+    const tamano = raiz.querySelector('[data-campo="tamanoVoluntario"]')
+    const asomo = raiz.querySelector('[data-campo="asomoVoluntario"]')
+    expect(tamano).not.toBeNull()
+    expect(asomo).not.toBeNull()
+    expect([...tamano.options].map((o) => o.value)).toEqual(['mediano', 'grande', 'enorme'])
+    expect([...asomo.options].map((o) => o.value)).toEqual(['apenas', 'montado', 'alto'])
+    expect(tamano.value).toBe(TAMANO_VOLUNTARIO_POR_DEFECTO)
+    expect(asomo.value).toBe(ASOMO_VOLUNTARIO_POR_DEFECTO)
   })
 
   it('el formato por defecto es la grilla', () => {

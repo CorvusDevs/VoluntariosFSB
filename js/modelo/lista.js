@@ -11,6 +11,12 @@ export const FORMATO_POR_DEFECTO = 'grilla'
 // banda y el resto de la foto queda libre para la cara.
 export const ESQUINA_VOLUNTARIO_POR_DEFECTO = 'abajo-derecha'
 
+// Tamaño y cuanto asoma el medallon. Solo cuentan cuando la esquina elegida es
+// una de las "montadas": con el medallon apoyado adentro de la foto, agrandarlo
+// taparia al chico, que es justo lo que no queremos.
+export const TAMANO_VOLUNTARIO_POR_DEFECTO = 'grande'
+export const ASOMO_VOLUNTARIO_POR_DEFECTO = 'montado'
+
 export const SALUDO_POR_DEFECTO =
   'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
 export const DESPEDIDA_POR_DEFECTO = 'Nos vemos mañana. Gracias a todos.'
@@ -45,6 +51,8 @@ export function crearLista(fecha, roster, base = {}) {
     opcionesImagen: {
       saludo: true, despedida: true, fotos: true, compacto: false, formato: FORMATO_POR_DEFECTO,
       esquinaVoluntario: ESQUINA_VOLUNTARIO_POR_DEFECTO,
+      tamanoVoluntario: TAMANO_VOLUNTARIO_POR_DEFECTO,
+      asomoVoluntario: ASOMO_VOLUNTARIO_POR_DEFECTO,
     },
   }
 }

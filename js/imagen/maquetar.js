@@ -1,5 +1,5 @@
 import {
-  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas, RETRATOS, ESQUINA_POR_DEFECTO, esDerecha, esAbajo, ajustarTexto, anchoDeCeldaRetratos,
+  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas, RETRATOS, ESQUINA_POR_DEFECTO, esDerecha, esAbajo, ajustarTexto, anchoDeCeldaRetratos, medidasRetratos, TAMANO_POR_DEFECTO, ASOMO_POR_DEFECTO, esMontado,
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { FORMATO_POR_DEFECTO } from '../modelo/lista.js'
@@ -35,11 +35,21 @@ export function maquetar(lista, roster, opciones = {}) {
   // no se achica dentro del archivo. Los otros dos formatos conservan el ancho fijo.
   const masPobladoDelGrupo = Math.max(1, ...lista.grupos.map((g) => g.filas.length))
   const columnasGrilla = columnasNecesarias(masPobladoDelGrupo)
-  const ensancha = formato === 'grilla' || formato === 'retratos'
-  const ancho = ensancha ? anchoParaColumnas(columnasGrilla, base.margen) : ANCHO
+  const esquinaVoluntario = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
+  const tamanoVoluntario = lista.opcionesImagen?.tamanoVoluntario ?? TAMANO_POR_DEFECTO
+  const asomoVoluntario = lista.opcionesImagen?.asomoVoluntario ?? ASOMO_POR_DEFECTO
+  // Retratos con el medallon montado separa mas las columnas para que dos
+  // medallones no se pisen, asi que su ancho no es el mismo que el de la grilla.
+  const retratos = medidasRetratos({
+    margen: base.margen, columnas: columnasGrilla,
+    esquina: esquinaVoluntario, tamano: tamanoVoluntario, asomo: asomoVoluntario,
+  })
+  let ancho = ANCHO
+  if (formato === 'grilla') ancho = anchoParaColumnas(columnasGrilla, base.margen)
+  else if (formato === 'retratos') ancho = retratos.anchoImagen
   const m = {
     ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
-    esquinaVoluntario: lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO,
+    esquinaVoluntario, tamanoVoluntario, asomoVoluntario, retratos,
   }
 
   const ordenes = []
@@ -478,27 +488,28 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
 
 function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const columnas = m.columnasRetratos ?? RETRATOS.porFila
-  const ancho = anchoDeCeldaRetratos(m.margen)
-  const alto = Math.round(ancho * RETRATOS.proporcionCelda)
-  const altoCelda = alto + RETRATOS.margenInferior
-  const color = colorDeGrupo(grupo.numero).fuerte
   const esquina = m.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
+  const medidas = m.retratos ?? medidasRetratos({
+    margen: m.margen, columnas, esquina,
+    tamano: m.tamanoVoluntario, asomo: m.asomoVoluntario,
+  })
+  const { celda: ancho, alto, altoCelda, anchoMed, altoMed, asoma, asomaLado, separacion, montado } = medidas
+  const color = colorDeGrupo(grupo.numero).fuerte
   const derecha = esDerecha(esquina)
   const abajo = esAbajo(esquina)
 
   const pxBase = Math.round(ancho * RETRATOS.factorNombre)
   const aire = Math.round(ancho * RETRATOS.aireFranja)
   const altoFranja = aire * 2 + pxBase
-  const anchoMed = Math.round(ancho * RETRATOS.factorMedallon)
-  const altoMed = Math.round(anchoMed * RETRATOS.proporcionMedallon)
   const inset = Math.round(ancho * RETRATOS.insetMedallon)
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
 
   let cursor = y
   grupo.filas.forEach((fila, i) => {
     const columna = i % columnas
-    const x = m.margen + columna * (ancho + RETRATOS.separacion)
-    const arriba = cursor
+    const x = m.margen + columna * (ancho + separacion)
+    // La celda baja para dejarle lugar arriba al medallon que asoma.
+    const arriba = cursor + asoma
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
@@ -520,7 +531,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // Con el medallon abajo, el nombre se corre al lado libre para dejarle el
     // hueco. Es la unica diferencia real entre elegir una esquina de arriba y una
     // de abajo, y le quita al nombre casi la mitad del ancho.
-    const hueco = abajo ? anchoMed + inset * 2 : 0
+    const hueco = abajo && !montado ? anchoMed + inset * 2 : 0
     const anchoNombre = ancho - hueco - inset * 2
     const centro = abajo
       ? (derecha ? x + inset + anchoNombre / 2 : x + ancho - inset - anchoNombre / 2)
@@ -546,14 +557,19 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       alineacion: 'center', lineaBase: 'middle', fila: clave })
 
     voluntarios.forEach((voluntario, n) => {
-      const mx = derecha ? x + ancho - inset - anchoMed : x + inset
-      // Abajo se ancla al borde inferior de la celda, no al centro de la franja:
-      // anclado a la franja el medallon sobresalia por debajo de la celda y se
-      // superponia con la fila siguiente de la grilla.
-      const base = abajo
-        ? arriba + alto - inset - altoMed
-        : arriba + inset
-      const my = abajo ? base - paso * n : base + paso * n
+      // Montado: pegado al borde de la celda y corrido hacia afuera, arrancando
+      // por encima del techo. Apoyado: adentro, separado del borde por el inset.
+      const mx = montado
+        ? (derecha ? x + ancho - anchoMed + asomaLado : x - asomaLado)
+        : (derecha ? x + ancho - inset - anchoMed : x + inset)
+      // Anclar el medallon de abajo al centro de la franja lo hacia sobresalir
+      // por debajo de la celda y meterse en la fila siguiente, asi que va contra
+      // el borde inferior.
+      const base = montado
+        ? arriba - asoma
+        : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
+      // Con el medallon apoyado abajo la pila sube; en los otros dos casos baja.
+      const my = abajo && !montado ? base - paso * n : base + paso * n
       medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto)
     })
 
