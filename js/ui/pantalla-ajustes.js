@@ -89,7 +89,7 @@ export function crearPantallaAjustes(raiz, opciones) {
     selector.dataset.usuario = registro.usuario
     selector.addEventListener('change', () => correr(async () => {
       const siguiente = cambiarRol(archivo, registro.usuario, selector.value)
-      await guardarArchivo(siguiente)
+      await guardarArchivo(siguiente, `Cambiar el rol de ${registro.nombre} a ${selector.value}`)
       archivo = siguiente
     }))
     fila.appendChild(selector)
@@ -97,7 +97,7 @@ export function crearPantallaAjustes(raiz, opciones) {
     const quitar = boton('Quitar', () => correr(async () => {
       if (!confirmar(`¿Quitar a ${registro.nombre}? Va a dejar de poder entrar.`)) return
       const siguiente = quitarUsuario(archivo, registro.usuario)
-      await guardarArchivo(siguiente)
+      await guardarArchivo(siguiente, `Quitar el acceso de ${registro.nombre}`)
       archivo = siguiente
     }))
     quitar.dataset.accion = 'quitar'
@@ -163,7 +163,7 @@ export function crearPantallaAjustes(raiz, opciones) {
         const contrasena = generarContrasena()
         const registro = await cifrar(sesion.token, contrasena)
         const siguiente = agregarUsuario(archivo, { ...datos, rol: selector.value }, registro)
-        await guardarArchivo(siguiente)
+        await guardarArchivo(siguiente, `Dar acceso a ${datos.nombre} como ${selector.value}`)
         archivo = siguiente
         borrador = { usuario: '', nombre: '' }
         nuevoRol = 'coordinacion'
@@ -221,7 +221,7 @@ export function crearPantallaAjustes(raiz, opciones) {
           nuevas.push({ usuario: registro.usuario, nombre: registro.nombre, contrasena })
         }
         const siguiente = { ...archivo, usuarios }
-        await guardarArchivo(siguiente)
+        await guardarArchivo(siguiente, 'Rotar el token y regenerar todas las contraseñas')
         archivo = siguiente
         // El token viejo queda revocado: el almacén tiene que dejar de usarlo
         // o la próxima lista que se guarde falla con un 401.

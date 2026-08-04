@@ -61,3 +61,35 @@ describe('registro de actividad', () => {
     expect(raiz.textContent).toContain('Todavía no hay nada registrado')
   })
 })
+
+
+describe('cambios de acceso en el registro', () => {
+  const accesos = [{
+    sha: 'z', fecha: '2026-08-04T17:40:00Z',
+    mensaje: 'Dar acceso a Monica Carreño como coordinacion · Claudia Cravea',
+  }]
+
+  it('los muestra y los marca aparte', async () => {
+    crearPantallaRegistro(raiz, {
+      sesion: { rol: 'admin' },
+      cliente: clienteFalso(),
+      clientePublico: { listarCommits: async () => accesos },
+    })
+    await esperar()
+    const fila = raiz.querySelector('.registro-entrada.de-accesos')
+    expect(fila).not.toBeNull()
+    expect(fila.textContent).toContain('Dar acceso a Monica Carreño')
+    expect(fila.textContent).toContain('Claudia Cravea')
+  })
+
+  it('a quien coordina tampoco le pide el historial de accesos', async () => {
+    let pidio = false
+    crearPantallaRegistro(raiz, {
+      sesion: { rol: 'coordinacion' },
+      cliente: clienteFalso(),
+      clientePublico: { listarCommits: async () => { pidio = true; return accesos } },
+    })
+    await esperar()
+    expect(pidio).toBe(false)
+  })
+})

@@ -136,7 +136,7 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
         acompanante: await acompananteDeMuestra(tipo),
         alGuardar: async (blob) => {
           const clave = `${persona.id}.jpg`
-          await almacen.guardarFoto(clave, blob)
+          await almacen.guardarFoto(clave, blob, persona.nombre)
           await guardar(editarPersona(actual, persona.id, { foto: clave }))
         },
         alCancelar: () => { foto.value = '' },
@@ -156,7 +156,7 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
         // molesta mucho menos que ver la foto seguir apareciendo.
         await guardar(editarPersona(actual, persona.id, { foto: null }))
         try {
-          await almacen.borrarFoto(clave)
+          await almacen.borrarFoto(clave, persona.nombre)
         } catch {
           // Sin foto en pantalla igual: el archivo suelto no le hace mal a nadie.
         }

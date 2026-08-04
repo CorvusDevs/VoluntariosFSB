@@ -9,7 +9,7 @@ import { esAdmin } from '../acceso/usuarios.js'
 // cada una, asi que cualquiera que entre puede leer el repositorio privado
 // entero por su cuenta. Sirve para saber quien hizo que entre gente que trabaja
 // junta, no para esconderle algo a alguien.
-export function crearPantallaRegistro(raiz, { sesion, cliente, cantidad = 60 }) {
+export function crearPantallaRegistro(raiz, { sesion, cliente, clientePublico = null, cantidad = 60 }) {
   let dias = null
   let error = ''
   let cargando = false
@@ -19,7 +19,7 @@ export function crearPantallaRegistro(raiz, { sesion, cliente, cantidad = 60 }) 
     error = ''
     dibujar()
     try {
-      dias = await leerRegistro(cliente, { cantidad })
+      dias = await leerRegistro(cliente, { cantidad, clientePublico })
     } catch (fallo) {
       error = fallo.message
     } finally {
@@ -35,6 +35,8 @@ export function crearPantallaRegistro(raiz, { sesion, cliente, cantidad = 60 }) 
       elemento('span', ['registro-accion'], item.accion),
       elemento('span', ['registro-quien'], item.quien ?? 'sin registrar'),
     )
+    // Los cambios de acceso se marcan aparte: son los que mas importa auditar.
+    if (item.origen === 'accesos') fila.classList.add('de-accesos')
     if (!item.quien) fila.classList.add('sin-autor')
     return fila
   }
@@ -52,7 +54,8 @@ export function crearPantallaRegistro(raiz, { sesion, cliente, cantidad = 60 }) 
     }
 
     caja.appendChild(elemento('p', ['campo-ayuda'],
-      'Cada cambio guardado deja una marca con quién lo hizo y cuándo. '
+      'Cada cambio guardado deja una marca con quién lo hizo y cuándo, '
+      + 'incluidos los cambios de acceso, que van resaltados. '
       + 'Las entradas sin nombre son anteriores a que se empezara a registrarlo.'))
 
     const recargar = boton(cargando ? 'Buscando...' : 'Actualizar', () => { if (!cargando) cargar() })

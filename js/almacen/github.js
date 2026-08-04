@@ -140,9 +140,13 @@ export function crearClienteGitHub({ token, duenio, repo, rama = 'main', fetchFn
     // archivo que la aplicacion escriba. Un archivo propio habria que reescribirlo
     // entero en cada accion, con su conflicto y su crecimiento sin techo; el
     // historial ya se escribe solo y no se puede editar desde la aplicacion.
-    async listarCommits({ cantidad = 60 } = {}) {
+    // `ruta` acota el historial a los commits que tocan ese archivo. Hace falta
+    // para el repositorio publico, que es tambien el del codigo: sin filtrar,
+    // el registro se llenaba de commits de desarrollo en vez de accesos.
+    async listarCommits({ cantidad = 60, ruta = null } = {}) {
       const url = `https://api.github.com/repos/${duenio}/${repo}/commits`
         + `?sha=${encodeURIComponent(rama)}&per_page=${cantidad}`
+        + (ruta ? `&path=${encodeURIComponent(ruta)}` : '')
       const respuesta = await pedir(url, { headers: cabeceras() })
       if (respuesta.status === 404) return []
       if (!respuesta.ok) await fallar(respuesta, 'leer el registro')

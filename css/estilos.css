@@ -763,3 +763,6 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .registro-accion { flex: 1; min-width: 0; }
 .registro-quien { flex-shrink: 0; color: var(--magenta-texto); font-size: 13px; }
 .registro-entrada.sin-autor .registro-quien { color: var(--texto-suave); font-style: italic; }
+/* Los cambios de acceso, resaltados: son los que más importa auditar. */
+.registro-entrada.de-accesos { background: #FBF6FD; }
+.registro-entrada.de-accesos .registro-accion { color: var(--violeta); font-weight: 500; }

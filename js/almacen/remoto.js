@@ -82,14 +82,14 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       return new Blob([datos.bytes], { type: 'image/jpeg' })
     },
 
-    async guardarFoto(clave, blob) {
+    async guardarFoto(clave, blob, dueño = clave) {
       await asegurarAcceso()
       const bytes = new Uint8Array(await blob.arrayBuffer())
       const ruta = rutaFoto(clave)
       // Las fotos siguen el mismo camino que el JSON, con la misma salvedad.
       try {
         const resultado = await cliente.escribirBytes(
-          ruta, bytes, shas.get(ruta) ?? null, `Cargar la foto de ${clave} · ${autor}`,
+          ruta, bytes, shas.get(ruta) ?? null, `Cargar la foto de ${dueño} · ${autor}`,
         )
         shas.set(ruta, resultado.sha)
       } catch (error) {
@@ -102,7 +102,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       }
     },
 
-    async borrarFoto(clave) {
+    async borrarFoto(clave, dueño = clave) {
       await asegurarAcceso()
       const ruta = rutaFoto(clave)
       const sha = shas.get(ruta)
@@ -111,7 +111,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
         if (!datos) return
         shas.set(ruta, datos.sha)
       }
-      await cliente.borrar(ruta, shas.get(ruta), `Quitar la foto de ${clave} · ${autor}`)
+      await cliente.borrar(ruta, shas.get(ruta), `Quitar la foto de ${dueño} · ${autor}`)
       shas.delete(ruta)
     },
   }

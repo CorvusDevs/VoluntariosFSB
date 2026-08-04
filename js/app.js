@@ -44,7 +44,9 @@ function olvidarVista() {
 // por la API contra el repositorio publico.
 const leerArchivoUsuarios = () => leerUsuarios(CONFIG)
 
-async function guardarArchivoUsuarios(archivo) {
+// La descripcion viaja hasta el mensaje del commit: es lo unico que despues
+// deja saber que paso con los accesos, que es justo lo que mas importa auditar.
+async function guardarArchivoUsuarios(archivo, descripcion = 'Cambiar los accesos') {
   const cliente = crearClienteGitHub({
     token: sesion.token, duenio: CONFIG.duenio, repo: CONFIG.repoPublico, rama: CONFIG.rama,
   })
@@ -55,7 +57,7 @@ async function guardarArchivoUsuarios(archivo) {
     RUTA_USUARIOS,
     `${JSON.stringify(archivo, null, 2)}\n`,
     actual?.sha ?? null,
-    'Actualizar las personas con acceso',
+    `${descripcion} · ${sesion?.nombre ?? 'sin registrar'}`,
   )
 }
 
@@ -146,6 +148,14 @@ function dibujar() {
         token: sesion?.token,
         duenio: CONFIG.duenio,
         repo: CONFIG.repoDatos,
+        rama: CONFIG.rama,
+      }),
+      // Los cambios de acceso viven en el otro repositorio: sin este cliente
+      // faltaria justo lo mas importante de auditar.
+      clientePublico: crearClienteGitHub({
+        token: sesion?.token,
+        duenio: CONFIG.duenio,
+        repo: CONFIG.repoPublico,
         rama: CONFIG.rama,
       }),
     })

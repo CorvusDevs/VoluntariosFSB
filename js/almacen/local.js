@@ -70,6 +70,7 @@ export async function crearAlmacenLocal() {
       return blob ?? null
     },
 
+    // El segundo dato es para el registro del almacen remoto: aca no hay commits.
     async guardarFoto(clave, blob) {
       await operar(db, DEPOSITOS.fotos, 'readwrite', (d) => d.put(blob, clave))
     },

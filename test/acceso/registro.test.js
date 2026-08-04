@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { interpretar, porDia, hora, leerRegistro } from '../../js/acceso/registro.js'
+import {
+  interpretar, porDia, agruparPorDia, mezclar, hora, leerRegistro, RUTA_ACCESOS,
+} from '../../js/acceso/registro.js'
 
 const commit = (mensaje, fecha = '2026-08-04T17:26:00Z', sha = 'abc') => ({ sha, mensaje, fecha })
 
@@ -72,5 +74,53 @@ describe('leerRegistro', () => {
     const dias = await leerRegistro(cliente, { cantidad: 5 })
     expect(pedido.cantidad).toBe(5)
     expect(dias[0].entradas[0].quien).toBe('Ana')
+  })
+})
+
+describe('mezclar los dos historiales', () => {
+  const datos = [commit('Cambiar la planilla del 2026-08-08 · Ana', '2026-08-04T17:26:00Z', 'd1')]
+  const accesos = [commit('Dar acceso a Monica como coordinacion · Ana', '2026-08-04T17:40:00Z', 'a1')]
+
+  it('ordena las dos fuentes por fecha, no una despues de la otra', () => {
+    const entradas = mezclar([
+      { commits: datos, origen: 'datos' },
+      { commits: accesos, origen: 'accesos' },
+    ])
+    expect(entradas.map((e) => e.sha)).toEqual(['a1', 'd1'])
+    expect(entradas[0].origen).toBe('accesos')
+  })
+
+  it('leerRegistro trae los cambios de acceso, que es lo que mas importa auditar', async () => {
+    const dias = await leerRegistro(
+      { listarCommits: async () => datos },
+      { clientePublico: { listarCommits: async () => accesos } },
+    )
+    const todas = dias.flatMap((d) => d.entradas)
+    expect(todas.some((e) => e.origen === 'accesos' && e.accion.includes('Dar acceso'))).toBe(true)
+  })
+
+  it('si el historial de accesos falla, muestra el otro igual', async () => {
+    // Media verdad sirve mas que una pantalla en blanco.
+    const dias = await leerRegistro(
+      { listarCommits: async () => datos },
+      { clientePublico: { listarCommits: async () => { throw new Error('403') } } },
+    )
+    expect(dias.flatMap((d) => d.entradas)).toHaveLength(1)
+  })
+
+  it('le pide al repositorio publico solo los commits del archivo de accesos', async () => {
+    // Ese repositorio guarda tambien el codigo: sin filtrar, el registro se
+    // llenaba de commits de desarrollo en vez de cambios de acceso.
+    let pedido = null
+    await leerRegistro(
+      { listarCommits: async () => datos },
+      { clientePublico: { listarCommits: async (o) => { pedido = o; return accesos } } },
+    )
+    expect(pedido.ruta).toBe(RUTA_ACCESOS)
+  })
+
+  it('sin cliente publico se comporta como antes', async () => {
+    const dias = await leerRegistro({ listarCommits: async () => datos })
+    expect(dias.flatMap((d) => d.entradas)).toHaveLength(1)
   })
 })
