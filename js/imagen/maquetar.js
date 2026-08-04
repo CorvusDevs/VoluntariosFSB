@@ -531,13 +531,25 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const inset = Math.round(ancho * RETRATOS.insetMedallon)
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
 
+  // El sobresalido se reserva por renglon y solo donde de verdad hay medallones.
+  // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
+  // 18 chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
+  const renglonDe = (i) => Math.floor(i / columnas)
+  const conMedallon = grupo.filas.reduce((acc, fila, i) => {
+    const r = renglonDe(i)
+    acc[r] = acc[r] || fila.voluntarios.length > 0
+    return acc
+  }, [])
+  const asomaEn = (i) => (superpuesto && conMedallon[renglonDe(i)] ? asoma : 0)
+
   let cursor = y
   grupo.filas.forEach((fila, i) => {
     const columna = i % columnas
     const x = m.margen + columna * (ancho + separacion)
+    const asomaFila = asomaEn(i)
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
-    const arriba = cursor + (superpuesto && !abajo ? asoma : 0)
+    const arriba = cursor + (superpuesto && !abajo ? asomaFila : 0)
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
@@ -596,7 +608,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       // por debajo de la celda y meterse en la fila siguiente, asi que va contra
       // el borde inferior.
       const base = superpuesto
-        ? (abajo ? arriba + alto + asoma - altoMed : arriba - asoma)
+        ? (abajo ? arriba + alto + asomaFila - altoMed : arriba - asomaFila)
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
       // Con el medallon abajo la pila sube, para no salirse por el pie.
       const my = abajo ? base - paso * n : base + paso * n
@@ -604,7 +616,11 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         m.abreviar?.voluntario ?? abreviarApellido)
     })
 
-    if (columna === columnas - 1 || i === grupo.filas.length - 1) cursor += altoCelda
+    // El alto del renglon sale de lo que ese renglon necesita, no de un maximo
+    // fijo para todo el grupo.
+    if (columna === columnas - 1 || i === grupo.filas.length - 1) {
+      cursor += alto + RETRATOS.margenInferior + asomaFila
+    }
   })
   return cursor
 }

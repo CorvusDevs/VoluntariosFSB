@@ -864,6 +864,26 @@ describe('formato retratos', () => {
     })
   })
 
+  it('no reserva el sobresalido en los renglones sin acompañante', () => {
+    // Reservarlo siempre dejaba 76 px muertos por renglon: en una planilla de 18
+    // chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
+    const sinNadie = {
+      ...enRetratos({ esquinaVoluntario: 'superpuesto-abajo-derecha' }),
+      grupos: LISTA.grupos.map((g) => ({ ...g, filas: g.filas.map((f) => ({ ...f, voluntarios: [] })) })),
+    }
+    const conUno = {
+      ...sinNadie,
+      grupos: sinNadie.grupos.map((g, i) => (i === 0
+        ? { ...g, filas: g.filas.map((f, j) => (j === 0 ? { ...f, voluntarios: ['v1'] } : f)) }
+        : g)),
+    }
+    const alto = (l) => maquetar(l, ROSTER, opciones).alto
+    expect(alto(sinNadie)).toBeLessThan(alto(conUno))
+    // Y la diferencia es exactamente el sobresalido de un renglon.
+    const medidas = medidasRetratos({ margen: 56, esquina: 'superpuesto-abajo-derecha' })
+    expect(alto(conUno) - alto(sinNadie)).toBe(medidas.asoma)
+  })
+
   it('la imagen se ensancha con el medallon superpuesto, para hacerle lugar', () => {
     const angosta = maquetar(enRetratos(), ROSTER, opciones)
     const ancha = maquetar(enRetratos({ esquinaVoluntario: 'superpuesto-derecha' }), ROSTER, opciones)
