@@ -1,5 +1,19 @@
 const normalizar = (usuario) => String(usuario ?? '').trim().toLowerCase()
 
+// Aplana un texto hasta lo que dos personas escribirian igual: sin tildes, sin
+// espacios y en minuscula. El teclado del telefono pone mayuscula sola y nadie
+// escribe su propio nombre dos veces igual.
+const plegar = (texto) => String(texto ?? '')
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/\s+/g, '')
+  .toLowerCase()
+
+// Arma un usuario a partir del nombre de la persona. Se usa al dar de alta,
+// para que nadie tenga que inventarlo ni pueda escribirlo mal.
+export function usuarioSugerido(nombre) {
+  return plegar(nombre)
+}
+
 export function urlUsuarios({ duenio, repoPublico, rama }) {
   return `https://raw.githubusercontent.com/${duenio}/${repoPublico}/${rama}/usuarios.json`
 }
@@ -44,6 +58,22 @@ function exigirQuedeUnAdmin(usuarios) {
 export function buscarUsuario(archivo, usuario) {
   const clave = normalizar(usuario)
   return archivo.usuarios.find((u) => u.usuario === clave) ?? null
+}
+
+// Solo para ingresar. Las operaciones de administracion (cambiar rol, quitar)
+// siguen siendo exactas a proposito: ahi hay que apuntar a un registro y a uno
+// solo. Aca, en cambio, hay una persona escribiendo en un telefono, asi que
+// aceptamos tambien su nombre completo y perdonamos tildes y mayusculas.
+export function buscarParaIngresar(archivo, usuario) {
+  const exacto = buscarUsuario(archivo, usuario)
+  if (exacto) return exacto
+  const buscado = plegar(usuario)
+  if (!buscado) return null
+  const candidatos = archivo.usuarios.filter(
+    (u) => plegar(u.usuario) === buscado || plegar(u.nombre) === buscado)
+  // Si dos responden a lo mismo no elegimos por ninguna: entrar como otra
+  // persona seria peor que no entrar.
+  return candidatos.length === 1 ? candidatos[0] : null
 }
 
 export function agregarUsuario(archivo, { usuario, nombre, rol = 'coordinacion' }, registro) {

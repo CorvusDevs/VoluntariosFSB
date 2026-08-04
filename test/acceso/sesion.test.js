@@ -26,10 +26,17 @@ describe('ingresar', () => {
     await expect(ingresar({ archivo, usuario: 'majo', contrasena: 'otra' })).rejects.toThrow()
   })
 
-  it('da el mismo mensaje si el usuario no existe que si la contrasena esta mal', async () => {
-    const a = await ingresar({ archivo, usuario: 'majo', contrasena: 'mal' }).catch((e) => e.message)
-    const b = await ingresar({ archivo, usuario: 'nadie', contrasena: 'mal' }).catch((e) => e.message)
-    expect(a).toBe(b)
+  it('distingue el usuario inexistente de la contrasena equivocada', async () => {
+    // Distinguirlos no filtra nada: usuarios.json es publico y lista a todos.
+    // Con el mensaje unico, quien tenia la contrasena buena y el usuario mal
+    // escrito la reintentaba sin enterarse nunca de cual era el problema.
+    const sinUsuario = await ingresar({ archivo, usuario: 'nadie', contrasena: 'X' })
+      .catch((e) => e.message)
+    const claveMal = await ingresar({ archivo, usuario: 'majo', contrasena: 'otra' })
+      .catch((e) => e.message)
+    expect(sinUsuario).toMatch(/usuario/i)
+    expect(claveMal).toMatch(/contraseña/i)
+    expect(sinUsuario).not.toBe(claveMal)
   })
 })
 

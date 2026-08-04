@@ -1,7 +1,7 @@
 import { elemento, boton, vaciar } from './componentes.js'
 import { cifrar, generarContrasena } from '../acceso/cripto.js'
 import {
-  ROLES, agregarUsuario, archivoVacio, cambiarRol, esAdmin, quitarUsuario,
+  ROLES, agregarUsuario, archivoVacio, cambiarRol, esAdmin, quitarUsuario, usuarioSugerido,
 } from '../acceso/usuarios.js'
 
 const AVISO_ADMIN = 'Va a poder agregar y quitar personas, cambiar roles y rotar el token.'
@@ -116,12 +116,22 @@ export function crearPantallaAjustes(raiz, opciones) {
     const seccion = elemento('section', ['seccion'])
     seccion.appendChild(elemento('h3', [], 'Agregar una persona'))
 
-    const usuario = campo('Usuario', 'text', 'nuevo-usuario', {
+    const nombre = campo('Nombre de la persona', 'text', 'nuevo-nombre')
+    const usuario = campo('Usuario para ingresar', 'text', 'nuevo-usuario', {
       autocapitalize: 'none', autocorrect: 'off', spellcheck: 'false',
     })
-    const nombre = campo('Nombre', 'text', 'nuevo-nombre')
-    usuario.entrada.value = borrador.usuario
     nombre.entrada.value = borrador.nombre
+    usuario.entrada.value = borrador.usuario
+    // El usuario se arma solo con el nombre mientras se escribe. Tipearlo a mano
+    // ya dejo un usuario con una letra de menos, y como el error solo aparece al
+    // intentar entrar, semanas despues, nadie lo relaciona con el alta.
+    nombre.entrada.addEventListener('input', () => {
+      if (usuario.entrada.dataset.tocado === 'si') return
+      usuario.entrada.value = usuarioSugerido(nombre.entrada.value)
+    })
+    usuario.entrada.addEventListener('input', () => {
+      usuario.entrada.dataset.tocado = usuario.entrada.value ? 'si' : ''
+    })
 
     const selector = selectorDeRol(nuevoRol, 'nuevo-rol')
     const cajaRol = elemento('label', ['campo'])
@@ -141,7 +151,7 @@ export function crearPantallaAjustes(raiz, opciones) {
     enviar.dataset.accion = 'agregar'
 
     const formulario = elemento('form', ['formulario-agregar'])
-    formulario.append(usuario.caja, nombre.caja, cajaRol, avisoAdmin, enviar)
+    formulario.append(nombre.caja, usuario.caja, cajaRol, avisoAdmin, enviar)
     formulario.addEventListener('submit', (evento) => {
       evento.preventDefault()
       correr(async () => {

@@ -124,7 +124,7 @@ describe('ingreso con usuario y contraseña', () => {
     expect(entradas[0].recordar).toBe(false)
   })
 
-  it('el mismo mensaje aparece para usuario inexistente y para contraseña equivocada', async () => {
+  it('dice cuál de las dos cosas falló, para no reintentar la contraseña buena', async () => {
     escribir('usuario', 'majo')
     escribir('contrasena', 'otra cosa')
     await enviar()
@@ -135,8 +135,9 @@ describe('ingreso con usuario y contraseña', () => {
     await enviar()
     const conUsuarioInexistente = raiz.querySelector('.error-ingreso').textContent
 
-    expect(conContrasenaMala).toBe('Usuario o contraseña incorrectos.')
-    expect(conUsuarioInexistente).toBe(conContrasenaMala)
+    expect(conContrasenaMala).toMatch(/contraseña/i)
+    expect(conUsuarioInexistente).toMatch(/usuario/i)
+    expect(conUsuarioInexistente).not.toBe(conContrasenaMala)
     expect(entradas).toHaveLength(0)
   })
 
@@ -299,13 +300,13 @@ describe('seguir sin ingresar', () => {
 })
 
 describe('lista de usuarios todavia vacia', () => {
-  it('da el mismo mensaje de siempre y deja el token como unica via', async () => {
+  it('avisa que no hay tal usuario y deja el token como unica via', async () => {
     montar({ leerArchivo: async () => archivoVacio() })
     escribir('usuario', 'majo')
     escribir('contrasena', CONTRASENA)
     await enviar()
     expect(entradas).toHaveLength(0)
-    expect(raiz.querySelector('.error-ingreso').textContent).toBe('Usuario o contraseña incorrectos.')
+    expect(raiz.querySelector('.error-ingreso').textContent).toMatch(/usuario/i)
     expect(raiz.querySelector('details.ingreso-token')).not.toBeNull()
   })
 })

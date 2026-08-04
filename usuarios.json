@@ -2,7 +2,7 @@
   "version": 1,
   "usuarios": [
     {
-      "usuario": "claudacravea",
+      "usuario": "claudiacravea",
       "nombre": "Claudia Cravea",
       "rol": "admin",
       "kdf": {

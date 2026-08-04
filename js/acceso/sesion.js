@@ -1,21 +1,25 @@
 import { descifrar } from './cripto.js'
-import { buscarUsuario } from './usuarios.js'
+import { buscarParaIngresar } from './usuarios.js'
 
 const BASE = 'voluntarios-fsb-sesion'
 const DEPOSITO = 'sesion'
 const CLAVE = 'actual'
-// El mismo mensaje para usuario inexistente y contrasena incorrecta, para no
-// revelar quien esta dado de alta.
-const MENSAJE_INVALIDO = 'Usuario o contraseña incorrectos.'
+// Los dos mensajes son distintos a proposito. Esconder cual de las dos cosas
+// fallo solo tendria sentido si la lista de usuarios fuera secreta, y no lo es:
+// usuarios.json es publico y cualquiera lo baja sin credenciales. Con el mensaje
+// unico no protegiamos nada y dejabamos a la persona probando la contraseña
+// correcta una y otra vez contra un usuario mal escrito.
+const SIN_USUARIO = 'No encontramos ese usuario. Probá con tu nombre completo, como figura en la lista.'
+const CONTRASENA_MAL = 'Esa contraseña no coincide. Pegala de nuevo, sin espacios al final.'
 
 export async function ingresar({ archivo, usuario, contrasena }) {
-  const registro = buscarUsuario(archivo, usuario)
-  if (!registro) throw new Error(MENSAJE_INVALIDO)
+  const registro = buscarParaIngresar(archivo, usuario)
+  if (!registro) throw new Error(SIN_USUARIO)
   let token
   try {
     token = await descifrar(registro, contrasena)
   } catch {
-    throw new Error(MENSAJE_INVALIDO)
+    throw new Error(CONTRASENA_MAL)
   }
   return { token, nombre: registro.nombre, usuario: registro.usuario, rol: registro.rol }
 }

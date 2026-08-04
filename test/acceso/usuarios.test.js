@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest'
 import {
-  archivoVacio, leerUsuarios, buscarUsuario, agregarUsuario, quitarUsuario,
-  cambiarRol, esAdmin, urlUsuarios,
+  archivoVacio,
+  leerUsuarios,
+  buscarUsuario,
+  agregarUsuario,
+  quitarUsuario,
+  cambiarRol,
+  esAdmin,
+  urlUsuarios,
+  buscarParaIngresar,
+  usuarioSugerido,
 } from '../../js/acceso/usuarios.js'
 
 const REGISTRO = {
@@ -162,5 +170,51 @@ describe('esAdmin', () => {
     expect(esAdmin(buscarUsuario(ARCHIVO, 'majo'))).toBe(true)
     expect(esAdmin({ rol: 'coordinacion' })).toBe(false)
     expect(esAdmin(null)).toBe(false)
+  })
+})
+
+describe('buscarParaIngresar: perdona lo que una persona escribe en el teléfono', () => {
+  const archivo = {
+    version: 1,
+    usuarios: [
+      { usuario: 'claudacravea', nombre: 'Claudia Cravea', rol: 'admin' },
+      { usuario: 'majo', nombre: 'María José', rol: 'coordinacion' },
+    ],
+  }
+
+  it('encuentra por el usuario exacto', () => {
+    expect(buscarParaIngresar(archivo, 'majo').nombre).toBe('María José')
+  })
+
+  it('encuentra a la persona por su nombre completo, que es lo que se acuerda', () => {
+    expect(buscarParaIngresar(archivo, 'Claudia Cravea').usuario).toBe('claudacravea')
+  })
+
+  it('no se traba con mayúsculas, espacios ni tildes', () => {
+    expect(buscarParaIngresar(archivo, 'MARIA JOSE').usuario).toBe('majo')
+    expect(buscarParaIngresar(archivo, ' Claudia  Cravea ').usuario).toBe('claudacravea')
+    // Y el usuario "natural" tambien entra, aunque el guardado tenga un error
+    // de tipeo, porque coincide con el nombre de la persona.
+    expect(buscarParaIngresar(archivo, 'ClaudiaCravea').usuario).toBe('claudacravea')
+  })
+
+  it('no deja entrar a una por otra si dos responden a lo mismo', () => {
+    const repetido = { version: 1, usuarios: [
+      { usuario: 'ana1', nombre: 'Ana Pérez' },
+      { usuario: 'ana2', nombre: 'Ana Perez' },
+    ] }
+    expect(buscarParaIngresar(repetido, 'Ana Pérez')).toBeNull()
+  })
+
+  it('no cambia la búsqueda exacta que usa la administración', () => {
+    // Renombrar o quitar tiene que seguir apuntando a un registro y solo uno.
+    expect(buscarUsuario(archivo, 'Claudia Cravea')).toBeNull()
+  })
+})
+
+describe('usuarioSugerido', () => {
+  it('arma el usuario a partir del nombre, sin tildes ni espacios', () => {
+    expect(usuarioSugerido('Claudia Cravea')).toBe('claudiacravea')
+    expect(usuarioSugerido('María José Núñez')).toBe('mariajosenunez')
   })
 })
