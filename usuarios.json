@@ -45,6 +45,21 @@
         "iv": "eGGRM46XIhAsYeo9",
         "datos": "6mDJ6i/MDDcsBwanH3Rn0kNr5qc2zMhR2bL7Q/eqEkLC7cfXsW5l1RsNVUEjxhwT/j7gfZmQB9LIQwcxhnsvCV1tuXlvgChY6tYIPLMVU8+E8celdQEB8pZc/1HzT1+Ep+lJd6aNph/VUlLqEw=="
       }
+    },
+    {
+      "usuario": "mariajosetoribio",
+      "nombre": "Maria Jose Toribio",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "OO74VmwQn/Gn9riEN0NQuA=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "DtWBpn/t6LeUV1as",
+        "datos": "YFP/o+MSr4fhffd1CXWBnUXVHBreaw8edyqbsSpkokYlPhxZ/WuzJtSV0shoiwljnV5voNDJW8juadDkLtbhSsnfon8C5Us5sKlGmZtQv996QqZIapiWp+qyf9neLyzH7oClYpm/76lfFK/CPw=="
+      }
     }
   ]
 }
