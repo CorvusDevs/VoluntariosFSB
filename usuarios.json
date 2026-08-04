@@ -30,6 +30,21 @@
         "iv": "F3bVUgnP6/D5CRJj",
         "datos": "h+WzpIjzMLiU2BZHoQAjv84uikrD4p/t22lL9+1pOTW1X6uDO0Me8qOdrMfP0PM5+5FPVvhQT7exNDTDTgtatkmpBDiePxupUB0yUBV4htIiauJPT7t7VXN+Q60tu01XOvquQ1WH663MYiXAOg=="
       }
+    },
+    {
+      "usuario": "monicacarreño",
+      "nombre": "moni",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "mWTyQnnKbRoPDwy8n6DtVQ=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "dTRkKknklC/Icd/4",
+        "datos": "xns7bvDK2YdntAZeF37BqRgWa5YPBD5pZjavWtNvQU1BxUFCttFnJzCaxKDR9TXnt+WIArNKb1HcUs+uVcGuD8kEEqW4NLaluVUjZGaYfF7vnX5+0/YmZeH6JhiZXJJfAXI7uNCHWlPb3K/GHQ=="
+      }
     }
   ]
 }
