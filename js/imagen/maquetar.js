@@ -3,7 +3,7 @@ import {
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { FORMATO_POR_DEFECTO } from '../modelo/lista.js'
-import { iniciales, abreviarApellido } from '../util/nombres.js'
+import { iniciales, abreviarApellido, crearAbreviador } from '../util/nombres.js'
 
 const RELACION_RECORTE = 2.5
 
@@ -17,6 +17,13 @@ export function maquetar(lista, roster, opciones = {}) {
   const conFotos = Boolean(lista.opcionesImagen?.fotos) && medidas(compacto).mostrarFotos
   const base = medidas(compacto)
   const porId = indexar(roster)
+  // Los apellidos se abrevian contra el resto de su propia lista: chicos con
+  // chicos y voluntarios con voluntarios. Asi dos Francisco P. distintos salen
+  // como Francisco Pl. y Francisco Pe. en vez de quedar iguales en la planilla.
+  const abreviar = {
+    participante: crearAbreviador(roster.participantes.map((p) => p.nombre)),
+    voluntario: crearAbreviador(roster.voluntarios.map((v) => v.nombre)),
+  }
 
   // Tres formatos: apilado, una fila por participante; en columnas, dos por fila;
   // y grilla, con la foto vertical y el nombre debajo, y retratos, con los nombres
@@ -49,7 +56,7 @@ export function maquetar(lista, roster, opciones = {}) {
   else if (formato === 'retratos') ancho = retratos.anchoImagen
   const m = {
     ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
-    esquinaVoluntario, tamanoVoluntario, asomoVoluntario, retratos,
+    esquinaVoluntario, tamanoVoluntario, asomoVoluntario, retratos, abreviar,
   }
 
   const ordenes = []
@@ -452,7 +459,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 // El medallon del voluntario: repite la receta de la celda grande, foto arriba y
 // franja del color del grupo abajo con el nombre. Asi las dos piezas se leen como
 // lo mismo, una grande y una chica.
-function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, clave, medirTexto) {
+function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, clave, medirTexto, corto = abreviarApellido) {
   const borde = Math.max(2, Math.round(ancho * RETRATOS.bordeMedallon))
   const radio = Math.round(ancho * RETRATOS.radioMedallon)
   // El marco blanco despega el medallon de la foto de abajo aunque las dos sean
@@ -478,7 +485,7 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
 
   ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,
     color, radio: [0, 0, radioInterno, radioInterno], fila: clave })
-  const nombre = abreviarApellido(voluntario.nombre) + (voluntario.nuevo ? ' (nuevo)' : '')
+  const nombre = corto(voluntario.nombre) + (voluntario.nuevo ? ' (nuevo)' : '')
   // Aire propio: con el borde del marco como unico margen, el nombre quedaba
   // tocando los dos costados del medallon.
   const pad = Math.round(iAncho * RETRATOS.padNombreMedallon)
@@ -554,7 +561,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       color, radio: [0, 0, RETRATOS.radioFoto, RETRATOS.radioFoto], fila: clave })
     // El apellido va abreviado: en la planilla no hace falta entero, y el lugar
     // que ocupa es justo el que necesita la foto del voluntario al lado.
-    const nombre = participantes.map((p) => abreviarApellido(p.nombre)).join(' / ')
+    const corto = m.abreviar?.participante ?? abreviarApellido
+    const nombre = participantes.map((p) => corto(p.nombre)).join(' / ')
     const px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
       FUENTES.titulo, medirTexto)
     ordenes.push({ tipo: 'texto', texto: nombre, x: centro, y: arriba + alto - altoFranja / 2,
@@ -575,7 +583,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
       // Con el medallon abajo la pila sube, para no salirse por el pie.
       const my = abajo ? base - paso * n : base + paso * n
-      medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto)
+      medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto,
+        m.abreviar?.voluntario ?? abreviarApellido)
     })
 
     if (columna === columnas - 1 || i === grupo.filas.length - 1) cursor += altoCelda

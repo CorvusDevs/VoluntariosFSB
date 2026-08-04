@@ -800,6 +800,22 @@ describe('formato retratos', () => {
     expect(textos).not.toContain('Maria Perez')
   })
 
+  it('dos apellidos con la misma inicial no quedan iguales en la planilla', () => {
+    const dosFrancisco = {
+      ...ROSTER,
+      participantes: ROSTER.participantes.map((p, i) => {
+        if (i === 0) return { ...p, nombre: 'Francisco Planells' }
+        if (i === 1) return { ...p, nombre: 'Francisco Perez', grupo: p.grupo }
+        return p
+      }),
+    }
+    const plano = maquetar(enRetratos(), dosFrancisco, opciones)
+    const textos = plano.ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
+    expect(textos).toContain('Francisco Pl.')
+    expect(textos).toContain('Francisco Pe.')
+    expect(textos.filter((s) => s === 'Francisco P.')).toHaveLength(0)
+  })
+
   it('no corre el nombre del chico que no tiene voluntario', () => {
     // El hueco del medallon se reservaba siempre, asi que los chicos sin
     // acompañante quedaban con el nombre corrido contra el borde sin motivo.

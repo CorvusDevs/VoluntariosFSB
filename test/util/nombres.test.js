@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { iniciales, sinAcentos, coincide, ordenarPorNombre, abreviarApellido } from '../../js/util/nombres.js'
+import { iniciales, sinAcentos, coincide, ordenarPorNombre, abreviarApellido, crearAbreviador } from '../../js/util/nombres.js'
 
 describe('iniciales', () => {
   it('toma las dos primeras letras de un nombre simple', () => {
@@ -88,5 +88,52 @@ describe('abreviarApellido', () => {
     expect(abreviarApellido('  Juan   Gomez  ')).toBe('Juan G.')
     expect(abreviarApellido('')).toBe('')
     expect(abreviarApellido(null)).toBe('')
+  })
+})
+
+describe('abreviar contra el grupo', () => {
+  const corto = (nombres) => {
+    const ab = crearAbreviador(nombres)
+    return nombres.map((n) => ab(n))
+  }
+
+  it('con una sola letra alcanza si no hay choque', () => {
+    expect(corto(['Maria Perez', 'Ana Gomez'])).toEqual(['Maria P.', 'Ana G.'])
+  })
+
+  it('agrega una segunda letra cuando dos apellidos empiezan igual', () => {
+    // Sin esto los dos quedaban como "Francisco P." y la planilla mentia.
+    expect(corto(['Francisco Planells', 'Francisco Perez']))
+      .toEqual(['Francisco Pl.', 'Francisco Pe.'])
+  })
+
+  it('sigue agregando letras hasta que se distingan', () => {
+    expect(corto(['Ana Pereira', 'Ana Perez'])).toEqual(['Ana Perei.', 'Ana Perez'])
+  })
+
+  it('cuando hacen falta todas las letras muestra el apellido entero, sin punto', () => {
+    expect(corto(['Ana Perez', 'Ana Pereira'])[0]).toBe('Ana Perez')
+  })
+
+  it('nombres de pila distintos no se estorban entre si', () => {
+    // Maria P. y Ana P. ya se distinguen por el nombre: alargar seria ruido.
+    expect(corto(['Maria Perez', 'Ana Planells'])).toEqual(['Maria P.', 'Ana P.'])
+  })
+
+  it('el largo es el mismo para todo el grupo que comparte nombre', () => {
+    // Parejo en letras del apellido. El punto aparece solo cuando quedo cortado,
+    // asi que no cuenta para comparar largos.
+    const salida = corto(['Juan Perez', 'Juan Planells', 'Juan Pereira'])
+    const letras = new Set(salida.map((s) => s.split(' ')[1].replace(/\.$/, '').length))
+    expect(letras.size).toBe(1)
+    expect(salida).toEqual(['Juan Perez', 'Juan Plane.', 'Juan Perei.'])
+  })
+
+  it('dos personas con el mismo nombre y apellido quedan iguales, sin colgarse', () => {
+    expect(corto(['Juan Gomez', 'Juan Gomez'])).toEqual(['Juan G.', 'Juan G.'])
+  })
+
+  it('un nombre que no estaba en el grupo cae en la inicial', () => {
+    expect(crearAbreviador(['Ana Gomez'])('Pedro Suarez')).toBe('Pedro S.')
   })
 })
