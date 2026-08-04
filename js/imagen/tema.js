@@ -128,8 +128,11 @@ export const RETRATOS = Object.freeze({
   insetMedallon: 0.05,
   pasoMedallon: 1.08,
   radioMedallon: 0.20,
-  bordeMedallon: 0.055,
-  franjaMedallon: 0.30,
+  // El marco blanco solo tiene que despegar el medallon de la foto de abajo. A
+  // 0.055 se comia el 21% del medallon y la cara del voluntario quedaba con el
+  // 55%; a 0.03 el marco baja al 11% y la cara sube al 64%.
+  bordeMedallon: 0.03,
+  franjaMedallon: 0.28,
   factorNombreMedallon: 0.62,
   factorInicialesMedallon: 0.34,
 })

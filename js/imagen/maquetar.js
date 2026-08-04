@@ -467,7 +467,7 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
   }
 
   ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,
-    color, fila: clave })
+    color, radio: [0, 0, radioInterno, radioInterno], fila: clave })
   const nombre = voluntario.nombre + (voluntario.nuevo ? ' (nuevo)' : '')
   const px = ajustarTexto(nombre, iAncho - borde * 2,
     Math.round(franja * RETRATOS.factorNombreMedallon), 7, FUENTES.normal, medirTexto)
@@ -526,8 +526,11 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       ? (derecha ? x + inset + anchoNombre / 2 : x + ancho - inset - anchoNombre / 2)
       : x + ancho / 2
 
+    // Las esquinas de abajo van redondeadas igual que la foto: dibujada como
+    // rectangulo recto, la franja le cuadraba las dos esquinas inferiores a
+    // todas las celdas. El orden es arriba-izq, arriba-der, abajo-der, abajo-izq.
     ordenes.push({ tipo: 'rect', x, y: arriba + alto - altoFranja, ancho, alto: altoFranja,
-      color, fila: clave })
+      color, radio: [0, 0, RETRATOS.radioFoto, RETRATOS.radioFoto], fila: clave })
     // Si ni achicado entra, se muestra solo el primer nombre: un renglon de mas
     // empujaria la franja hacia la cara del chico, que es lo unico que no queremos tapar.
     let nombre = participantes.map((p) => p.nombre).join(' / ')

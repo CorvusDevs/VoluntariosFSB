@@ -696,7 +696,7 @@ describe('formato retratos', () => {
   it('pone la franja con el color del grupo, distinto en cada cancha', () => {
     const plano = maquetar(enRetratos(), ROSTER, opciones)
     const franjas = plano.ordenes.filter(
-      (o) => o.tipo === 'rect' && !o.radio && [COLORES.turquesaTexto, COLORES.magentaTexto].includes(o.color))
+      (o) => o.tipo === 'rect' && [COLORES.turquesaTexto, COLORES.magentaTexto].includes(o.color))
     expect(franjas.some((f) => f.color === COLORES.turquesaTexto)).toBe(true)
     expect(franjas.some((f) => f.color === COLORES.magentaTexto)).toBe(true)
   })
@@ -739,6 +739,34 @@ describe('formato retratos', () => {
     const alto = Math.round(ancho * RETRATOS.proporcionCelda)
     const escala = Math.max(ancho / 400, alto / 400)
     expect(Math.round(ancho / escala)).toBe(300)
+  })
+
+  it('redondea las esquinas de abajo de la franja, como la foto', () => {
+    // Dibujada como rectangulo recto, la franja le cuadraba las dos esquinas
+    // inferiores a todas las celdas, y solo las de arriba quedaban redondeadas.
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const franjas = plano.ordenes.filter(
+      (o) => o.tipo === 'rect' && [COLORES.turquesaTexto, COLORES.magentaTexto].includes(o.color))
+    expect(franjas.length).toBeGreaterThan(0)
+    franjas.forEach((f) => {
+      expect(Array.isArray(f.radio), 'la franja se dibuja sin redondear').toBe(true)
+      const [arribaIzq, arribaDer, abajoDer, abajoIzq] = f.radio
+      expect(arribaIzq).toBe(0)
+      expect(arribaDer).toBe(0)
+      expect(abajoDer).toBeGreaterThan(0)
+      expect(abajoIzq).toBe(abajoDer)
+    })
+  })
+
+  it('le deja al voluntario mas foto que marco', () => {
+    // El marco blanco llego a comerse el 21% del medallon y la cara quedaba con
+    // el 55%. Solo tiene que despegarlo de la foto de abajo, nada mas.
+    const ancho = anchoDeCeldaRetratos(56)
+    const w = Math.round(ancho * RETRATOS.factorMedallon)
+    const h = Math.round(w * RETRATOS.proporcionMedallon)
+    const borde = Math.max(2, Math.round(w * RETRATOS.bordeMedallon))
+    const interior = (w - borde * 2) * (h - borde * 2)
+    expect((w * h - interior) / (w * h)).toBeLessThan(0.15)
   })
 
   it('nunca deja el medallon fuera de la celda, en ninguna de las cuatro esquinas', () => {
