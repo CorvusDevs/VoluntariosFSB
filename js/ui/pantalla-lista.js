@@ -40,10 +40,11 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
 
   function alTocarVoluntario(id) {
     if (apoyoDe !== null) {
+      const grupo = estado().grupos.find((g) => g.numero === apoyoDe)
       const siguiente = agregarApoyo(estado(), apoyoDe, id)
       pila.registrar(siguiente)
       apoyoDe = null
-      alCambiar(siguiente)
+      alCambiar(siguiente, `Sumar a ${nombreDe(id)} como apoyo del ${grupo?.titulo ?? 'grupo'}`)
       dibujar()
       return
     }
@@ -53,15 +54,23 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       ? quitarVoluntario(estado(), seleccionado, id)
       : asignarVoluntario(estado(), seleccionado, id)
     pila.registrar(siguiente)
+    const quien = nombreDe(seleccionado)
     seleccionado = null
-    alCambiar(siguiente)
+    alCambiar(siguiente, yaEsta
+      ? `Quitar a ${nombreDe(id)} de ${quien}`
+      : `Asignar a ${nombreDe(id)} con ${quien}`)
     dibujar()
   }
+
+  // Los rotulos son los del formulario, asi el registro dice "Cambiar la hora"
+  // y no "Cambiar hora", que es como se llama el campo por dentro.
+  const ROTULOS = { fecha: 'la fecha', hora: 'la hora', lugar: 'el lugar' }
 
   function actualizar(cambios) {
     const siguiente = { ...estado(), ...cambios }
     pila.registrar(siguiente)
-    alCambiar(siguiente)
+    const que = Object.keys(cambios).map((c) => ROTULOS[c] ?? c).join(' y ')
+    alCambiar(siguiente, `Cambiar ${que} de la jornada`)
     dibujar()
   }
 
@@ -108,7 +117,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     const deshacer = boton('Deshacer', () => {
       pila.deshacer()
       seleccionado = null
-      alCambiar(estado())
+      alCambiar(estado(), 'Deshacer el último cambio')
       dibujar()
     })
     deshacer.dataset.accion = 'deshacer'
@@ -117,7 +126,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     const rehacer = boton('Rehacer', () => {
       pila.rehacer()
       seleccionado = null
-      alCambiar(estado())
+      alCambiar(estado(), 'Rehacer el cambio deshecho')
       dibujar()
     })
     rehacer.dataset.accion = 'rehacer'
@@ -128,9 +137,10 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   }
 
   function editarRotulo(numeroGrupo, cambios) {
+    const grupo = estado().grupos.find((g) => g.numero === numeroGrupo)
     const siguiente = editarGrupo(estado(), numeroGrupo, cambios)
     pila.registrar(siguiente)
-    alCambiar(siguiente)
+    alCambiar(siguiente, `Cambiar el rótulo del ${grupo?.titulo ?? `grupo ${numeroGrupo}`}`)
     dibujar()
   }
 
@@ -224,7 +234,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       el.addEventListener('click', () => {
         const siguiente = quitarApoyo(estado(), grupo.numero, id)
         pila.registrar(siguiente)
-        alCambiar(siguiente)
+        alCambiar(siguiente, `Quitar a ${persona.nombre} del apoyo del ${grupo.titulo}`)
         dibujar()
       })
       caja.appendChild(el)
@@ -311,7 +321,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       const siguiente = quitarDeLista(estado(), quien)
       pila.registrar(siguiente)
       seleccionado = null
-      alCambiar(siguiente)
+      alCambiar(siguiente, `Marcar que ${nombreDe(quien)} hoy no viene`)
       dibujar()
     })
     sacar.dataset.accion = 'sacar-de-lista'
@@ -344,7 +354,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       el.addEventListener('click', () => {
         const siguiente = volverALaLista(estado(), persona.id, roster)
         pila.registrar(siguiente)
-        alCambiar(siguiente)
+        alCambiar(siguiente, `Devolver a ${persona.nombre} a la planilla`)
         dibujar()
       })
       columna.appendChild(el)

@@ -111,9 +111,9 @@ function dibujar() {
     vista = crearPantallaLista(cuerpo, {
       lista,
       roster,
-      alCambiar: async (siguiente) => {
+      alCambiar: async (siguiente, descripcion) => {
         lista = siguiente
-        await deposito.guardarLista(lista)
+        await deposito.guardarLista(lista, descripcion)
       },
       // Las listas se guardan por fecha: cambiar la fecha es abrir otra lista.
       // Si no hay ninguna guardada para ese dia, empezamos una con los mismos
@@ -134,9 +134,9 @@ function dibujar() {
       lista,
       roster,
       cargarFoto,
-      alCambiar: async (siguiente) => {
+      alCambiar: async (siguiente, descripcion) => {
         lista = siguiente
-        await deposito.guardarLista(lista)
+        await deposito.guardarLista(lista, descripcion)
       },
     })
   } else if (pantalla === 'registro' && esAdmin(sesion)) {

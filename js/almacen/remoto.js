@@ -60,9 +60,11 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       return leerJson(rutaLista(fecha))
     },
 
-    guardarLista(lista) {
-      return escribirJson(rutaLista(lista.fecha), lista,
-        `Cambiar la planilla del ${lista.fecha} · ${autor}`)
+    guardarLista(lista, descripcion = null) {
+      // La descripcion viene de quien toco el boton: sin ella el registro decia
+      // "Cambiar la planilla" una vez por guardado y nunca que habia cambiado.
+      const que = descripcion ?? `Cambiar la planilla del ${lista.fecha}`
+      return escribirJson(rutaLista(lista.fecha), lista, `${que} · ${autor}`)
     },
 
     async listarListas() {

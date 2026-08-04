@@ -55,6 +55,7 @@ export async function crearAlmacenLocal() {
       return guardada ?? null
     },
 
+    // La descripcion es para el registro del almacen remoto: aca no hay commits.
     async guardarLista(lista) {
       await operar(db, DEPOSITOS.listas, 'readwrite', (d) => d.put(lista, lista.fecha))
       return { sha: null }

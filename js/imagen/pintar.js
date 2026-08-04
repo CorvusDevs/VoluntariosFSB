@@ -1,5 +1,9 @@
 import { COLORES } from './tema.js'
 
+// Los tipos de orden que este pintor sabe dibujar. Se exporta para que la prueba
+// no tenga que repetirlos: la lista escrita a mano ya se quedo atras una vez.
+export const TIPOS = Object.freeze(['rect', 'circulo', 'linea', 'texto', 'imagen', 'icono'])
+
 export function pintar(ctx, plano, imagenes = {}, densidad = 1) {
   ctx.canvas.width = plano.ancho * densidad
   ctx.canvas.height = plano.alto * densidad
@@ -15,6 +19,7 @@ export function pintar(ctx, plano, imagenes = {}, densidad = 1) {
       case 'linea': return linea(ctx, orden)
       case 'texto': return texto(ctx, orden)
       case 'imagen': return imagen(ctx, orden, imagenes)
+      case 'icono': return icono(ctx, orden)
       default: throw new Error(`Orden de dibujo desconocida: ${orden.tipo}`)
     }
   })
@@ -53,6 +58,54 @@ function texto(ctx, o) {
   ctx.textAlign = o.alineacion ?? 'left'
   ctx.textBaseline = o.lineaBase ?? 'alphabetic'
   ctx.fillText(o.texto, o.x, o.y)
+}
+
+// Los iconos van dibujados y no como archivo: son dos, viven en la banda de
+// abajo y traerlos como imagen sumaria dos descargas y un estado de carga a algo
+// que se resuelve con cuatro trazos.
+const ICONOS = {
+  // Un globo: circulo, ecuador y dos meridianos.
+  globo(ctx, x, y, lado) {
+    const r = lado / 2
+    const cx = x + r
+    const cy = y + r
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.moveTo(cx - r, cy)
+    ctx.lineTo(cx + r, cy)
+    ctx.moveTo(cx, cy - r)
+    // Los meridianos son elipses vistas de canto: dan la vuelta al globo.
+    ctx.ellipse(cx, cy, r * 0.45, r, 0, -Math.PI / 2, Math.PI * 1.5)
+    ctx.moveTo(cx, cy - r)
+    ctx.ellipse(cx, cy, r * 0.9, r, 0, -Math.PI / 2, Math.PI * 1.5)
+    ctx.stroke()
+  },
+  // Camara de Instagram: marco redondeado, lente y punto del flash.
+  instagram(ctx, x, y, lado) {
+    const r = lado * 0.28
+    ctx.beginPath()
+    ctx.roundRect(x, y, lado, lado, r)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(x + lado / 2, y + lado / 2, lado * 0.24, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(x + lado * 0.76, y + lado * 0.24, Math.max(1, lado * 0.055), 0, Math.PI * 2)
+    ctx.fillStyle = ctx.strokeStyle
+    ctx.fill()
+  },
+}
+
+function icono(ctx, o) {
+  const dibujar = ICONOS[o.nombre]
+  if (!dibujar) return
+  ctx.save()
+  ctx.strokeStyle = o.color
+  ctx.lineWidth = o.grosor ?? Math.max(1, o.lado * 0.075)
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  dibujar(ctx, o.x, o.y, o.lado)
+  ctx.restore()
 }
 
 function imagen(ctx, o, imagenes) {

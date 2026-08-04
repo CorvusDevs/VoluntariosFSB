@@ -150,3 +150,24 @@ describe('verificacion de acceso', () => {
     expect(veces).toBe(1)
   })
 })
+
+describe('descripcion de la accion en el registro', () => {
+  const conAutor = () => {
+    const cliente = clienteFalso()
+    return { cliente, almacen: crearAlmacenRemoto({ cliente, autor: 'Ana' }) }
+  }
+
+  it('el mensaje del commit dice que se hizo y quien', async () => {
+    // Sin descripcion el registro decia "Cambiar la planilla" una vez por
+    // guardado, que con tres asignaciones son tres renglones identicos.
+    const { cliente, almacen } = conAutor()
+    await almacen.guardarLista({ fecha: '2026-08-08' }, 'Asignar a Vicky con Gaia')
+    expect(cliente.escrituras.at(-1).mensaje).toBe('Asignar a Vicky con Gaia · Ana')
+  })
+
+  it('sin descripcion cae en un mensaje generico, no en undefined', async () => {
+    const { cliente, almacen } = conAutor()
+    await almacen.guardarLista({ fecha: '2026-08-08' })
+    expect(cliente.escrituras.at(-1).mensaje).toBe('Cambiar la planilla del 2026-08-08 · Ana')
+  })
+})

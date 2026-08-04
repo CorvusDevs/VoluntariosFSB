@@ -88,7 +88,7 @@ export function maquetar(lista, roster, opciones = {}) {
 
   y += m.margen / 2
   const alto = y + m.altoBandaInferior
-  bandaInferior(ordenes, m, y, alto)
+  bandaInferior(ordenes, m, y, alto, medirTexto)
 
   const bordeDerecho = ordenes.reduce((maximo, o) => {
     if (o.tipo === 'rect' && o.x === 0 && o.ancho === m.ancho) return maximo
@@ -146,17 +146,34 @@ function bandaSuperior(ordenes, lista, m, y) {
   return y + alto
 }
 
-function bandaInferior(ordenes, m, y, alto) {
+function bandaInferior(ordenes, m, y, alto, medirTexto) {
   ordenes.push({ tipo: 'rect', x: 0, y, ancho: m.ancho, alto: alto - y, color: COLORES.violeta })
   const centro = y + (alto - y) / 2
+  const fuente = FUENTES.normal(m.pxBanda)
+  // El icono acompaña al texto y no lo pisa: mismo alto que la letra y un
+  // respiro proporcional, asi la banda aguanta el modo compacto sin retoques.
+  const lado = Math.round(m.pxBanda * 0.95)
+  const aire = Math.round(m.pxBanda * 0.45)
+  const arriba = Math.round(centro - lado / 2)
+
   ordenes.push({
-    tipo: 'texto', texto: 'aletea.org', x: m.margen, y: centro,
-    fuente: FUENTES.normal(m.pxBanda), color: COLORES.violetaClaro, lineaBase: 'middle',
+    tipo: 'icono', nombre: 'globo', x: m.margen, y: arriba, lado, color: COLORES.violetaClaro,
   })
   ordenes.push({
-    tipo: 'texto', texto: '@futbol_sinbarreras', x: m.ancho - m.margen, y: centro,
-    fuente: FUENTES.normal(m.pxBanda), color: COLORES.blanco,
-    alineacion: 'right', lineaBase: 'middle',
+    tipo: 'texto', texto: 'aletea.org', x: m.margen + lado + aire, y: centro,
+    fuente, color: COLORES.violetaClaro, lineaBase: 'middle',
+  })
+
+  const handle = '@futbol_sinbarreras'
+  const derecha = m.ancho - m.margen
+  ordenes.push({
+    tipo: 'texto', texto: handle, x: derecha, y: centro,
+    fuente, color: COLORES.blanco, alineacion: 'right', lineaBase: 'middle',
+  })
+  ordenes.push({
+    tipo: 'icono', nombre: 'instagram',
+    x: derecha - medirTexto(handle, fuente) - aire - lado, y: arriba,
+    lado, color: COLORES.blanco,
   })
 }
 

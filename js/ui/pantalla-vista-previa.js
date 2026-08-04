@@ -130,9 +130,16 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     })
   }
 
+  const NOMBRE_CAMPO = {
+    formato: 'el formato',
+    esquinaVoluntario: 'la esquina del voluntario',
+    tamanoVoluntario: 'el tamaño del voluntario',
+    asomoVoluntario: 'cuánto sobresale el voluntario',
+  }
+
   function elegir(campo, valor) {
     lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, [campo]: valor } }
-    alCambiar(lista)
+    alCambiar(lista, `Cambiar ${NOMBRE_CAMPO[campo] ?? campo} de la imagen a ${valor}`)
     redibujar()
   }
 

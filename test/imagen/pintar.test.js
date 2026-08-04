@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { pintar } from '../../js/imagen/pintar.js'
+import { pintar, TIPOS } from '../../js/imagen/pintar.js'
 import { maquetar } from '../../js/imagen/maquetar.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
@@ -23,9 +23,14 @@ function contextoFalso() {
     fillText: registrar('fillText'),
     drawImage: registrar('drawImage'),
     roundRect: registrar('roundRect'),
+    ellipse: registrar('ellipse'),
+    rect: registrar('rect'),
     scale: registrar('scale'),
     set fillStyle(v) { llamadas.push({ nombre: 'fillStyle', args: [v] }) },
     set strokeStyle(v) { llamadas.push({ nombre: 'strokeStyle', args: [v] }) },
+    get strokeStyle() { return '#000' },
+    set lineJoin(v) { llamadas.push({ nombre: 'lineJoin', args: [v] }) },
+    set lineCap(v) { llamadas.push({ nombre: 'lineCap', args: [v] }) },
     set font(v) { llamadas.push({ nombre: 'font', args: [v] }) },
     set textAlign(v) { llamadas.push({ nombre: 'textAlign', args: [v] }) },
     set textBaseline(v) { llamadas.push({ nombre: 'textBaseline', args: [v] }) },
@@ -164,7 +169,9 @@ describe('pintar', () => {
     expect(() => pintar(ctx, planoReal, imagenes, 1)).not.toThrow()
 
     const tiposEmitidos = new Set(planoReal.ordenes.map((o) => o.tipo))
-    const tiposManejados = new Set(['rect', 'circulo', 'linea', 'texto', 'imagen'])
+    // Sale del propio pintor: escrita a mano, esta lista se quedo atras cuando
+    // aparecio un tipo nuevo y la prueba fallaba por el motivo equivocado.
+    const tiposManejados = new Set(TIPOS)
     tiposEmitidos.forEach((t) => expect(tiposManejados.has(t)).toBe(true))
 
     const cantidadTextosEnPlano = planoReal.ordenes.filter((o) => o.tipo === 'texto').length
