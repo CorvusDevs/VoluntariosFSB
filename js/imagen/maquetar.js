@@ -508,8 +508,9 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   grupo.filas.forEach((fila, i) => {
     const columna = i % columnas
     const x = m.margen + columna * (ancho + separacion)
-    // La celda baja para dejarle lugar arriba al medallon que asoma.
-    const arriba = cursor + asoma
+    // Montado arriba, la celda baja para dejarle lugar al medallon que asoma por
+    // encima. Montado abajo, lo que asoma cae por debajo y la celda no se mueve.
+    const arriba = cursor + (montado && !abajo ? asoma : 0)
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
@@ -531,7 +532,12 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // Con el medallon abajo, el nombre se corre al lado libre para dejarle el
     // hueco. Es la unica diferencia real entre elegir una esquina de arriba y una
     // de abajo, y le quita al nombre casi la mitad del ancho.
-    const hueco = abajo && !montado ? anchoMed + inset * 2 : 0
+    // El nombre se corre siempre que el medallon vaya abajo, montado o apoyado.
+    // Montado ya se llevo parte del ancho afuera de la celda, asi que el hueco
+    // que necesita adentro es menor.
+    const hueco = abajo
+      ? (montado ? anchoMed - asomaLado + inset : anchoMed + inset * 2)
+      : 0
     const anchoNombre = ancho - hueco - inset * 2
     const centro = abajo
       ? (derecha ? x + inset + anchoNombre / 2 : x + ancho - inset - anchoNombre / 2)
@@ -566,10 +572,10 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       // por debajo de la celda y meterse en la fila siguiente, asi que va contra
       // el borde inferior.
       const base = montado
-        ? arriba - asoma
+        ? (abajo ? arriba + alto + asoma - altoMed : arriba - asoma)
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
-      // Con el medallon apoyado abajo la pila sube; en los otros dos casos baja.
-      const my = abajo && !montado ? base - paso * n : base + paso * n
+      // Con el medallon abajo la pila sube, para no salirse por el pie.
+      const my = abajo ? base - paso * n : base + paso * n
       medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto)
     })
 

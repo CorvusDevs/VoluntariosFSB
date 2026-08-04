@@ -1,4 +1,6 @@
 import { elemento, boton, vaciar } from './componentes.js'
+import { selectorVisual } from './selector-visual.js'
+import { dibujarMuestra } from './muestra-celda.js'
 import { maquetar } from '../imagen/maquetar.js'
 import { pintar } from '../imagen/pintar.js'
 import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
@@ -72,101 +74,102 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // Dos formatos conviven a proposito: el apilado sirve los sabados sin fotos
   // cargadas, donde una grilla de iniciales grandes se ve peor que una lista.
   const FORMATOS = [
-    ['filas', 'Lista, uno por renglón'],
-    ['columnas', 'Dos columnas, foto grande'],
-    ['grilla', 'Grilla, foto vertical'],
-    ['retratos', 'Retratos, nombres adentro'],
+    ['retratos', 'Retratos'],
+    ['grilla', 'Grilla'],
+    ['columnas', 'Dos columnas'],
+    ['filas', 'Lista'],
   ]
 
   // Solo tiene sentido en "retratos": es el unico formato donde el voluntario
   // aparece como medallon sobre la foto del chico.
   const ESQUINAS_VOLUNTARIO = [
-    ['abajo-derecha', 'Abajo a la derecha'],
-    ['abajo-izquierda', 'Abajo a la izquierda'],
-    ['arriba-derecha', 'Arriba a la derecha'],
-    ['arriba-izquierda', 'Arriba a la izquierda'],
-    ['montado-derecha', 'Montado sobre la esquina derecha'],
-    ['montado-izquierda', 'Montado sobre la esquina izquierda'],
+    ['abajo-derecha', 'Abajo derecha'],
+    ['abajo-izquierda', 'Abajo izquierda'],
+    ['arriba-derecha', 'Arriba derecha'],
+    ['arriba-izquierda', 'Arriba izquierda'],
+    ['montado-derecha', 'Montado arriba der.'],
+    ['montado-izquierda', 'Montado arriba izq.'],
+    ['montado-abajo-derecha', 'Montado abajo der.'],
+    ['montado-abajo-izquierda', 'Montado abajo izq.'],
   ]
-
-  // Los dos de abajo solo cambian algo con el medallon montado, asi que aparecen
-  // unicamente ahi: mostrarlos siempre haria creer que hacen algo cuando no.
   const TAMANOS_VOLUNTARIO = [
-    ['mediano', 'Mediano, el doble de cara'],
-    ['grande', 'Grande, casi el triple'],
-    ['enorme', 'Muy grande, casi el cuádruple'],
+    ['mediano', 'Mediano'],
+    ['grande', 'Grande'],
+    ['enorme', 'Muy grande'],
   ]
   const ASOMOS_VOLUNTARIO = [
-    ['apenas', 'Apenas asomando'],
-    ['montado', 'Montado, más de la mitad afuera'],
-    ['alto', 'Bien arriba, casi entero afuera'],
+    ['apenas', 'Apenas'],
+    ['montado', 'Montado'],
+    ['alto', 'Bien arriba'],
   ]
 
+  // Quien elige toma la decision mirando, no leyendo: cada opcion se dibuja con
+  // el motor real de la planilla, con las fotos que ya estan cargadas.
+  function personaDeMuestra(gente, respaldo) {
+    const conFoto = gente.find((p) => p.activo && p.foto && imagenes[p.foto])
+    const alguno = conFoto ?? gente.find((p) => p.activo)
+    return alguno
+      ? { nombre: alguno.nombre, nuevo: alguno.nuevo, foto: imagenes[alguno.foto] ? alguno.foto : null }
+      : respaldo
+  }
+
+  function bosquejoDe(lienzo, cambios, ancho) {
+    const actuales = lista.opcionesImagen ?? {}
+    dibujarMuestra(lienzo, {
+      formato: cambios.formato ?? actuales.formato ?? FORMATO_POR_DEFECTO,
+      esquinaVoluntario: cambios.esquinaVoluntario ?? actuales.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO,
+      tamanoVoluntario: cambios.tamanoVoluntario ?? actuales.tamanoVoluntario ?? TAMANO_VOLUNTARIO_POR_DEFECTO,
+      asomoVoluntario: cambios.asomoVoluntario ?? actuales.asomoVoluntario ?? ASOMO_VOLUNTARIO_POR_DEFECTO,
+      participante: personaDeMuestra(roster.participantes, { nombre: 'Chico' }),
+      voluntario: personaDeMuestra(roster.voluntarios, { nombre: 'Voluntario' }),
+      imagenes,
+      medirTexto: medidorDesde(ctx),
+      ancho,
+    })
+  }
+
+  function elegir(campo, valor) {
+    lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, [campo]: valor } }
+    alCambiar(lista)
+    redibujar()
+  }
+
   function selectorDeFormato() {
-    const caja = elemento('label', ['campo', 'campo-formato'])
-    caja.appendChild(elemento('span', ['campo-rotulo'], 'Formato'))
-    const selector = document.createElement('select')
-    selector.dataset.campo = 'formato'
-    FORMATOS.forEach(([valor, rotulo]) => {
-      const opcion = document.createElement('option')
-      opcion.value = valor
-      opcion.textContent = rotulo
-      selector.appendChild(opcion)
+    return selectorVisual({
+      campo: 'formato',
+      rotulo: 'Formato',
+      valores: FORMATOS,
+      valor: lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO,
+      dibujar: (lienzo, valor, ancho) => bosquejoDe(lienzo, { formato: valor }, ancho),
+      alElegir: (valor) => elegir('formato', valor),
     })
-    selector.value = lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO
-    selector.addEventListener('change', () => {
-      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: selector.value } }
-      alCambiar(lista)
-      redibujar()
-    })
-    caja.appendChild(selector)
-    return caja
   }
 
   function selectorDeEsquina() {
     if ((lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO) !== 'retratos') return null
-    const caja = elemento('label', ['campo', 'campo-formato'])
-    caja.appendChild(elemento('span', ['campo-rotulo'], 'Esquina de los voluntarios'))
-    const selector = document.createElement('select')
-    selector.dataset.campo = 'esquina-voluntario'
-    ESQUINAS_VOLUNTARIO.forEach(([valor, rotulo]) => {
-      const opcion = document.createElement('option')
-      opcion.value = valor
-      opcion.textContent = rotulo
-      selector.appendChild(opcion)
+    return selectorVisual({
+      campo: 'esquina-voluntario',
+      rotulo: 'Dónde va la foto del voluntario',
+      valores: ESQUINAS_VOLUNTARIO,
+      valor: lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO,
+      dibujar: (lienzo, valor, ancho) => bosquejoDe(lienzo, { esquinaVoluntario: valor }, ancho),
+      alElegir: (valor) => elegir('esquinaVoluntario', valor),
     })
-    selector.value = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
-    selector.addEventListener('change', () => {
-      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, esquinaVoluntario: selector.value } }
-      alCambiar(lista)
-      redibujar()
-    })
-    caja.appendChild(selector)
-    return caja
   }
 
-  // Un selector chico para las opciones que solo valen con el medallon montado.
+  // Los dos de abajo solo cambian algo con el medallon montado, asi que aparecen
+  // unicamente ahi: mostrarlos siempre haria creer que hacen algo cuando no.
   function selectorMontado(campo, rotulo, valores, porDefecto) {
     const esquina = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
     if (!String(esquina).startsWith('montado-')) return null
-    const caja = elemento('label', ['campo', 'campo-formato'])
-    caja.appendChild(elemento('span', ['campo-rotulo'], rotulo))
-    const selector = document.createElement('select')
-    selector.dataset.campo = campo
-    valores.forEach(([valor, texto]) => {
-      const opcion = document.createElement('option')
-      opcion.value = valor
-      opcion.textContent = texto
-      selector.appendChild(opcion)
+    return selectorVisual({
+      campo,
+      rotulo,
+      valores,
+      valor: lista.opcionesImagen?.[campo] ?? porDefecto,
+      dibujar: (lienzo, valor, ancho) => bosquejoDe(lienzo, { [campo]: valor }, ancho),
+      alElegir: (valor) => elegir(campo, valor),
     })
-    selector.value = lista.opcionesImagen?.[campo] ?? porDefecto
-    selector.addEventListener('change', () => {
-      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, [campo]: selector.value } }
-      alCambiar(lista)
-      redibujar()
-    })
-    caja.appendChild(selector)
-    return caja
   }
 
   function interruptores() {
@@ -314,7 +317,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   }
 
   // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
-  // solo las fotos de los participantes necesitan ese lector.
+  // solo las fotos de las personas necesitan ese lector.
   const cerrar = (i) => { if (i && typeof i.close === 'function') i.close() }
 
   async function precargarFotos() {
@@ -322,8 +325,12 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
     if (cargarFoto) {
+      // Los voluntarios tambien, no solo los participantes. Cuando se escribio
+      // esto ningun formato dibujaba la cara del voluntario; Retratos si, y sin
+      // esta linea su medallon salia en blanco aunque la foto estuviera cargada.
       const claves = new Set()
-      roster.participantes.forEach((p) => { if (p.foto) claves.add(p.foto) })
+      const gente = [...roster.participantes, ...roster.voluntarios]
+      gente.forEach((p) => { if (p.foto) claves.add(p.foto) })
       for (const clave of claves) {
         const imagen = await cargarFoto(clave)
         if (!vivo) return cerrar(imagen)

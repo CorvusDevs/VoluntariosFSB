@@ -676,3 +676,48 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .previa figcaption { margin-top: 5px; font-size: 11px; color: var(--texto-suave); text-align: center; }
 .editor-acciones { display: flex; gap: 10px; margin-top: 18px; }
 .editor-acciones .boton { flex: 1; }
+
+/* Selector visual: cada opción se ve en vez de leerse. Los nombres de estas
+   opciones no le dicen nada a nadie hasta que ve el resultado. */
+.selector-visual { padding: 14px 16px 4px; }
+.selector-rotulo { margin: 0 0 8px; font-size: 12px; color: var(--texto-suave); }
+.selector-opciones {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;        /* la tira scrollea sola, la página nunca */
+  padding-bottom: 6px;
+  scroll-snap-type: x proximity;
+}
+.bosquejo {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  width: 92px;
+  padding: 7px 5px 8px;
+  border: 2px solid var(--linea);
+  border-radius: 12px;
+  background: var(--fondo);
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.bosquejo:focus-visible { outline: 2px solid var(--violeta); outline-offset: 2px; }
+.bosquejo.elegido { border-color: var(--violeta); background: #F8F2FB; }
+.bosquejo-lienzo {
+  display: block;
+  width: 76px;
+  height: auto;
+  border-radius: 6px;
+  background: var(--linea);
+}
+.bosquejo-vacio { min-height: 76px; }
+.bosquejo-etiqueta {
+  font-size: 10.5px;
+  line-height: 1.25;
+  color: var(--texto-suave);
+  text-align: center;
+}
+.bosquejo.elegido .bosquejo-etiqueta { color: var(--violeta); font-weight: 500; }

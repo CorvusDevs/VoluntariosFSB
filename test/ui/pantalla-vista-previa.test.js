@@ -49,8 +49,16 @@ describe('pantalla de vista previa', () => {
   })
 
   it('refleja el estado guardado en la lista', () => {
-    expect(raiz.querySelector('[data-opcion="saludo"]').checked).toBe(true)
+    // El saludo arranca apagado a proposito: el mensaje va escrito en el chat.
+    expect(raiz.querySelector('[data-opcion="saludo"]').checked).toBe(false)
+    expect(raiz.querySelector('[data-opcion="fotos"]').checked).toBe(true)
     expect(raiz.querySelector('[data-opcion="compacto"]').checked).toBe(false)
+  })
+
+  it('el saludo y la despedida arrancan apagados', () => {
+    const nueva = crearLista('2026-08-08', ROSTER)
+    expect(nueva.opcionesImagen.saludo).toBe(false)
+    expect(nueva.opcionesImagen.despedida).toBe(false)
   })
 
   it('cambiar un interruptor actualiza la lista y avisa', () => {
@@ -294,7 +302,14 @@ describe('saludo y despedida editables', () => {
     expect(p.lista().saludo).toBe('Buenas, mañana jugamos igual con lluvia.')
   })
 
+  const prender = (cual) => {
+    const i = raiz.querySelector(`[data-opcion="${cual}"]`)
+    i.checked = true
+    i.dispatchEvent(new Event('change'))
+  }
+
   it('el texto editado llega a la imagen', () => {
+    prender('saludo')
     const s = raiz.querySelector('[data-campo="saludo"]')
     s.value = 'Texto propio de esta semana.'
     s.dispatchEvent(new Event('change'))
@@ -303,6 +318,7 @@ describe('saludo y despedida editables', () => {
   })
 
   it('editar la despedida tambien llega a la imagen', () => {
+    prender('despedida')
     const d = raiz.querySelector('[data-campo="despedida"]')
     d.value = 'Gracias por bancar la lluvia.'
     d.dispatchEvent(new Event('change'))
@@ -327,49 +343,56 @@ describe('saludo y despedida editables', () => {
 })
 
 describe('selector de formato', () => {
+  // Los selectores ya no son desplegables: cada opcion es un boton con un
+  // bosquejo de como queda. Se eligen tocando, no abriendo una lista.
+  const valores = (raizDada, campo) =>
+    [...raizDada.querySelectorAll(`[data-campo="${campo}"] .bosquejo`)].map((b) => b.dataset.valor)
+  const elegido = (raizDada, campo) =>
+    raizDada.querySelector(`[data-campo="${campo}"] .bosquejo.elegido`)?.dataset.valor
+  const tocar = (raizDada, campo, valor) =>
+    raizDada.querySelector(`[data-campo="${campo}"] .bosquejo[data-valor="${valor}"]`).click()
+
   it('ofrece los cuatro formatos y arranca en el por defecto', () => {
-    const selector = raiz.querySelector('[data-campo="formato"]')
-    expect(selector).not.toBeNull()
-    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas', 'grilla', 'retratos'])
-    expect(selector.value).toBe(FORMATO_POR_DEFECTO)
+    expect(valores(raiz, 'formato')).toEqual(['retratos', 'grilla', 'columnas', 'filas'])
+    expect(elegido(raiz, 'formato')).toBe(FORMATO_POR_DEFECTO)
+  })
+
+  it('cada opcion trae su propio bosquejo dibujado', () => {
+    const lienzos = raiz.querySelectorAll('[data-campo="formato"] .bosquejo-lienzo')
+    expect(lienzos).toHaveLength(4)
   })
 
   it('la esquina de los voluntarios solo aparece en el formato retratos', () => {
     // Los otros tres no dibujan al voluntario sobre la foto, asi que el selector
     // no tendria nada que cambiar y solo agregaria ruido.
     expect(raiz.querySelector('[data-campo="esquina-voluntario"]')).toBeNull()
-    const formato = raiz.querySelector('[data-campo="formato"]')
-    formato.value = 'retratos'
-    formato.dispatchEvent(new Event('change'))
-    const esquina = raiz.querySelector('[data-campo="esquina-voluntario"]')
-    expect(esquina).not.toBeNull()
-    expect([...esquina.options].map((o) => o.value)).toEqual([
+    tocar(raiz, 'formato', 'retratos')
+    expect(valores(raiz, 'esquina-voluntario')).toEqual([
       'abajo-derecha', 'abajo-izquierda', 'arriba-derecha', 'arriba-izquierda',
       'montado-derecha', 'montado-izquierda',
+      'montado-abajo-derecha', 'montado-abajo-izquierda',
     ])
-    expect(esquina.value).toBe(ESQUINA_VOLUNTARIO_POR_DEFECTO)
+    expect(elegido(raiz, 'esquina-voluntario')).toBe(ESQUINA_VOLUNTARIO_POR_DEFECTO)
   })
 
   it('el tamaño y el asomo solo aparecen con el medallon montado', () => {
     // Con el medallon apoyado no cambian nada, asi que mostrarlos haria creer
     // que hacen algo cuando no.
-    const formato = raiz.querySelector('[data-campo="formato"]')
-    formato.value = 'retratos'
-    formato.dispatchEvent(new Event('change'))
+    tocar(raiz, 'formato', 'retratos')
     expect(raiz.querySelector('[data-campo="tamanoVoluntario"]')).toBeNull()
     expect(raiz.querySelector('[data-campo="asomoVoluntario"]')).toBeNull()
 
-    const esquina = raiz.querySelector('[data-campo="esquina-voluntario"]')
-    esquina.value = 'montado-derecha'
-    esquina.dispatchEvent(new Event('change'))
-    const tamano = raiz.querySelector('[data-campo="tamanoVoluntario"]')
-    const asomo = raiz.querySelector('[data-campo="asomoVoluntario"]')
-    expect(tamano).not.toBeNull()
-    expect(asomo).not.toBeNull()
-    expect([...tamano.options].map((o) => o.value)).toEqual(['mediano', 'grande', 'enorme'])
-    expect([...asomo.options].map((o) => o.value)).toEqual(['apenas', 'montado', 'alto'])
-    expect(tamano.value).toBe(TAMANO_VOLUNTARIO_POR_DEFECTO)
-    expect(asomo.value).toBe(ASOMO_VOLUNTARIO_POR_DEFECTO)
+    tocar(raiz, 'esquina-voluntario', 'montado-derecha')
+    expect(valores(raiz, 'tamanoVoluntario')).toEqual(['mediano', 'grande', 'enorme'])
+    expect(valores(raiz, 'asomoVoluntario')).toEqual(['apenas', 'montado', 'alto'])
+    expect(elegido(raiz, 'tamanoVoluntario')).toBe(TAMANO_VOLUNTARIO_POR_DEFECTO)
+    expect(elegido(raiz, 'asomoVoluntario')).toBe(ASOMO_VOLUNTARIO_POR_DEFECTO)
+  })
+
+  it('las esquinas montadas de abajo tambien corren el nombre del chico', () => {
+    tocar(raiz, 'formato', 'retratos')
+    tocar(raiz, 'esquina-voluntario', 'montado-abajo-derecha')
+    expect(pantalla.lista().opcionesImagen.esquinaVoluntario).toBe('montado-abajo-derecha')
   })
 
   it('el formato por defecto es la grilla', () => {
@@ -382,9 +405,7 @@ describe('selector de formato', () => {
     const rf = document.getElementById('rf')
     let avisos = 0
     const p = armar(rf, lista, () => { avisos += 1 })
-    const selector = rf.querySelector('[data-campo="formato"]')
-    selector.value = 'columnas'
-    selector.dispatchEvent(new Event('change'))
+    rf.querySelector('[data-campo="formato"] .bosquejo[data-valor="columnas"]').click()
     expect(avisos).toBe(1)
     expect(p.lista().opcionesImagen.formato).toBe('columnas')
   })
@@ -394,9 +415,7 @@ describe('selector de formato', () => {
     const rc = document.getElementById('rc')
     const p = armar(rc, apilada(lista))
     const chica = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
-    const selector = rc.querySelector('[data-campo="formato"]')
-    selector.value = 'columnas'
-    selector.dispatchEvent(new Event('change'))
+    rc.querySelector('[data-campo="formato"] .bosquejo[data-valor="columnas"]').click()
     const grande = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
     expect(grande).toBeGreaterThan(chica * 1.8)
   })
@@ -406,6 +425,32 @@ describe('selector de formato', () => {
     document.body.innerHTML = '<div id="rg"></div>'
     const rg = document.getElementById('rg')
     armar(rg, guardada)
-    expect(rg.querySelector('[data-campo="formato"]').value).toBe('columnas')
+    expect(rg.querySelector('[data-campo="formato"] .bosquejo.elegido').dataset.valor).toBe('columnas')
+  })
+})
+
+
+describe('precarga de fotos', () => {
+  it('pide tambien las fotos de los voluntarios, no solo las de los chicos', async () => {
+    // Hasta el formato Retratos ningun formato dibujaba la cara del voluntario,
+    // asi que solo se precargaban las de los chicos y el medallon salia en
+    // blanco aunque la foto estuviera cargada y subida.
+    const pedidas = []
+    const roster = {
+      participantes: [{ id: 'p1', nombre: 'Ezequiel', grupo: 1, activo: true, foto: 'p1.jpg' }],
+      voluntarios: [{ id: 'v1', nombre: 'Alejandro', activo: true, foto: 'v1.jpg' }],
+    }
+    document.body.innerHTML = '<div id="raiz"></div>'
+    crearPantallaVistaPrevia(document.getElementById('raiz'), {
+      lista: crearLista('2026-08-08', roster),
+      roster,
+      alCambiar: () => {},
+      crearContexto: () => contextoFalso(),
+      cargarLogo: async () => null,
+      cargarFoto: async (clave) => { pedidas.push(clave); return null },
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pedidas).toContain('p1.jpg')
+    expect(pedidas).toContain('v1.jpg')
   })
 })

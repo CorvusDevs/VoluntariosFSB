@@ -140,11 +140,14 @@ export const RETRATOS = Object.freeze({
 export const ESQUINAS = Object.freeze([
   'abajo-derecha', 'abajo-izquierda', 'arriba-derecha', 'arriba-izquierda',
   'montado-derecha', 'montado-izquierda',
+  'montado-abajo-derecha', 'montado-abajo-izquierda',
 ])
 export const ESQUINA_POR_DEFECTO = 'abajo-derecha'
 
 export function esDerecha(esquina) { return String(esquina).endsWith('-derecha') }
-export function esAbajo(esquina) { return String(esquina).startsWith('abajo-') }
+export function esAbajo(esquina) {
+  return String(esquina).startsWith('abajo-') || String(esquina).startsWith('montado-abajo-')
+}
 // "Montado" saca el medallon del marco: queda arriba de la esquina, asomando
 // hacia arriba y hacia el costado. Se puede agrandar mucho mas sin taparle cara
 // al chico, y lo que sobresale se paga en alto de fila y en ancho de planilla.
