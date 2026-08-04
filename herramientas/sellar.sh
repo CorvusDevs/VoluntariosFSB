@@ -16,4 +16,12 @@ cat > js/version.js <<EOF
 export const VERSION = '$SELLO'
 EOF
 printf '{ "version": "%s" }\n' "$SELLO" > version.json
+# El nombre de la cache del service worker lleva el sello: sin esto la cache
+# vieja sobrevive a la publicacion y el trabajador sirve codigo viejo, que es
+# justo lo que vino a evitar.
+python3 - "$SELLO" <<'PY'
+import pathlib, re, sys
+p = pathlib.Path('sw.js')
+p.write_text(re.sub(r"const VERSION = '[^']*'", f"const VERSION = '{sys.argv[1]}'", p.read_text()))
+PY
 echo "Sello: $SELLO"

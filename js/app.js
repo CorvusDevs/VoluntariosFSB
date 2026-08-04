@@ -13,6 +13,7 @@ import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
 import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
 import { sello, vigilarVersion } from './ui/aviso-version.js'
+import { registrarTrabajador } from './ui/trabajador.js'
 import { VERSION } from './version.js'
 
 const RUTA_USUARIOS = 'usuarios.json'
@@ -241,6 +242,11 @@ async function cerrarSesion() {
 // Arriba de todo y sobre cualquier pantalla, tambien la de ingreso: el aviso
 // tiene que verse aunque nadie haya entrado todavia.
 vigilarVersion(contenedor)
+
+// Con el trabajador registrado, cada recarga trae el codigo publicado en vez de
+// lo que haya quedado en la cache del navegador. No se espera su resultado: si
+// tarda o falla, la aplicacion arranca igual.
+registrarTrabajador()
 
 const recordada = await recuperarRecordado()
 if (recordada) await entrar({ ...recordada, recordar: false })
