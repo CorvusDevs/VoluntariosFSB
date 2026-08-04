@@ -45,6 +45,8 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // ocupado dura lo que dura una exportacion: mientras tanto los controles
   // quedan bloqueados para que el PNG que baja sea el que estaba en pantalla.
   let ocupado = false
+  // Los bosquejos arrancan plegados: se abren al tocar "Cambiar".
+  let formatoAbierto = false
   // Aviso puntual para la coordinadora, por ejemplo cuando compartir no anda.
   let mensaje = ''
 
@@ -87,10 +89,10 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     ['abajo-izquierda', 'Abajo izquierda'],
     ['arriba-derecha', 'Arriba derecha'],
     ['arriba-izquierda', 'Arriba izquierda'],
-    ['montado-derecha', 'Montado arriba der.'],
-    ['montado-izquierda', 'Montado arriba izq.'],
-    ['montado-abajo-derecha', 'Montado abajo der.'],
-    ['montado-abajo-izquierda', 'Montado abajo izq.'],
+    ['montado-derecha', 'Saliente arriba der.'],
+    ['montado-izquierda', 'Saliente arriba izq.'],
+    ['montado-abajo-derecha', 'Saliente abajo der.'],
+    ['montado-abajo-izquierda', 'Saliente abajo izq.'],
   ]
   const TAMANOS_VOLUNTARIO = [
     ['mediano', 'Mediano'],
@@ -99,7 +101,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   ]
   const ASOMOS_VOLUNTARIO = [
     ['apenas', 'Apenas'],
-    ['montado', 'Montado'],
+    ['montado', 'Saliente'],
     ['alto', 'Bien arriba'],
   ]
 
@@ -170,6 +172,54 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       dibujar: (lienzo, valor, ancho) => bosquejoDe(lienzo, { [campo]: valor }, ancho),
       alElegir: (valor) => elegir(campo, valor),
     })
+  }
+
+  // Cuatro tiras de bosquejos abiertas ocupaban dos pantallas de alto y empujaban
+  // la vista previa fuera de cuadro, que es justo lo que se viene a mirar. Se
+  // abren cuando alguien decide cambiar el formato, no antes.
+  function resumenDeFormato() {
+    const o = lista.opcionesImagen ?? {}
+    const nombre = (pares, valor, respaldo) =>
+      (pares.find(([v]) => v === (valor ?? respaldo)) ?? pares[0])[1]
+    const partes = [nombre(FORMATOS, o.formato, FORMATO_POR_DEFECTO)]
+    if ((o.formato ?? FORMATO_POR_DEFECTO) === 'retratos') {
+      partes.push(nombre(ESQUINAS_VOLUNTARIO, o.esquinaVoluntario, ESQUINA_VOLUNTARIO_POR_DEFECTO))
+      if (String(o.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO).startsWith('montado-')) {
+        partes.push(nombre(TAMANOS_VOLUNTARIO, o.tamanoVoluntario, TAMANO_VOLUNTARIO_POR_DEFECTO))
+      }
+    }
+    return partes.join(' · ')
+  }
+
+  function panelDeFormato() {
+    const caja = elemento('section', ['panel-formato'])
+    const cabecera = elemento('div', ['panel-formato-cabecera'])
+    cabecera.append(
+      elemento('span', ['panel-formato-rotulo'], 'Formato'),
+      elemento('span', ['panel-formato-resumen'], resumenDeFormato()),
+    )
+    const abrir = elemento('button', ['boton', 'boton-cambiar-formato'], formatoAbierto ? 'Listo' : 'Cambiar')
+    abrir.type = 'button'
+    abrir.dataset.accion = 'cambiar-formato'
+    abrir.setAttribute('aria-expanded', String(formatoAbierto))
+    abrir.addEventListener('click', () => {
+      formatoAbierto = !formatoAbierto
+      redibujar()
+    })
+    cabecera.appendChild(abrir)
+    caja.appendChild(cabecera)
+    if (!formatoAbierto) return caja
+
+    caja.appendChild(selectorDeFormato())
+    const esquina = selectorDeEsquina()
+    if (esquina) caja.appendChild(esquina)
+    const tamano = selectorMontado(
+      'tamanoVoluntario', 'Tamaño del voluntario', TAMANOS_VOLUNTARIO, TAMANO_VOLUNTARIO_POR_DEFECTO)
+    if (tamano) caja.appendChild(tamano)
+    const asomo = selectorMontado(
+      'asomoVoluntario', 'Cuánto sobresale', ASOMOS_VOLUNTARIO, ASOMO_VOLUNTARIO_POR_DEFECTO)
+    if (asomo) caja.appendChild(asomo)
+    return caja
   }
 
   function interruptores() {
@@ -293,15 +343,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (!vivo) return
     vaciar(raiz)
     calcular()
-    raiz.appendChild(selectorDeFormato())
-    const esquina = selectorDeEsquina()
-    if (esquina) raiz.appendChild(esquina)
-    const tamano = selectorMontado(
-      'tamanoVoluntario', 'Tamaño del voluntario', TAMANOS_VOLUNTARIO, TAMANO_VOLUNTARIO_POR_DEFECTO)
-    if (tamano) raiz.appendChild(tamano)
-    const asomo = selectorMontado(
-      'asomoVoluntario', 'Cuánto asoma', ASOMOS_VOLUNTARIO, ASOMO_VOLUNTARIO_POR_DEFECTO)
-    if (asomo) raiz.appendChild(asomo)
+    raiz.appendChild(panelDeFormato())
     raiz.appendChild(interruptores())
     raiz.appendChild(mensajes())
     raiz.appendChild(informacion())

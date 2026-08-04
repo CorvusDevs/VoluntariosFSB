@@ -351,6 +351,21 @@ describe('selector de formato', () => {
     raizDada.querySelector(`[data-campo="${campo}"] .bosquejo.elegido`)?.dataset.valor
   const tocar = (raizDada, campo, valor) =>
     raizDada.querySelector(`[data-campo="${campo}"] .bosquejo[data-valor="${valor}"]`).click()
+  // Los bosquejos arrancan plegados: abiertos ocupaban dos pantallas de alto.
+  const abrir = (raizDada) => raizDada.querySelector('[data-accion="cambiar-formato"]').click()
+
+  beforeEach(() => abrir(raiz))
+
+  it('arranca plegado, con solo el resumen a la vista', () => {
+    document.body.innerHTML = '<div id="rp"></div>'
+    const rp = document.getElementById('rp')
+    armar(rp, lista)
+    expect(rp.querySelector('.selector-visual')).toBeNull()
+    expect(rp.querySelector('[data-accion="cambiar-formato"]')).not.toBeNull()
+    expect(rp.querySelector('.panel-formato-resumen').textContent).toContain('Grilla')
+    rp.querySelector('[data-accion="cambiar-formato"]').click()
+    expect(rp.querySelector('.selector-visual')).not.toBeNull()
+  })
 
   it('ofrece los cuatro formatos y arranca en el por defecto', () => {
     expect(valores(raiz, 'formato')).toEqual(['retratos', 'grilla', 'columnas', 'filas'])
@@ -405,6 +420,7 @@ describe('selector de formato', () => {
     const rf = document.getElementById('rf')
     let avisos = 0
     const p = armar(rf, lista, () => { avisos += 1 })
+    abrir(rf)
     rf.querySelector('[data-campo="formato"] .bosquejo[data-valor="columnas"]').click()
     expect(avisos).toBe(1)
     expect(p.lista().opcionesImagen.formato).toBe('columnas')
@@ -415,6 +431,7 @@ describe('selector de formato', () => {
     const rc = document.getElementById('rc')
     const p = armar(rc, apilada(lista))
     const chica = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
+    abrir(rc)
     rc.querySelector('[data-campo="formato"] .bosquejo[data-valor="columnas"]').click()
     const grande = p.plano().ordenes.find((o) => o.tipo === 'circulo').radio
     expect(grande).toBeGreaterThan(chica * 1.8)
@@ -425,6 +442,8 @@ describe('selector de formato', () => {
     document.body.innerHTML = '<div id="rg"></div>'
     const rg = document.getElementById('rg')
     armar(rg, guardada)
+    expect(rg.querySelector('.panel-formato-resumen').textContent).toContain('Dos columnas')
+    rg.querySelector('[data-accion="cambiar-formato"]').click()
     expect(rg.querySelector('[data-campo="formato"] .bosquejo.elegido').dataset.valor).toBe('columnas')
   })
 })

@@ -721,3 +721,24 @@ html, body { max-width: 100%; overflow-x: hidden; }
   text-align: center;
 }
 .bosquejo.elegido .bosquejo-etiqueta { color: var(--violeta); font-weight: 500; }
+
+/* Panel de formato: plegado por defecto. Abierto son cuatro tiras de bosquejos,
+   que empujaban la vista previa fuera de la pantalla. */
+.panel-formato { border-bottom: 1px solid var(--linea); }
+.panel-formato-cabecera {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px;
+}
+.panel-formato-rotulo { font-size: 12px; color: var(--texto-suave); flex-shrink: 0; }
+.panel-formato-resumen {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--violeta);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.boton-cambiar-formato { flex-shrink: 0; padding: 8px 14px; font-size: 14px; white-space: nowrap; }
