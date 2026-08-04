@@ -544,8 +544,11 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 
     voluntarios.forEach((voluntario, n) => {
       const mx = derecha ? x + ancho - inset - anchoMed : x + inset
+      // Abajo se ancla al borde inferior de la celda, no al centro de la franja:
+      // anclado a la franja el medallon sobresalia por debajo de la celda y se
+      // superponia con la fila siguiente de la grilla.
       const base = abajo
-        ? arriba + alto - altoFranja / 2 - altoMed / 2
+        ? arriba + alto - inset - altoMed
         : arriba + inset
       const my = abajo ? base - paso * n : base + paso * n
       medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto)

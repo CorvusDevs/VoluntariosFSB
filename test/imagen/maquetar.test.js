@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import {
-  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, anchoDeCeldaRetratos,
+  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, anchoDeCeldaRetratos,
 } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
@@ -729,6 +729,37 @@ describe('formato retratos', () => {
     const centrado = nombreX('arriba-derecha')
     expect(nombreX('abajo-derecha')).toBeLessThan(centrado)
     expect(nombreX('abajo-izquierda')).toBeGreaterThan(centrado)
+  })
+
+  it('usa la misma proporcion que la foto de la grilla, para no recortar de mas', () => {
+    // Las fotos se guardan cuadradas. Una celda mas alta obliga al recorte que
+    // cubre a comerse los costados de la cara, que es lo que se veia estirado.
+    expect(RETRATOS.proporcionCelda).toBe(GRILLA.proporcionFoto)
+    const ancho = anchoDeCeldaRetratos(56)
+    const alto = Math.round(ancho * RETRATOS.proporcionCelda)
+    const escala = Math.max(ancho / 400, alto / 400)
+    expect(Math.round(ancho / escala)).toBe(300)
+  })
+
+  it('nunca deja el medallon fuera de la celda, en ninguna de las cuatro esquinas', () => {
+    // Anclado al centro de la franja, el medallon sobresalia por debajo del borde
+    // y se metia en la fila siguiente de la grilla.
+    const ancho = anchoDeCeldaRetratos(56)
+    const alto = Math.round(ancho * RETRATOS.proporcionCelda)
+    const lado = Math.round(ancho * RETRATOS.factorMedallon)
+    const altoMed = Math.round(lado * RETRATOS.proporcionMedallon)
+    ESQUINAS.forEach((esquina) => {
+      const plano = maquetar(enRetratos({ esquinaVoluntario: esquina }), ROSTER, opciones)
+      const celdas = celdasDe(plano)
+      const marcos = plano.ordenes.filter(
+        (o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === lado)
+      expect(marcos.length).toBeGreaterThan(0)
+      marcos.forEach((marco) => {
+        const celda = celdas.find((c) => marco.x >= c.x - 1 && marco.x + lado <= c.x + c.ancho + 1
+          && marco.y >= c.y - 1 && marco.y + altoMed <= c.y + c.alto + 1)
+        expect(celda, `${esquina}: el medallon en (${marco.x}, ${marco.y}) se sale de toda celda`).toBeDefined()
+      })
+    })
   })
 
   it('ensancha la imagen cuando hay mas participantes, en vez de achicar la cara', () => {

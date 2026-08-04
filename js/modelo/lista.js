@@ -6,9 +6,10 @@ import { activos } from './roster.js'
 export const FORMATO_POR_DEFECTO = 'grilla'
 
 // En que esquina de la foto del participante van los medallones de los
-// voluntarios. Solo lo usa el formato "retratos". Arriba a la derecha porque las
-// caras se encuadran al centro, asi que esa esquina casi siempre es fondo.
-export const ESQUINA_VOLUNTARIO_POR_DEFECTO = 'arriba-derecha'
+// voluntarios. Solo lo usa el formato "retratos". Abajo a la derecha queda
+// apoyado sobre la franja del nombre, asi las dos anotaciones viven en la misma
+// banda y el resto de la foto queda libre para la cara.
+export const ESQUINA_VOLUNTARIO_POR_DEFECTO = 'abajo-derecha'
 
 export const SALUDO_POR_DEFECTO =
   'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'

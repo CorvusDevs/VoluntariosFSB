@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { crearPantallaVistaPrevia, DENSIDAD } from '../../js/ui/pantalla-vista-previa.js'
-import { crearLista, asignarVoluntario, FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
+import {
+  crearLista, asignarVoluntario, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO,
+} from '../../js/modelo/lista.js'
 import { ROSTER, medirFalso } from '../ayudas/datos.js'
 
 function contextoFalso() {
@@ -342,7 +344,7 @@ describe('selector de formato', () => {
     expect(esquina).not.toBeNull()
     expect([...esquina.options].map((o) => o.value))
       .toEqual(['arriba-derecha', 'arriba-izquierda', 'abajo-derecha', 'abajo-izquierda'])
-    expect(esquina.value).toBe('arriba-derecha')
+    expect(esquina.value).toBe(ESQUINA_VOLUNTARIO_POR_DEFECTO)
   })
 
   it('el formato por defecto es la grilla', () => {

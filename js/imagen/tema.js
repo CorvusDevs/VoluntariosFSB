@@ -106,14 +106,21 @@ export const GRILLA = Object.freeze({
 export const RETRATOS = Object.freeze({
   porFila: 5,
   separacion: 16,
-  proporcionCelda: 1.81,   // alto sobre ancho
+  // La misma proporcion que la foto de la grilla, a proposito. Las fotos se
+  // guardan cuadradas (400x400), asi que una celda mas alta que esta obliga al
+  // recorte a comerse los costados de la cara: a 1.81 sobrevivian 221 px de los
+  // 400, contra 300 px con esta. Los nombres se meten adentro de la foto en vez
+  // de sumar alto, que es justamente lo que hace corto a este formato.
+  proporcionCelda: 4 / 3,  // alto sobre ancho
   radioFoto: 16,
   filasObjetivo: 2,
   margenInferior: 12,
   // Franja del nombre del participante, al pie de la foto.
   factorNombre: 0.145,
   aireFranja: 0.055,
-  pisoNombre: 0.7,         // no se achica mas alla de esta fraccion
+  // Con el medallon abajo, al nombre le queda menos de la mitad del ancho, asi
+  // que el piso tiene que dar mas margen o los nombres largos se pasan de la franja.
+  pisoNombre: 0.6,         // no se achica mas alla de esta fraccion
   // Medallon del voluntario. Vertical a proposito: a igual ancho da 3 px mas de
   // nombre que el cuadrado, porque la franja no le come la cara.
   factorMedallon: 0.36,
@@ -128,7 +135,7 @@ export const RETRATOS = Object.freeze({
 })
 
 export const ESQUINAS = Object.freeze(['arriba-derecha', 'arriba-izquierda', 'abajo-derecha', 'abajo-izquierda'])
-export const ESQUINA_POR_DEFECTO = 'arriba-derecha'
+export const ESQUINA_POR_DEFECTO = 'abajo-derecha'
 
 export function esDerecha(esquina) { return esquina === 'arriba-derecha' || esquina === 'abajo-derecha' }
 export function esAbajo(esquina) { return esquina === 'abajo-derecha' || esquina === 'abajo-izquierda' }
