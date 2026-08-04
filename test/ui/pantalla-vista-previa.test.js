@@ -324,11 +324,25 @@ describe('saludo y despedida editables', () => {
 })
 
 describe('selector de formato', () => {
-  it('ofrece los tres formatos y arranca en el por defecto', () => {
+  it('ofrece los cuatro formatos y arranca en el por defecto', () => {
     const selector = raiz.querySelector('[data-campo="formato"]')
     expect(selector).not.toBeNull()
-    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas', 'grilla'])
+    expect([...selector.options].map((o) => o.value)).toEqual(['filas', 'columnas', 'grilla', 'retratos'])
     expect(selector.value).toBe(FORMATO_POR_DEFECTO)
+  })
+
+  it('la esquina de los voluntarios solo aparece en el formato retratos', () => {
+    // Los otros tres no dibujan al voluntario sobre la foto, asi que el selector
+    // no tendria nada que cambiar y solo agregaria ruido.
+    expect(raiz.querySelector('[data-campo="esquina-voluntario"]')).toBeNull()
+    const formato = raiz.querySelector('[data-campo="formato"]')
+    formato.value = 'retratos'
+    formato.dispatchEvent(new Event('change'))
+    const esquina = raiz.querySelector('[data-campo="esquina-voluntario"]')
+    expect(esquina).not.toBeNull()
+    expect([...esquina.options].map((o) => o.value))
+      .toEqual(['arriba-derecha', 'arriba-izquierda', 'abajo-derecha', 'abajo-izquierda'])
+    expect(esquina.value).toBe('arriba-derecha')
   })
 
   it('el formato por defecto es la grilla', () => {

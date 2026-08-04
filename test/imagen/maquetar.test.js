@@ -1,7 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
-import { ANCHO, COLORES, COLUMNAS, GRILLA } from '../../js/imagen/tema.js'
+import {
+  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, anchoDeCeldaRetratos,
+} from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
 
 const opciones = { saludo: SALUDO, despedida: DESPEDIDA, medirTexto: medirFalso }
@@ -653,5 +655,95 @@ describe('un voluntario que acompaña a varios', () => {
     const alturas = new Set(verticales.map((l) => l.y1))
     expect(alturas.size).toBeGreaterThanOrEqual(1)
     verticales.forEach((l) => expect(l.x1).toBeLessThanOrEqual(plano.ancho))
+  })
+})
+
+// El formato "retratos" es una opcion mas: no reemplaza a ninguno de los tres
+// que ya existian, y solo se dibuja cuando se lo elige.
+describe('formato retratos', () => {
+  const enRetratos = (extra = {}) => ({
+    ...LISTA,
+    opcionesImagen: { ...LISTA.opcionesImagen, fotos: true, formato: 'retratos', ...extra },
+  })
+  const celdasDe = (plano) => plano.ordenes.filter(
+    (o) => o.tipo === 'rect' && o.radio === RETRATOS.radioFoto && o.alto > 200)
+
+  it('no cambia nada en los otros tres formatos', () => {
+    const antes = maquetar({ ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } }, ROSTER, opciones)
+    const despues = maquetar({ ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } }, ROSTER, opciones)
+    expect(despues.alto).toBe(antes.alto)
+    expect(despues.ordenes.length).toBe(antes.ordenes.length)
+  })
+
+  it('da a la celda toda la altura, sin texto por debajo de la foto', () => {
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const celda = celdasDe(plano)[0]
+    const ancho = anchoDeCeldaRetratos(56)
+    expect(celda.ancho).toBe(ancho)
+    expect(celda.alto).toBe(Math.round(ancho * RETRATOS.proporcionCelda))
+  })
+
+  it('escribe el nombre del participante en blanco, adentro de la franja', () => {
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const celda = celdasDe(plano)[0]
+    const nombre = plano.ordenes.find(
+      (o) => o.tipo === 'texto' && o.color === COLORES.blanco && o.y > celda.y + celda.alto * 0.7)
+    expect(nombre).toBeDefined()
+    // Adentro de la celda, no debajo.
+    expect(nombre.y).toBeLessThan(celda.y + celda.alto)
+  })
+
+  it('pone la franja con el color del grupo, distinto en cada cancha', () => {
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const franjas = plano.ordenes.filter(
+      (o) => o.tipo === 'rect' && !o.radio && [COLORES.turquesaTexto, COLORES.magentaTexto].includes(o.color))
+    expect(franjas.some((f) => f.color === COLORES.turquesaTexto)).toBe(true)
+    expect(franjas.some((f) => f.color === COLORES.magentaTexto)).toBe(true)
+  })
+
+  it('mueve los medallones a la esquina elegida', () => {
+    const ancho = anchoDeCeldaRetratos(56)
+    const lado = Math.round(ancho * RETRATOS.factorMedallon)
+    const marcos = (esquina) => {
+      const plano = maquetar(enRetratos({ esquinaVoluntario: esquina }), ROSTER, opciones)
+      return plano.ordenes.filter((o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === lado)
+    }
+    const derecha = marcos('arriba-derecha')
+    const izquierda = marcos('arriba-izquierda')
+    expect(derecha.length).toBeGreaterThan(0)
+    expect(izquierda.length).toBe(derecha.length)
+    expect(izquierda[0].x).toBeLessThan(derecha[0].x)
+    const abajo = marcos('abajo-derecha')
+    expect(abajo[0].y).toBeGreaterThan(derecha[0].y)
+  })
+
+  it('corre el nombre al lado libre cuando el medallon va abajo', () => {
+    const nombreX = (esquina) => {
+      const plano = maquetar(enRetratos({ esquinaVoluntario: esquina }), ROSTER, opciones)
+      const celda = celdasDe(plano)[0]
+      return plano.ordenes.find(
+        (o) => o.tipo === 'texto' && o.color === COLORES.blanco && o.y > celda.y + celda.alto * 0.7).x
+    }
+    // Con el medallon arriba el nombre va centrado; abajo a la derecha se corre
+    // a la izquierda, y abajo a la izquierda se corre a la derecha.
+    const centrado = nombreX('arriba-derecha')
+    expect(nombreX('abajo-derecha')).toBeLessThan(centrado)
+    expect(nombreX('abajo-izquierda')).toBeGreaterThan(centrado)
+  })
+
+  it('ensancha la imagen cuando hay mas participantes, en vez de achicar la cara', () => {
+    const muchos = {
+      ...enRetratos(),
+      grupos: LISTA.grupos.map((g, i) => (i === 0
+        ? { ...g, filas: Array.from({ length: 14 }, (_, n) => ({ participantes: [`p${n + 1}`], voluntarios: [] })) }
+        : g)),
+    }
+    const rosterGrande = {
+      ...ROSTER,
+      participantes: Array.from({ length: 14 }, (_, n) => ({ id: `p${n + 1}`, nombre: `Chico ${n + 1}`, grupo: 1, activo: true })),
+    }
+    const plano = maquetar(muchos, rosterGrande, opciones)
+    expect(plano.ancho).toBeGreaterThan(ANCHO)
+    expect(celdasDe(plano)[0].ancho).toBe(anchoDeCeldaRetratos(56))
   })
 })

@@ -100,6 +100,49 @@ export const GRILLA = Object.freeze({
   aireLlave: 10,
 })
 
+// Medidas del formato "Retratos": la foto ocupa toda la celda y los nombres van
+// adentro. Los factores son fracciones del ancho de la celda, no pixeles fijos,
+// para que la celda pueda cambiar de tamaño sin desarmar la proporcion.
+export const RETRATOS = Object.freeze({
+  porFila: 5,
+  separacion: 16,
+  proporcionCelda: 1.81,   // alto sobre ancho
+  radioFoto: 16,
+  filasObjetivo: 2,
+  margenInferior: 12,
+  // Franja del nombre del participante, al pie de la foto.
+  factorNombre: 0.145,
+  aireFranja: 0.055,
+  pisoNombre: 0.7,         // no se achica mas alla de esta fraccion
+  // Medallon del voluntario. Vertical a proposito: a igual ancho da 3 px mas de
+  // nombre que el cuadrado, porque la franja no le come la cara.
+  factorMedallon: 0.36,
+  proporcionMedallon: 1.28,
+  insetMedallon: 0.05,
+  pasoMedallon: 1.08,
+  radioMedallon: 0.20,
+  bordeMedallon: 0.055,
+  franjaMedallon: 0.30,
+  factorNombreMedallon: 0.62,
+  factorInicialesMedallon: 0.34,
+})
+
+export const ESQUINAS = Object.freeze(['arriba-derecha', 'arriba-izquierda', 'abajo-derecha', 'abajo-izquierda'])
+export const ESQUINA_POR_DEFECTO = 'arriba-derecha'
+
+export function esDerecha(esquina) { return esquina === 'arriba-derecha' || esquina === 'abajo-derecha' }
+export function esAbajo(esquina) { return esquina === 'abajo-derecha' || esquina === 'abajo-izquierda' }
+
+// Baja el tamaño de letra hasta que el texto entre en el ancho dado. Devuelve el
+// tamaño con el que quedo, que puede ser el minimo aunque todavia no entre: quien
+// llama decide que hacer en ese caso.
+export function ajustarTexto(texto, ancho, px, minimo, fuenteDe, medirTexto) {
+  let actual = Math.round(px)
+  const piso = Math.max(1, Math.round(minimo))
+  while (actual > piso && medirTexto(texto, fuenteDe(actual)) > ancho) actual -= 1
+  return actual
+}
+
 export function anchoDeCeldaGrilla(margen, columnas = GRILLA.porFila, ancho = ANCHO) {
   const total = ancho - margen * 2 - GRILLA.separacion * (columnas - 1)
   return Math.floor(total / columnas)
@@ -110,6 +153,13 @@ export function anchoDeCeldaGrilla(margen, columnas = GRILLA.porFila, ancho = AN
 // las fotos desparramadas a lo ancho.
 export function columnasNecesarias(maxPorGrupo) {
   return Math.max(GRILLA.porFila, Math.ceil(maxPorGrupo / GRILLA.filasObjetivo))
+}
+
+// Retratos usa la misma celda y la misma separacion que la grilla, asi que
+// ensancha igual. Se expone aparte para que un cambio en uno no arrastre al otro.
+export function anchoDeCeldaRetratos(margen, columnas = RETRATOS.porFila, ancho = ANCHO) {
+  const total = ancho - margen * 2 - RETRATOS.separacion * (columnas - 1)
+  return Math.floor(total / columnas)
 }
 
 // Ancho de imagen que hace falta para esa cantidad de columnas, manteniendo la

@@ -5,6 +5,11 @@ import { activos } from './roster.js'
 // a cada chico de un vistazo.
 export const FORMATO_POR_DEFECTO = 'grilla'
 
+// En que esquina de la foto del participante van los medallones de los
+// voluntarios. Solo lo usa el formato "retratos". Arriba a la derecha porque las
+// caras se encuadran al centro, asi que esa esquina casi siempre es fondo.
+export const ESQUINA_VOLUNTARIO_POR_DEFECTO = 'arriba-derecha'
+
 export const SALUDO_POR_DEFECTO =
   'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'
 export const DESPEDIDA_POR_DEFECTO = 'Nos vemos mañana. Gracias a todos.'
@@ -38,6 +43,7 @@ export function crearLista(fecha, roster, base = {}) {
     grupos,
     opcionesImagen: {
       saludo: true, despedida: true, fotos: true, compacto: false, formato: FORMATO_POR_DEFECTO,
+      esquinaVoluntario: ESQUINA_VOLUNTARIO_POR_DEFECTO,
     },
   }
 }

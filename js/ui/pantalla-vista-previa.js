@@ -4,7 +4,9 @@ import { pintar } from '../imagen/pintar.js'
 import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
-import { SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO } from '../modelo/lista.js'
+import {
+  SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO,
+} from '../modelo/lista.js'
 
 // El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
 // El archivo que se descarga mide, entonces, el doble que el plano.
@@ -73,6 +75,16 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     ['filas', 'Lista, uno por renglón'],
     ['columnas', 'Dos columnas, foto grande'],
     ['grilla', 'Grilla, foto vertical'],
+    ['retratos', 'Retratos, nombres adentro'],
+  ]
+
+  // Solo tiene sentido en "retratos": es el unico formato donde el voluntario
+  // aparece como medallon sobre la foto del chico.
+  const ESQUINAS_VOLUNTARIO = [
+    ['arriba-derecha', 'Arriba a la derecha'],
+    ['arriba-izquierda', 'Arriba a la izquierda'],
+    ['abajo-derecha', 'Abajo a la derecha'],
+    ['abajo-izquierda', 'Abajo a la izquierda'],
   ]
 
   function selectorDeFormato() {
@@ -89,6 +101,28 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     selector.value = lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO
     selector.addEventListener('change', () => {
       lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: selector.value } }
+      alCambiar(lista)
+      redibujar()
+    })
+    caja.appendChild(selector)
+    return caja
+  }
+
+  function selectorDeEsquina() {
+    if ((lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO) !== 'retratos') return null
+    const caja = elemento('label', ['campo', 'campo-formato'])
+    caja.appendChild(elemento('span', ['campo-rotulo'], 'Esquina de los voluntarios'))
+    const selector = document.createElement('select')
+    selector.dataset.campo = 'esquina-voluntario'
+    ESQUINAS_VOLUNTARIO.forEach(([valor, rotulo]) => {
+      const opcion = document.createElement('option')
+      opcion.value = valor
+      opcion.textContent = rotulo
+      selector.appendChild(opcion)
+    })
+    selector.value = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
+    selector.addEventListener('change', () => {
+      lista = { ...lista, opcionesImagen: { ...lista.opcionesImagen, esquinaVoluntario: selector.value } }
       alCambiar(lista)
       redibujar()
     })
@@ -218,6 +252,8 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     vaciar(raiz)
     calcular()
     raiz.appendChild(selectorDeFormato())
+    const esquina = selectorDeEsquina()
+    if (esquina) raiz.appendChild(esquina)
     raiz.appendChild(interruptores())
     raiz.appendChild(mensajes())
     raiz.appendChild(informacion())

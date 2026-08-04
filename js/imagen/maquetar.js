@@ -1,6 +1,5 @@
 import {
-  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA,
-  anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas,
+  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas, RETRATOS, ESQUINA_POR_DEFECTO, esDerecha, esAbajo, ajustarTexto, anchoDeCeldaRetratos,
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { FORMATO_POR_DEFECTO } from '../modelo/lista.js'
@@ -20,11 +19,14 @@ export function maquetar(lista, roster, opciones = {}) {
   const porId = indexar(roster)
 
   // Tres formatos: apilado, una fila por participante; en columnas, dos por fila;
-  // y grilla, con la foto vertical y el nombre debajo. La cabecera, los titulos,
-  // los apoyos y las bandas son iguales en los tres: cambia el cuerpo del grupo.
+  // y grilla, con la foto vertical y el nombre debajo, y retratos, con los nombres
+  // adentro de la foto. La cabecera, los titulos, los apoyos y las bandas son
+  // iguales en todos: lo unico que cambia es el cuerpo del grupo.
   // Una lista guardada antes de que existieran los formatos, o con un valor que
   // no reconocemos, sale en el formato por defecto en lugar de fallar.
-  const formato = ['filas', 'columnas', 'grilla'].includes(lista.opcionesImagen?.formato)
+  // Los validos salen del despachador y no de una lista escrita a mano, porque
+  // esa lista ya se quedo atras una vez y dejo un formato elegible pero muerto.
+  const formato = Object.prototype.hasOwnProperty.call(CUERPOS, lista.opcionesImagen?.formato ?? '')
     ? lista.opcionesImagen.formato
     : FORMATO_POR_DEFECTO
 
@@ -33,10 +35,12 @@ export function maquetar(lista, roster, opciones = {}) {
   // no se achica dentro del archivo. Los otros dos formatos conservan el ancho fijo.
   const masPobladoDelGrupo = Math.max(1, ...lista.grupos.map((g) => g.filas.length))
   const columnasGrilla = columnasNecesarias(masPobladoDelGrupo)
-  const ancho = formato === 'grilla'
-    ? anchoParaColumnas(columnasGrilla, base.margen)
-    : ANCHO
-  const m = { ...base, ancho, columnasGrilla }
+  const ensancha = formato === 'grilla' || formato === 'retratos'
+  const ancho = ensancha ? anchoParaColumnas(columnasGrilla, base.margen) : ANCHO
+  const m = {
+    ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
+    esquinaVoluntario: lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO,
+  }
 
   const ordenes = []
   let y = 0
@@ -435,6 +439,123 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   return cursor
 }
 
+// El medallon del voluntario: repite la receta de la celda grande, foto arriba y
+// franja del color del grupo abajo con el nombre. Asi las dos piezas se leen como
+// lo mismo, una grande y una chica.
+function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, clave, medirTexto) {
+  const borde = Math.max(2, Math.round(ancho * RETRATOS.bordeMedallon))
+  const radio = Math.round(ancho * RETRATOS.radioMedallon)
+  // El marco blanco despega el medallon de la foto de abajo aunque las dos sean
+  // claras, que es lo unico que las separa cuando no hay sombra.
+  ordenes.push({ tipo: 'rect', x, y, ancho, alto, color: COLORES.blanco, radio, fila: clave })
+
+  const ix = x + borde, iy = y + borde
+  const iAncho = ancho - borde * 2, iAlto = alto - borde * 2
+  const radioInterno = Math.max(1, radio - Math.round(borde * 0.5))
+  const franja = Math.round(iAlto * RETRATOS.franjaMedallon)
+
+  if (voluntario.foto) {
+    ordenes.push({ tipo: 'imagen', clave: voluntario.foto, x: ix, y: iy,
+      ancho: iAncho, alto: iAlto, radio: radioInterno, fila: clave })
+  } else {
+    ordenes.push({ tipo: 'rect', x: ix, y: iy, ancho: iAncho, alto: iAlto,
+      color: COLORES.violetaTenue, radio: radioInterno, fila: clave })
+    ordenes.push({ tipo: 'texto', texto: iniciales(voluntario.nombre),
+      x: ix + iAncho / 2, y: iy + (iAlto - franja) / 2,
+      fuente: FUENTES.titulo(Math.round(iAncho * RETRATOS.factorInicialesMedallon)),
+      color: COLORES.violeta, alineacion: 'center', lineaBase: 'middle', fila: clave })
+  }
+
+  ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,
+    color, fila: clave })
+  const nombre = voluntario.nombre + (voluntario.nuevo ? ' (nuevo)' : '')
+  const px = ajustarTexto(nombre, iAncho - borde * 2,
+    Math.round(franja * RETRATOS.factorNombreMedallon), 7, FUENTES.normal, medirTexto)
+  ordenes.push({ tipo: 'texto', texto: nombre, x: ix + iAncho / 2, y: iy + iAlto - franja / 2,
+    fuente: FUENTES.normal(px), color: COLORES.blanco,
+    alineacion: 'center', lineaBase: 'middle', fila: clave })
+}
+
+function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
+  const columnas = m.columnasRetratos ?? RETRATOS.porFila
+  const ancho = anchoDeCeldaRetratos(m.margen)
+  const alto = Math.round(ancho * RETRATOS.proporcionCelda)
+  const altoCelda = alto + RETRATOS.margenInferior
+  const color = colorDeGrupo(grupo.numero).fuerte
+  const esquina = m.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
+  const derecha = esDerecha(esquina)
+  const abajo = esAbajo(esquina)
+
+  const pxBase = Math.round(ancho * RETRATOS.factorNombre)
+  const aire = Math.round(ancho * RETRATOS.aireFranja)
+  const altoFranja = aire * 2 + pxBase
+  const anchoMed = Math.round(ancho * RETRATOS.factorMedallon)
+  const altoMed = Math.round(anchoMed * RETRATOS.proporcionMedallon)
+  const inset = Math.round(ancho * RETRATOS.insetMedallon)
+  const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
+
+  let cursor = y
+  grupo.filas.forEach((fila, i) => {
+    const columna = i % columnas
+    const x = m.margen + columna * (ancho + RETRATOS.separacion)
+    const arriba = cursor
+    const clave = fila.participantes[0]
+    const participantes = fila.participantes.map((id) => buscar(porId, id))
+    if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
+    const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
+
+    const primero = participantes[0]
+    ordenes.push({ tipo: 'rect', x, y: arriba, ancho, alto,
+      color: colorDeGrupo(grupo.numero).tenue, radio: RETRATOS.radioFoto, fila: clave })
+    if (conFotos && primero.foto) {
+      ordenes.push({ tipo: 'imagen', clave: primero.foto, x, y: arriba, ancho, alto,
+        radio: RETRATOS.radioFoto, fila: clave })
+    } else {
+      ordenes.push({ tipo: 'texto', texto: iniciales(primero.nombre),
+        x: x + ancho / 2, y: arriba + (alto - altoFranja) / 2,
+        fuente: FUENTES.titulo(Math.round(ancho * GRILLA.factorIniciales)),
+        color: COLORES.violeta, alineacion: 'center', lineaBase: 'middle', fila: clave })
+    }
+
+    // Con el medallon abajo, el nombre se corre al lado libre para dejarle el
+    // hueco. Es la unica diferencia real entre elegir una esquina de arriba y una
+    // de abajo, y le quita al nombre casi la mitad del ancho.
+    const hueco = abajo ? anchoMed + inset * 2 : 0
+    const anchoNombre = ancho - hueco - inset * 2
+    const centro = abajo
+      ? (derecha ? x + inset + anchoNombre / 2 : x + ancho - inset - anchoNombre / 2)
+      : x + ancho / 2
+
+    ordenes.push({ tipo: 'rect', x, y: arriba + alto - altoFranja, ancho, alto: altoFranja,
+      color, fila: clave })
+    // Si ni achicado entra, se muestra solo el primer nombre: un renglon de mas
+    // empujaria la franja hacia la cara del chico, que es lo unico que no queremos tapar.
+    let nombre = participantes.map((p) => p.nombre).join(' / ')
+    let px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
+      FUENTES.titulo, medirTexto)
+    if (medirTexto(nombre, FUENTES.titulo(px)) > anchoNombre) {
+      nombre = nombre.split(' ')[0]
+      px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
+        FUENTES.titulo, medirTexto)
+    }
+    ordenes.push({ tipo: 'texto', texto: nombre, x: centro, y: arriba + alto - altoFranja / 2,
+      fuente: FUENTES.titulo(px), color: COLORES.blanco,
+      alineacion: 'center', lineaBase: 'middle', fila: clave })
+
+    voluntarios.forEach((voluntario, n) => {
+      const mx = derecha ? x + ancho - inset - anchoMed : x + inset
+      const base = abajo
+        ? arriba + alto - altoFranja / 2 - altoMed / 2
+        : arriba + inset
+      const my = abajo ? base - paso * n : base + paso * n
+      medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto)
+    })
+
+    if (columna === columnas - 1 || i === grupo.filas.length - 1) cursor += altoCelda
+  })
+  return cursor
+}
+
 function cuerpoApilado(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   let cursor = y
   grupo.filas.forEach((fila) => {
@@ -460,6 +581,7 @@ const CUERPOS = {
   filas: cuerpoApilado,
   columnas: cuerpoEnColumnas,
   grilla: cuerpoEnGrilla,
+  retratos: cuerpoEnRetratos,
 }
 
 function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medirTexto, numeroGrupo) {
