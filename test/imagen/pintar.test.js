@@ -97,12 +97,15 @@ describe('pintar', () => {
     expect(ctx.llamadas.some((l) => l.nombre === 'arc')).toBe(false)
   })
 
-  it('una imagen sin radio ni circular se dibuja sin recorte', () => {
+  it('una imagen sin esquinas redondeadas igual se recorta, con un clip recto', () => {
+    // El recorte lo hace siempre el clip: la imagen se dibuja agrandada para
+    // tapar el hueco, asi que sin clip se derramaria sobre lo de al lado.
     const ctx = contextoFalso()
     pintar(ctx, plano([
       { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 30, alto: 40 },
     ]), { 'f.jpg': {} }, 1)
-    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(false)
+    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(true)
+    expect(ctx.llamadas.some((l) => l.nombre === 'rect')).toBe(true)
     expect(ctx.llamadas.some((l) => l.nombre === 'drawImage')).toBe(true)
   })
 
@@ -112,23 +115,24 @@ describe('pintar', () => {
     pintar(ctx, plano([
       { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 180, alto: 240, radio: 16 },
     ]), { 'f.jpg': { naturalWidth: 400, naturalHeight: 400 } }, 1)
-    const dibujo = ctx.llamadas.find((l) => l.nombre === 'drawImage')
-    // Nueve argumentos: se recorta el origen, no se estira el destino.
-    expect(dibujo.args).toHaveLength(9)
-    const [, sx, sy, sw, sh] = dibujo.args
-    expect(sw).toBeCloseTo(300, 0)   // 400 * (180/240)
-    expect(sh).toBeCloseTo(400, 0)
-    expect(sx).toBeCloseTo(50, 0)    // centrado
-    expect(sy).toBeCloseTo(0, 0)
+    const [, x, y, ancho, alto] = ctx.llamadas.find((l) => l.nombre === 'drawImage').args
+    // Cubre el hueco sin deformar: la cuadrada crece hasta el alto de la celda
+    // y lo que sobra a los costados queda fuera del clip.
+    expect(alto).toBeCloseTo(240, 0)
+    expect(ancho).toBeCloseTo(240, 0)
+    expect(ancho / alto).toBeCloseTo(400 / 400, 5)
+    // Y queda centrada en el hueco, no pegada a un costado.
+    expect(x + ancho / 2).toBeCloseTo(90, 5)
+    expect(y + alto / 2).toBeCloseTo(120, 5)
   })
 
-  it('una foto ya proporcionada se dibuja entera', () => {
+  it('una foto ya proporcionada llena el hueco justo, sin sobrar', () => {
     const ctx = contextoFalso()
     pintar(ctx, plano([
       { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 180, alto: 240 },
     ]), { 'f.jpg': { naturalWidth: 300, naturalHeight: 400 } }, 1)
-    const [, sx, sy, sw, sh] = ctx.llamadas.find((l) => l.nombre === 'drawImage').args
-    expect([sx, sy, sw, sh]).toEqual([0, 0, 300, 400])
+    const [, x, y, ancho, alto] = ctx.llamadas.find((l) => l.nombre === 'drawImage').args
+    expect([x, y, ancho, alto]).toEqual([0, 0, 180, 240])
   })
 
   it('sin dimensiones conocidas cae en el dibujo simple', () => {
@@ -178,5 +182,39 @@ describe('pintar', () => {
     const cantidadTextosEnPlano = planoReal.ordenes.filter((o) => o.tipo === 'texto').length
     const cantidadFillText = ctx.llamadas.filter((l) => l.nombre === 'fillText').length
     expect(cantidadFillText).toBe(cantidadTextosEnPlano)
+  })
+})
+
+describe('recorte de origen de las fotos', () => {
+  it('dibuja sin rectangulo de origen y recorta con clip', () => {
+    const ctx = contextoFalso()
+    const fuente = { width: 400, height: 400 }
+    // Medidas reales del medallon en el tamaño Mediano, que es donde se reporto.
+    const plano = { ancho: 200, alto: 200, ordenes: [
+      { tipo: 'imagen', clave: 'f', x: 10, y: 20, ancho: 88, alto: 114, radio: 17 },
+    ] }
+    pintar(ctx, plano, { f: fuente }, 1)
+    const dibujo = ctx.llamadas.find((l) => l.nombre === 'drawImage')
+    // Cinco argumentos, no nueve: el recorte lo hace el clip. En Safari la forma
+    // de nueve no dibujaba nada con el medallon chico.
+    expect(dibujo.args).toHaveLength(5)
+    const [, x, y, ancho, alto] = dibujo.args
+    // La imagen se agranda hasta tapar el hueco y queda centrada en el.
+    // Coma flotante: 114 puede salir 113.9999..., asi que se compara con holgura.
+    expect(ancho).toBeGreaterThan(87.9)
+    expect(alto).toBeGreaterThan(113.9)
+    expect(x + ancho / 2).toBeCloseTo(10 + 88 / 2, 5)
+    expect(y + alto / 2).toBeCloseTo(20 + 114 / 2, 5)
+    // Y se recorta con un clip, siempre.
+    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(true)
+  })
+
+  it('recorta con clip tambien cuando la orden no pide esquinas redondeadas', () => {
+    const ctx = contextoFalso()
+    const plano = { ancho: 200, alto: 200, ordenes: [
+      { tipo: 'imagen', clave: 'f', x: 0, y: 0, ancho: 50, alto: 50 },
+    ] }
+    pintar(ctx, plano, { f: { width: 400, height: 400 } }, 1)
+    expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(true)
   })
 })

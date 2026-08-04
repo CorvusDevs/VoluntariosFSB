@@ -121,32 +121,33 @@ function imagen(ctx, o, imagenes) {
   if (!fuente) return
   ctx.save()
   try {
+    // El recorte lo hace SIEMPRE un clip, y la imagen se dibuja entera y
+    // agrandada hasta tapar el hueco. Antes se recortaba con el rectangulo de
+    // origen de drawImage, su forma de nueve argumentos: en Safari esa forma no
+    // dibujaba nada con el medallon chico, aunque el mismo codigo funcionara con
+    // el grande y en otros navegadores. Esta version usa la de cinco argumentos,
+    // que es otro camino adentro del motor, y ademas es mas simple: una sola
+    // cuenta de escala en vez de cuatro coordenadas de origen.
+    ctx.beginPath()
     if (o.circular) {
-      ctx.beginPath()
       ctx.arc(o.x + o.ancho / 2, o.y + o.alto / 2, o.ancho / 2, 0, Math.PI * 2)
-      ctx.closePath()
-      ctx.clip()
     } else if (o.radio) {
-      // Foto rectangular con esquinas redondeadas, para la grilla.
-      ctx.beginPath()
       ctx.roundRect(o.x, o.y, o.ancho, o.alto, o.radio)
-      ctx.closePath()
-      ctx.clip()
+    } else {
+      ctx.rect(o.x, o.y, o.ancho, o.alto)
     }
-    // Recorte que cubre: la foto guardada es cuadrada y la celda puede no serlo,
-    // asi que en vez de estirarla se toma la porcion centrada que llena el hueco.
+    ctx.closePath()
+    ctx.clip()
+
     const anchoOrigen = fuente.naturalWidth ?? fuente.width ?? 0
     const altoOrigen = fuente.naturalHeight ?? fuente.height ?? 0
     if (anchoOrigen > 0 && altoOrigen > 0) {
+      // Cubrir sin deformar: la foto guardada es cuadrada y el hueco puede no
+      // serlo, asi que se agranda hasta taparlo y lo que sobra queda fuera del clip.
       const escala = Math.max(o.ancho / anchoOrigen, o.alto / altoOrigen)
-      const recorteAncho = o.ancho / escala
-      const recorteAlto = o.alto / escala
-      ctx.drawImage(
-        fuente,
-        (anchoOrigen - recorteAncho) / 2, (altoOrigen - recorteAlto) / 2,
-        recorteAncho, recorteAlto,
-        o.x, o.y, o.ancho, o.alto,
-      )
+      const ancho = anchoOrigen * escala
+      const alto = altoOrigen * escala
+      ctx.drawImage(fuente, o.x - (ancho - o.ancho) / 2, o.y - (alto - o.alto) / 2, ancho, alto)
     } else {
       ctx.drawImage(fuente, o.x, o.y, o.ancho, o.alto)
     }
@@ -154,3 +155,4 @@ function imagen(ctx, o, imagenes) {
     ctx.restore()
   }
 }
+
