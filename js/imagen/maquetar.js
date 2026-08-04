@@ -488,16 +488,19 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
   const radioInterno = Math.max(1, radio - Math.round(borde * 0.5))
   const franja = Math.round(iAlto * RETRATOS.franjaMedallon)
 
+  // Las iniciales van SIEMPRE, y la foto encima si la hay. Antes eran excluyentes,
+  // y cuando la foto no llegaba a dibujarse el medallon quedaba en blanco, sin
+  // decir de quien era. Con las iniciales debajo, lo peor que puede pasar es que
+  // se vean las iniciales, que es exactamente lo que se muestra cuando no hay foto.
+  ordenes.push({ tipo: 'rect', x: ix, y: iy, ancho: iAncho, alto: iAlto,
+    color: COLORES.violetaTenue, radio: radioInterno, fila: clave })
+  ordenes.push({ tipo: 'texto', texto: iniciales(voluntario.nombre),
+    x: ix + iAncho / 2, y: iy + (iAlto - franja) / 2,
+    fuente: FUENTES.titulo(Math.round(iAncho * RETRATOS.factorInicialesMedallon)),
+    color: COLORES.violeta, alineacion: 'center', lineaBase: 'middle', fila: clave })
   if (voluntario.foto) {
     ordenes.push({ tipo: 'imagen', clave: voluntario.foto, x: ix, y: iy,
       ancho: iAncho, alto: iAlto, radio: radioInterno, fila: clave })
-  } else {
-    ordenes.push({ tipo: 'rect', x: ix, y: iy, ancho: iAncho, alto: iAlto,
-      color: COLORES.violetaTenue, radio: radioInterno, fila: clave })
-    ordenes.push({ tipo: 'texto', texto: iniciales(voluntario.nombre),
-      x: ix + iAncho / 2, y: iy + (iAlto - franja) / 2,
-      fuente: FUENTES.titulo(Math.round(iAncho * RETRATOS.factorInicialesMedallon)),
-      color: COLORES.violeta, alineacion: 'center', lineaBase: 'middle', fila: clave })
   }
 
   ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,

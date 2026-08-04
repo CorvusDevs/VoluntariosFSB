@@ -789,6 +789,23 @@ describe('formato retratos', () => {
     })
   })
 
+  it('el medallon nunca queda vacio: iniciales debajo, foto encima', () => {
+    // Antes eran excluyentes. Si la foto no llegaba a dibujarse, el medallon
+    // quedaba en blanco y no decia de quien era. Con las iniciales debajo, lo
+    // peor que puede pasar es que se vean las iniciales.
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const conFoto = ROSTER.voluntarios.find((v) => v.foto)
+    if (!conFoto) return
+    const suyas = plano.ordenes.filter((o) => o.clave === conFoto.foto)
+    expect(suyas.length).toBeGreaterThan(0)
+    const laFoto = suyas[0]
+    const iniciales = plano.ordenes.filter(
+      (o) => o.tipo === 'texto' && o.color === COLORES.violeta && Math.abs(o.x - (laFoto.x + laFoto.ancho / 2)) < 2)
+    expect(iniciales.length).toBeGreaterThan(0)
+    // Y las iniciales van ANTES que la foto, o taparian la cara.
+    expect(plano.ordenes.indexOf(iniciales[0])).toBeLessThan(plano.ordenes.indexOf(laFoto))
+  })
+
   it('abrevia el apellido en la franja, para dejarle lugar al voluntario', () => {
     const conApellido = {
       ...ROSTER,
