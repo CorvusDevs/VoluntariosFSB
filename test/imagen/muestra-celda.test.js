@@ -9,7 +9,7 @@ const roster = {
   voluntarios: [{ id: CLAVES_MUESTRA.voluntario, nombre: 'Alejandro', activo: true, foto: 'v.jpg' }],
 }
 const plano = (formato) => maquetar(
-  listaDeMuestra(formato, 'abajo-derecha', roster.participantes[0], roster.voluntarios[0]),
+  listaDeMuestra({ formato, esquinaVoluntario: 'abajo-derecha', voluntario: roster.voluntarios[0] }),
   roster,
   { saludo: '', despedida: '', medirTexto: medirFalso },
 )
@@ -41,11 +41,38 @@ describe('muestra de una celda para el editor de fotos', () => {
 
   it('funciona igual sin voluntario asignado', () => {
     const sinVol = maquetar(
-      listaDeMuestra('retratos', 'abajo-derecha', roster.participantes[0], null),
+      listaDeMuestra({ formato: 'retratos', esquinaVoluntario: 'abajo-derecha', voluntario: null }),
       { participantes: roster.participantes, voluntarios: [] },
       { saludo: '', despedida: '', medirTexto: medirFalso },
     )
     expect(regionDeFila(sinVol)).not.toBeNull()
+  })
+
+  it('el tamaño y el sobresalido llegan al bosquejo', () => {
+    // Sin esto los tres bosquejos de cada fila salian identicos, y elegir
+    // "Muy grande" se veia exactamente igual que "Mediano".
+    const lado = (tamano) => {
+      const l = listaDeMuestra({
+        formato: 'retratos', esquinaVoluntario: 'superpuesto-derecha',
+        tamanoVoluntario: tamano, voluntario: roster.voluntarios[0],
+      })
+      const p = maquetar(l, roster, { saludo: '', despedida: '', medirTexto: medirFalso })
+      return p.ordenes.find((o) => o.tipo === 'rect' && o.color === '#FFFFFF').ancho
+    }
+    expect(lado('mediano')).toBeLessThan(lado('grande'))
+    expect(lado('grande')).toBeLessThan(lado('enorme'))
+  })
+
+  it('el sobresalido cambia el alto del bosquejo', () => {
+    const alto = (asomo) => {
+      const l = listaDeMuestra({
+        formato: 'retratos', esquinaVoluntario: 'superpuesto-derecha',
+        asomoVoluntario: asomo, voluntario: roster.voluntarios[0],
+      })
+      return maquetar(l, roster, { saludo: '', despedida: '', medirTexto: medirFalso }).alto
+    }
+    expect(alto('apenas')).toBeLessThan(alto('medio'))
+    expect(alto('medio')).toBeLessThan(alto('alto'))
   })
 
   it('devuelve null si esa persona no esta en el plano', () => {

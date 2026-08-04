@@ -10,7 +10,9 @@ const CLAVE_V = 'muestra-voluntario'
 
 // Una lista minima: un chico, un voluntario, y nada mas. El saludo y la
 // despedida se apagan porque solo estorbarian arriba y abajo del recorte.
-export function listaDeMuestra(formato, esquinaVoluntario, participante, voluntario) {
+export function listaDeMuestra({
+  formato, esquinaVoluntario, tamanoVoluntario, asomoVoluntario, voluntario,
+}) {
   return {
     version: 1,
     fecha: '2026-08-08',
@@ -30,7 +32,10 @@ export function listaDeMuestra(formato, esquinaVoluntario, participante, volunta
     }],
     opcionesImagen: {
       saludo: false, despedida: false, fotos: true, compacto: false,
-      formato, esquinaVoluntario,
+      // El tamaño y el sobresalido tienen que viajar hasta aca. Sin ellos los
+      // tres bosquejos de cada fila salian identicos, y elegir "Muy grande" se
+      // veia exactamente igual que "Mediano".
+      formato, esquinaVoluntario, tamanoVoluntario, asomoVoluntario,
     },
   }
 }
@@ -61,9 +66,12 @@ export function regionDeFila(plano, clave = CLAVE_P) {
 // entra con la clave del participante o la del voluntario, segun a quien
 // pertenezca, para que se vea en el lugar que le toca.
 export function dibujarMuestra(lienzo, {
-  formato, esquinaVoluntario, participante, voluntario, imagenes, medirTexto, ancho = 150,
+  formato, esquinaVoluntario, tamanoVoluntario, asomoVoluntario,
+  participante, voluntario, imagenes, medirTexto, ancho = 150,
 }) {
-  const lista = listaDeMuestra(formato, esquinaVoluntario, participante, voluntario)
+  const lista = listaDeMuestra({
+    formato, esquinaVoluntario, tamanoVoluntario, asomoVoluntario, voluntario,
+  })
   const porId = {
     ...(participante ? { [CLAVE_P]: { ...participante, id: CLAVE_P } } : {}),
     ...(voluntario ? { [CLAVE_V]: { ...voluntario, id: CLAVE_V } } : {}),
