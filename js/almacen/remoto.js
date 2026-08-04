@@ -53,7 +53,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
     },
 
     guardarRoster(roster) {
-      return escribirJson(RUTA_ROSTER, roster, `Actualizar personas desde ${autor}`)
+      return escribirJson(RUTA_ROSTER, roster, `Cambiar las personas · ${autor}`)
     },
 
     leerLista(fecha) {
@@ -61,7 +61,8 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
     },
 
     guardarLista(lista) {
-      return escribirJson(rutaLista(lista.fecha), lista, `Actualizar la lista del ${lista.fecha}`)
+      return escribirJson(rutaLista(lista.fecha), lista,
+        `Cambiar la planilla del ${lista.fecha} · ${autor}`)
     },
 
     async listarListas() {
@@ -88,7 +89,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       // Las fotos siguen el mismo camino que el JSON, con la misma salvedad.
       try {
         const resultado = await cliente.escribirBytes(
-          ruta, bytes, shas.get(ruta) ?? null, `Actualizar la foto ${clave}`,
+          ruta, bytes, shas.get(ruta) ?? null, `Cargar la foto de ${clave} · ${autor}`,
         )
         shas.set(ruta, resultado.sha)
       } catch (error) {
@@ -110,7 +111,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
         if (!datos) return
         shas.set(ruta, datos.sha)
       }
-      await cliente.borrar(ruta, shas.get(ruta), `Borrar la foto ${clave}`)
+      await cliente.borrar(ruta, shas.get(ruta), `Quitar la foto de ${clave} · ${autor}`)
       shas.delete(ruta)
     },
   }

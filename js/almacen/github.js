@@ -136,6 +136,24 @@ export function crearClienteGitHub({ token, duenio, repo, rama = 'main', fetchFn
       if (!respuesta.ok && respuesta.status !== 404) await fallar(respuesta, `borrar ${ruta}`)
     },
 
+    // El registro de acciones se lee de los commits del repositorio, no de un
+    // archivo que la aplicacion escriba. Un archivo propio habria que reescribirlo
+    // entero en cada accion, con su conflicto y su crecimiento sin techo; el
+    // historial ya se escribe solo y no se puede editar desde la aplicacion.
+    async listarCommits({ cantidad = 60 } = {}) {
+      const url = `https://api.github.com/repos/${duenio}/${repo}/commits`
+        + `?sha=${encodeURIComponent(rama)}&per_page=${cantidad}`
+      const respuesta = await pedir(url, { headers: cabeceras() })
+      if (respuesta.status === 404) return []
+      if (!respuesta.ok) await fallar(respuesta, 'leer el registro')
+      const datos = await respuesta.json()
+      return datos.map((c) => ({
+        sha: c.sha,
+        mensaje: c.commit?.message ?? '',
+        fecha: c.commit?.author?.date ?? null,
+      }))
+    },
+
     async listar(ruta) {
       const datos = await leerCrudo(ruta)
       if (!datos || !Array.isArray(datos)) return []

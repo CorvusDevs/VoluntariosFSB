@@ -5,6 +5,7 @@ import { crearPantallaPersonas } from './ui/pantalla-personas.js'
 import { crearPantallaVistaPrevia } from './ui/pantalla-vista-previa.js'
 import { crearPantallaIngreso } from './ui/pantalla-ingreso.js'
 import { crearPantallaAjustes } from './ui/pantalla-ajustes.js'
+import { crearPantallaRegistro } from './ui/pantalla-registro.js'
 import { crearLista, sincronizarConRoster } from './modelo/lista.js'
 import { proximoSabado } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
@@ -69,7 +70,10 @@ function navegacion() {
   nav.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
-  if (esAdmin(sesion)) nav.appendChild(ir('ajustes', 'Ajustes'))
+  if (esAdmin(sesion)) {
+    nav.appendChild(ir('registro', 'Registro'))
+    nav.appendChild(ir('ajustes', 'Ajustes'))
+  }
 
   if (sesion) {
     // Tambien para quien coordina, que no tiene pantalla de ajustes donde
@@ -132,6 +136,18 @@ function dibujar() {
         lista = siguiente
         await deposito.guardarLista(lista)
       },
+    })
+  } else if (pantalla === 'registro' && esAdmin(sesion)) {
+    // Se lee del repositorio privado, asi que sin sesion de GitHub no hay nada
+    // que mostrar: en modo local los cambios no dejan rastro compartido.
+    vista = crearPantallaRegistro(cuerpo, {
+      sesion,
+      cliente: crearClienteGitHub({
+        token: sesion?.token,
+        duenio: CONFIG.duenio,
+        repo: CONFIG.repoDatos,
+        rama: CONFIG.rama,
+      }),
     })
   } else if (pantalla === 'ajustes' && esAdmin(sesion)) {
     vista = crearPantallaAjustes(cuerpo, {

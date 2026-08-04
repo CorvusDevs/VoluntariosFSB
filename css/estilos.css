@@ -742,3 +742,24 @@ html, body { max-width: 100%; overflow-x: hidden; }
   white-space: nowrap;
 }
 .boton-cambiar-formato { flex-shrink: 0; padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+
+/* Registro de actividad. Solo administración. */
+.registro-dia {
+  margin: 20px 0 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--violeta);
+}
+.registro-lista { margin: 0; padding: 0; list-style: none; }
+.registro-entrada {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--linea);
+  font-size: 14px;
+}
+.registro-hora { flex-shrink: 0; font-variant-numeric: tabular-nums; color: var(--texto-suave); }
+.registro-accion { flex: 1; min-width: 0; }
+.registro-quien { flex-shrink: 0; color: var(--magenta-texto); font-size: 13px; }
+.registro-entrada.sin-autor .registro-quien { color: var(--texto-suave); font-style: italic; }
