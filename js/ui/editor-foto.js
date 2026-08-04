@@ -1,7 +1,7 @@
 import { elemento, boton, vaciar } from './componentes.js'
 import {
-  recorteDe, mover, reencuadrar, arrastreEnImagen,
-  RECORTE_INICIAL, ZOOM_MINIMO, ZOOM_MAXIMO, limitar,
+  recorteDe, mover, reencuadrar, arrastreEnImagen, girarCentro, espejarCentro,
+  cuartosDeVuelta, tamanoGirado, RECORTE_INICIAL, ZOOM_MINIMO, ZOOM_MAXIMO, limitar,
 } from './recorte.js'
 import { volcarRecorte, aBlob } from './fotos.js'
 import { dibujarMuestra, CLAVES_MUESTRA } from './muestra-celda.js'
@@ -27,7 +27,27 @@ export function crearEditorDeFoto({
   mapa, persona, tipo, acompanante, alGuardar, alCancelar, contenedor = document.body,
 }) {
   let estado = { ...RECORTE_INICIAL }
+  // El giro y el espejo se aplican a la imagen antes de recortar, no al recorte.
+  // Asi todo lo de abajo sigue trabajando contra una sola imagen derecha y no
+  // hay que arrastrar la transformacion por cada cuenta.
+  let giro = 0
+  let espejo = false
+  let fuente = mapa
   const medir = medidorDeTexto()
+
+  function rearmarFuente() {
+    if (cuartosDeVuelta(giro) === 0 && !espejo) { fuente = mapa; return }
+    const { ancho, alto } = tamanoGirado({ ancho: mapa.width, alto: mapa.height }, giro)
+    const c = document.createElement('canvas')
+    c.width = ancho
+    c.height = alto
+    const x = c.getContext('2d')
+    x.translate(ancho / 2, alto / 2)
+    x.rotate((cuartosDeVuelta(giro) * 90 * Math.PI) / 180)
+    if (espejo) x.scale(-1, 1)
+    x.drawImage(mapa, -mapa.width / 2, -mapa.height / 2)
+    fuente = c
+  }
 
   const capa = elemento('div', ['capa-editor'])
   const panel = elemento('section', ['editor-foto'])
@@ -61,13 +81,13 @@ export function crearEditorDeFoto({
   // es lo unico que contesta "que parte se guarda" sin tener que probar y ver.
   function dibujarEditor() {
     const ctx = lienzo.getContext('2d')
-    const r = recorteDe({ ancho: mapa.width, alto: mapa.height, ...estado })
+    const r = recorteDe({ ancho: fuente.width, alto: fuente.height, ...estado })
     ctx.clearRect(0, 0, LADO_EDITOR, LADO_EDITOR)
     // La foto entera, encajada en el cuadro del editor.
-    const escala = Math.min(LADO_EDITOR / mapa.width, LADO_EDITOR / mapa.height)
-    const ax = (LADO_EDITOR - mapa.width * escala) / 2
-    const ay = (LADO_EDITOR - mapa.height * escala) / 2
-    ctx.drawImage(mapa, ax, ay, mapa.width * escala, mapa.height * escala)
+    const escala = Math.min(LADO_EDITOR / fuente.width, LADO_EDITOR / fuente.height)
+    const ax = (LADO_EDITOR - fuente.width * escala) / 2
+    const ay = (LADO_EDITOR - fuente.height * escala) / 2
+    ctx.drawImage(fuente, ax, ay, fuente.width * escala, fuente.height * escala)
 
     const rx = ax + r.x * escala
     const ry = ay + r.y * escala
@@ -86,8 +106,8 @@ export function crearEditorDeFoto({
   }
 
   function dibujarPrevias() {
-    const r = recorteDe({ ancho: mapa.width, alto: mapa.height, ...estado })
-    const recortada = volcarRecorte(mapa, r)
+    const r = recorteDe({ ancho: fuente.width, alto: fuente.height, ...estado })
+    const recortada = volcarRecorte(fuente, r)
     const clave = `${tipo}-editando`
     const imagenes = { [clave]: recortada }
     const yo = { nombre: persona.nombre, nuevo: Boolean(persona.nuevo), foto: clave }
@@ -126,9 +146,9 @@ export function crearEditorDeFoto({
   lienzo.addEventListener('pointermove', (evento) => {
     if (!arrastrando) return
     evento.preventDefault()
-    const escala = Math.min(LADO_EDITOR / mapa.width, LADO_EDITOR / mapa.height)
+    const escala = Math.min(LADO_EDITOR / fuente.width, LADO_EDITOR / fuente.height)
     const { dx, dy } = arrastreEnImagen(arrastrando, { x: evento.clientX, y: evento.clientY }, escala)
-    estado = { ...estado, ...mover({ ancho: mapa.width, alto: mapa.height, ...estado }, dx, dy) }
+    estado = { ...estado, ...mover({ ancho: fuente.width, alto: fuente.height, ...estado }, dx, dy) }
     arrastrando = { x: evento.clientX, y: evento.clientY }
     refrescar()
   })
@@ -141,9 +161,28 @@ export function crearEditorDeFoto({
     const z = limitar(Number(zoom.value), ZOOM_MINIMO, ZOOM_MAXIMO)
     estado = { ...estado, zoom: z }
     // Alejar agranda el recuadro y lo puede dejar pisando el borde.
-    estado = { ...estado, ...reencuadrar({ ancho: mapa.width, alto: mapa.height, ...estado }) }
+    estado = { ...estado, ...reencuadrar({ ancho: fuente.width, alto: fuente.height, ...estado }) }
     refrescar()
   })
+
+  const girarFoto = boton('Girar', () => {
+    giro += 90
+    // El encuadre gira con la imagen: perderlo obligaria a reencuadrar la cara
+    // despues de cada giro.
+    estado = { ...estado, ...girarCentro(estado) }
+    rearmarFuente()
+    estado = { ...estado, ...reencuadrar({ ancho: fuente.width, alto: fuente.height, ...estado }) }
+    refrescar()
+  })
+  girarFoto.dataset.accion = 'girar-foto'
+
+  const espejarFoto = boton('Espejar', () => {
+    espejo = !espejo
+    estado = { ...estado, ...espejarCentro(estado) }
+    rearmarFuente()
+    refrescar()
+  })
+  espejarFoto.dataset.accion = 'espejar-foto'
 
   const centrar = boton('Centrar', () => {
     estado = { ...RECORTE_INICIAL }
@@ -157,8 +196,8 @@ export function crearEditorDeFoto({
   guardar.dataset.accion = 'guardar-foto'
   guardar.addEventListener('click', async () => {
     guardar.disabled = true
-    const r = recorteDe({ ancho: mapa.width, alto: mapa.height, ...estado })
-    const blob = await aBlob(volcarRecorte(mapa, r))
+    const r = recorteDe({ ancho: fuente.width, alto: fuente.height, ...estado })
+    const blob = await aBlob(volcarRecorte(fuente, r))
     cerrar()
     await alGuardar(blob)
   })
@@ -178,7 +217,9 @@ export function crearEditorDeFoto({
   const controles = elemento('div', ['editor-controles'])
   const filaZoom = elemento('label', ['editor-zoom'])
   filaZoom.append(elemento('span', ['campo-rotulo'], 'Acercar'), zoom)
-  controles.append(filaZoom, centrar)
+  controles.append(filaZoom)
+  const herramientas = elemento('div', ['editor-herramientas'])
+  herramientas.append(girarFoto, espejarFoto, centrar)
 
   const tira = elemento('div', ['editor-previas'])
   previas.forEach((p) => tira.appendChild(p.caja))
@@ -191,6 +232,7 @@ export function crearEditorDeFoto({
     elemento('p', ['editor-ayuda'], 'Arrastrá el recuadro para elegir qué parte se ve. Abajo, cómo queda en la planilla.'),
     lienzo,
     controles,
+    herramientas,
     elemento('h3', ['editor-subtitulo'], 'Así va a salir'),
     tira,
     acciones,

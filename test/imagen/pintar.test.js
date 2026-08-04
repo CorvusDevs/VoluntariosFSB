@@ -26,6 +26,7 @@ function contextoFalso() {
     ellipse: registrar('ellipse'),
     rect: registrar('rect'),
     scale: registrar('scale'),
+    translate: registrar('translate'),
     set fillStyle(v) { llamadas.push({ nombre: 'fillStyle', args: [v] }) },
     set strokeStyle(v) { llamadas.push({ nombre: 'strokeStyle', args: [v] }) },
     get strokeStyle() { return '#000' },

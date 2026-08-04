@@ -12,7 +12,7 @@ function contextoFalso() {
     measureText: (t) => ({ width: medirFalso(t, '32px Poppins') }),
     save() {}, restore() {}, beginPath() {}, closePath() {}, fill() {}, stroke() {},
     clip() {}, arc() {}, moveTo() {}, lineTo() {}, fillRect() {}, fillText() {},
-    drawImage() {}, roundRect() {}, scale() {}, ellipse() {}, rect() {},
+    drawImage() {}, roundRect() {}, scale() {}, translate() {}, ellipse() {}, rect() {},
     set lineJoin(v) {}, set lineCap(v) {}, get strokeStyle() { return '#000' },
     set fillStyle(v) {}, set strokeStyle(v) {}, set font(v) {},
     set textAlign(v) {}, set textBaseline(v) {}, set lineWidth(v) {},

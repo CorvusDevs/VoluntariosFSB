@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   recorteDe, centroDe, mover, reencuadrar, limitar, arrastreEnImagen, ZOOM_MAXIMO,
+  girarCentro, espejarCentro, cuartosDeVuelta, tamanoGirado,
 } from '../../js/ui/recorte.js'
 
 describe('recorte de la foto', () => {
@@ -90,5 +91,39 @@ describe('recorte de la foto', () => {
     expect(limitar(-1, 0, 10)).toBe(0)
     expect(limitar(11, 0, 10)).toBe(10)
     expect(limitar(undefined, 0, 10)).toBe(0)
+  })
+})
+
+describe('girar y espejar', () => {
+  it('un cuarto de vuelta lleva el encuadre con la imagen', () => {
+    // Volver al centro obligaria a reencuadrar despues de cada giro, que es el
+    // trabajo que el editor vino a evitar.
+    expect(girarCentro({ centroX: 0.2, centroY: 0.9 })).toEqual({ centroX: 0.09999999999999998, centroY: 0.2 })
+    // Cuatro giros devuelven el encuadre a donde estaba.
+    let c = { centroX: 0.3, centroY: 0.8 }
+    for (let i = 0; i < 4; i += 1) c = girarCentro(c)
+    expect(c.centroX).toBeCloseTo(0.3)
+    expect(c.centroY).toBeCloseTo(0.8)
+  })
+
+  it('espejar da vuelta solo el eje horizontal', () => {
+    expect(espejarCentro({ centroX: 0.25, centroY: 0.6 })).toEqual({ centroX: 0.75, centroY: 0.6 })
+    const ida = espejarCentro({ centroX: 0.25, centroY: 0.6 })
+    expect(espejarCentro(ida)).toEqual({ centroX: 0.25, centroY: 0.6 })
+  })
+
+  it('los cuartos de vuelta quedan entre 0 y 3 aunque lleguen raros', () => {
+    expect(cuartosDeVuelta(0)).toBe(0)
+    expect(cuartosDeVuelta(90)).toBe(1)
+    expect(cuartosDeVuelta(360)).toBe(0)
+    expect(cuartosDeVuelta(450)).toBe(1)
+    expect(cuartosDeVuelta(-90)).toBe(3)
+  })
+
+  it('al girar de costado se dan vuelta el ancho y el alto', () => {
+    expect(tamanoGirado({ ancho: 800, alto: 600 }, 0)).toEqual({ ancho: 800, alto: 600 })
+    expect(tamanoGirado({ ancho: 800, alto: 600 }, 90)).toEqual({ ancho: 600, alto: 800 })
+    expect(tamanoGirado({ ancho: 800, alto: 600 }, 180)).toEqual({ ancho: 800, alto: 600 })
+    expect(tamanoGirado({ ancho: 800, alto: 600 }, 270)).toEqual({ ancho: 600, alto: 800 })
   })
 })

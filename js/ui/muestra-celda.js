@@ -82,21 +82,13 @@ export function dibujarMuestra(lienzo, {
   }
   const plano = maquetar(lista, roster, { saludo: '', despedida: '', medirTexto })
 
-  const completo = document.createElement('canvas')
-  pintar(completo.getContext('2d'), plano, imagenes, 1)
-
   const region = regionDeFila(plano)
   if (!region) return null
-  const escala = ancho / region.ancho
-  lienzo.width = Math.round(region.ancho * escala)
-  lienzo.height = Math.round(region.alto * escala)
-  const ctx = lienzo.getContext('2d')
-  ctx.clearRect(0, 0, lienzo.width, lienzo.height)
-  ctx.drawImage(
-    completo,
-    region.x, region.y, region.ancho, region.alto,
-    0, 0, lienzo.width, lienzo.height,
-  )
+  // Se pinta derecho sobre el lienzo del bosquejo, con el recorte y la escala
+  // adentro del pintor. Antes se pintaba la planilla entera en un lienzo aparte
+  // y se copiaba un pedazo con drawImage: ese rebote no aportaba nada y era el
+  // unico paso que quedaba sin verificar cuando un bosquejo salia mal.
+  pintar(lienzo.getContext('2d'), plano, imagenes, ancho / region.ancho, region)
   return region
 }
 

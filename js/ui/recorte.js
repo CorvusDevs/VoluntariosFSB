@@ -65,3 +65,29 @@ export function reencuadrar({ ancho, alto, zoom, centroX, centroY }) {
 }
 
 export const RECORTE_INICIAL = Object.freeze({ zoom: 1, centroX: 0.5, centroY: 0.5 })
+
+// Girar y espejar. El recuadro elegido se lleva con la imagen en vez de volver
+// al centro: si alguien ya encuadro la cara y despues gira, perder el encuadre
+// obliga a rehacerlo, que es justo el trabajo que el editor vino a evitar.
+//
+// Un cuarto de vuelta a la derecha manda el eje X al Y: lo que estaba a la
+// izquierda queda arriba.
+export function girarCentro({ centroX, centroY }) {
+  return { centroX: 1 - centroY, centroY: centroX }
+}
+
+export function espejarCentro({ centroX, centroY }) {
+  return { centroX: 1 - centroX, centroY }
+}
+
+// Cuantos cuartos de vuelta, siempre entre 0 y 3, aunque lleguen negativos o
+// pasados de 360.
+export function cuartosDeVuelta(giro) {
+  return ((Math.round(Number(giro) / 90) % 4) + 4) % 4
+}
+
+// El tamaño que ocupa la imagen despues de girarla: en los cuartos impares se
+// dan vuelta el ancho y el alto.
+export function tamanoGirado({ ancho, alto }, giro) {
+  return cuartosDeVuelta(giro) % 2 === 1 ? { ancho: alto, alto: ancho } : { ancho, alto }
+}

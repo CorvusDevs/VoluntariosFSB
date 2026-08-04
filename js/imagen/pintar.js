@@ -4,13 +4,21 @@ import { COLORES } from './tema.js'
 // no tenga que repetirlos: la lista escrita a mano ya se quedo atras una vez.
 export const TIPOS = Object.freeze(['rect', 'circulo', 'linea', 'texto', 'imagen', 'icono'])
 
-export function pintar(ctx, plano, imagenes = {}, densidad = 1) {
-  ctx.canvas.width = plano.ancho * densidad
-  ctx.canvas.height = plano.alto * densidad
+// `recorte` pinta solo ese pedazo del plano, con el lienzo ya del tamaño justo.
+// Existe para los bosquejos: antes pintaban la planilla entera en un lienzo
+// aparte y despues copiaban un pedazo con drawImage. Ese rebote entre lienzos
+// era el unico paso sin verificar entre "el plano esta bien", que se probo, y
+// "el bosquejo se ve mal". Pintar derecho lo saca del medio y ademas evita
+// construir un lienzo grande por cada opcion.
+export function pintar(ctx, plano, imagenes = {}, densidad = 1, recorte = null) {
+  const marco = recorte ?? { x: 0, y: 0, ancho: plano.ancho, alto: plano.alto }
+  ctx.canvas.width = Math.round(marco.ancho * densidad)
+  ctx.canvas.height = Math.round(marco.alto * densidad)
   ctx.scale(densidad, densidad)
+  ctx.translate(-marco.x, -marco.y)
 
   ctx.fillStyle = COLORES.fondo
-  ctx.fillRect(0, 0, plano.ancho, plano.alto)
+  ctx.fillRect(marco.x, marco.y, marco.ancho, marco.alto)
 
   plano.ordenes.forEach((orden) => {
     switch (orden.tipo) {

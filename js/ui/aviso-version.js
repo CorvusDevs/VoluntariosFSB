@@ -11,9 +11,22 @@ import { VERSION } from '../version.js'
 // version se esta corriendo y si el servidor ya tiene otra.
 const RUTA = 'version.json'
 
-export function sello() {
-  const p = elemento('p', ['sello-version'], `Versión ${VERSION}`)
+// Con el trabajador controlando la pagina, lo que se ve es lo publicado. Sin el,
+// puede ser lo que quedo en la cache del navegador. Decirlo evita la pregunta
+// que ya nos costo varias vueltas: "¿esta roto o todavia no me llego?".
+export function trabajadorAlMando(navegador = typeof navigator !== 'undefined' ? navigator : null) {
+  return Boolean(navegador?.serviceWorker?.controller)
+}
+
+export function sello(navegador) {
+  const alMando = trabajadorAlMando(navegador)
+  const p = elemento('p', ['sello-version'])
   p.dataset.version = VERSION
+  p.dataset.trabajador = alMando ? 'si' : 'no'
+  p.appendChild(elemento('span', [], `Versión ${VERSION}`))
+  p.appendChild(elemento('span', ['sello-estado'], alMando
+    ? ' · al día'
+    : ' · recargá una vez para activar las actualizaciones'))
   return p
 }
 
