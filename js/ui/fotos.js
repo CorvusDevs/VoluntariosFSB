@@ -10,14 +10,26 @@ export function calcularRecorteCuadrado(ancho, alto) {
   }
 }
 
-export async function procesarFoto(archivo) {
-  const mapa = await createImageBitmap(archivo)
-  const { x, y, lado } = calcularRecorteCuadrado(mapa.width, mapa.height)
+// Vuelca un recorte cuadrado de la imagen al tamaño en que se guardan las fotos.
+// Recibe el recuadro ya calculado para no repetir la geometria en dos lugares.
+export function volcarRecorte(mapa, { x, y, lado }) {
   const lienzo = document.createElement('canvas')
   lienzo.width = LADO_FOTO
   lienzo.height = LADO_FOTO
   const ctx = lienzo.getContext('2d')
   ctx.drawImage(mapa, x, y, lado, lado, 0, 0, LADO_FOTO, LADO_FOTO)
-  mapa.close()
+  return lienzo
+}
+
+export function aBlob(lienzo) {
   return new Promise((resolver) => lienzo.toBlob(resolver, 'image/jpeg', CALIDAD))
+}
+
+// El recorte centrado de siempre, para cuando no se pasa por el editor.
+export async function procesarFoto(archivo) {
+  const mapa = await createImageBitmap(archivo)
+  const recorte = calcularRecorteCuadrado(mapa.width, mapa.height)
+  const lienzo = volcarRecorte(mapa, recorte)
+  mapa.close()
+  return aBlob(lienzo)
 }

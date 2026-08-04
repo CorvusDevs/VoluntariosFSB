@@ -1,6 +1,6 @@
 import { elemento, boton, vaciar } from './componentes.js'
 import { activos, agregarParticipante, agregarVoluntario, desactivarPersona, editarPersona } from '../modelo/roster.js'
-import { procesarFoto } from './fotos.js'
+import { crearEditorDeFoto } from './editor-foto.js'
 
 export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
   let actual = roster
@@ -57,6 +57,26 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     return caja
   }
 
+  // Para la vista previa hace falta alguien del otro lado: si estoy editando a un
+  // chico, un voluntario que se le superponga, y al reves. Se elige el primero
+  // que tenga foto cargada, que es el que mejor muestra como queda el medallon.
+  async function acompananteDeMuestra(tipo) {
+    const lista = tipo === 'participante' ? actual.voluntarios : actual.participantes
+    const candidatos = activos(lista)
+    const persona = candidatos.find((p) => p.foto) ?? candidatos[0]
+    if (!persona) return null
+    let imagen = null
+    if (persona.foto) {
+      try {
+        const blob = await almacen.leerFoto(persona.foto)
+        if (blob) imagen = await createImageBitmap(blob)
+      } catch {
+        imagen = null
+      }
+    }
+    return { nombre: persona.nombre, nuevo: persona.nuevo, foto: persona.foto, imagen }
+  }
+
   function filaPersona(persona, tipo) {
     const fila = elemento('div', ['fila-persona'])
     fila.dataset.id = persona.id
@@ -105,10 +125,22 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     foto.addEventListener('change', async () => {
       const archivo = foto.files?.[0]
       if (!archivo) return
-      const blob = await procesarFoto(archivo)
-      const clave = `${persona.id}.jpg`
-      await almacen.guardarFoto(clave, blob)
-      await guardar(editarPersona(actual, persona.id, { foto: clave }))
+      // Antes se guardaba el recorte centrado sin preguntar, y si la cara caia
+      // fuera del centro no habia forma de arreglarlo salvo recortar el archivo
+      // aparte y volver a subirlo.
+      const mapa = await createImageBitmap(archivo)
+      crearEditorDeFoto({
+        mapa,
+        persona,
+        tipo,
+        acompanante: await acompananteDeMuestra(tipo),
+        alGuardar: async (blob) => {
+          const clave = `${persona.id}.jpg`
+          await almacen.guardarFoto(clave, blob)
+          await guardar(editarPersona(actual, persona.id, { foto: clave }))
+        },
+        alCancelar: () => { foto.value = '' },
+      })
     })
     etiquetaFoto.appendChild(foto)
     fila.appendChild(etiquetaFoto)

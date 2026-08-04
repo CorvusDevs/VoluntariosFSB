@@ -619,3 +619,60 @@ html, body { max-width: 100%; overflow-x: hidden; }
   color: var(--violeta);
 }
 .aviso-version .boton { padding: 8px 14px; font-size: 14px; white-space: nowrap; }
+
+/* Editor de foto. Ocupa la pantalla entera en el teléfono, porque elegir el
+   recorte con el dedo necesita todo el espacio que haya. */
+.capa-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+  background: rgba(28, 16, 36, .55);
+}
+.editor-foto {
+  width: 100%;
+  max-width: 420px;
+  padding: 18px 16px 20px;
+  border-radius: 18px;
+  background: var(--fondo);
+  box-shadow: 0 12px 40px rgba(28, 16, 36, .3);
+}
+.editor-titulo { margin: 0 0 4px; font-size: 18px; font-weight: 500; }
+.editor-subtitulo { margin: 18px 0 8px; font-size: 13px; font-weight: 500; color: var(--texto-suave); }
+.editor-ayuda { margin: 0 0 14px; font-size: 13px; line-height: 1.4; color: var(--texto-suave); }
+.editor-lienzo {
+  display: block;
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 12px;
+  background: var(--linea);
+  touch-action: none;      /* el arrastre es nuestro, no del scroll de la página */
+  cursor: grab;
+}
+.editor-lienzo:active { cursor: grabbing; }
+.editor-controles {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-top: 14px;
+}
+.editor-zoom { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+/* Alto de sobra para el pulgar: el control nativo es de unos 20 px. */
+.editor-zoom input[type=range] { width: 100%; height: 40px; accent-color: var(--violeta); }
+.editor-previas {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;        /* la tira scrollea sola, la página nunca */
+  padding-bottom: 4px;
+}
+.previa { margin: 0; flex: 0 0 auto; }
+.previa canvas { display: block; border-radius: 8px; background: var(--linea); }
+.previa figcaption { margin-top: 5px; font-size: 11px; color: var(--texto-suave); text-align: center; }
+.editor-acciones { display: flex; gap: 10px; margin-top: 18px; }
+.editor-acciones .boton { flex: 1; }
