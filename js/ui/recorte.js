@@ -47,6 +47,17 @@ export function mover({ ancho, alto, zoom, centroX, centroY }, dx, dy) {
   return centroDe(movido, ancho, alto)
 }
 
+// Cuanto se movio el puntero, pasado a pixeles de la imagen original.
+//
+// El signo importa y no es obvio: en pantalla la foto se dibuja quieta y lo que
+// se mueve es el recuadro, asi que el recuadro tiene que ir HACIA donde va el
+// dedo. Restarlo al reves (pensando "arrastro la foto") lo manda para el lado
+// contrario, que es exactamente como se sentia antes.
+export function arrastreEnImagen(desde, hasta, escala) {
+  if (!(escala > 0)) return { dx: 0, dy: 0 }
+  return { dx: (hasta.x - desde.x) / escala, dy: (hasta.y - desde.y) / escala }
+}
+
 // Al alejar, el recuadro crece y puede quedar pisando el borde. Reencuadrar
 // devuelve el centro valido mas cercano en vez de recortar fuera de la imagen.
 export function reencuadrar({ ancho, alto, zoom, centroX, centroY }) {

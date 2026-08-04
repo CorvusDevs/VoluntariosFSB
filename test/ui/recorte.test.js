@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  recorteDe, centroDe, mover, reencuadrar, limitar, ZOOM_MAXIMO,
+  recorteDe, centroDe, mover, reencuadrar, limitar, arrastreEnImagen, ZOOM_MAXIMO,
 } from '../../js/ui/recorte.js'
 
 describe('recorte de la foto', () => {
@@ -59,6 +59,30 @@ describe('recorte de la foto', () => {
     const r = recorteDe({ ...alejado, ...centro })
     expect(r.x + r.lado).toBeLessThanOrEqual(800)
     expect(r.y + r.lado).toBeLessThanOrEqual(600)
+  })
+
+  it('el recuadro va HACIA donde va el dedo, no al reves', () => {
+    // En pantalla la foto se dibuja quieta y lo que se mueve es el recuadro, asi
+    // que tiene que seguir al puntero. Restado al reves iba para el lado
+    // contrario, que es lo que se sentia al arrastrar.
+    expect(arrastreEnImagen({ x: 0, y: 0 }, { x: 10, y: 4 }, 1)).toEqual({ dx: 10, dy: 4 })
+    expect(arrastreEnImagen({ x: 10, y: 10 }, { x: 0, y: 0 }, 1)).toEqual({ dx: -10, dy: -10 })
+  })
+
+  it('de punta a punta: dedo a la derecha, recuadro a la derecha', () => {
+    const estado = { ancho: 2400, alto: 1600, zoom: 2, centroX: 0.5, centroY: 0.5 }
+    const escala = 260 / 2400
+    const { dx, dy } = arrastreEnImagen({ x: 100, y: 50 }, { x: 150, y: 50 }, escala)
+    const despues = recorteDe({ ...estado, ...mover(estado, dx, dy) })
+    expect(despues.x).toBeGreaterThan(recorteDe(estado).x)
+    expect(despues.y).toBe(recorteDe(estado).y)
+  })
+
+  it('pasa el arrastre a pixeles de la imagen, asi el zoom no cambia la sensibilidad', () => {
+    // La foto se dibuja achicada en el editor: mover 10 px en pantalla tiene que
+    // mover mas de 10 px en una foto grande, o arrastrarla se hace eterno.
+    expect(arrastreEnImagen({ x: 0, y: 0 }, { x: 10, y: 0 }, 0.1).dx).toBe(100)
+    expect(arrastreEnImagen({ x: 0, y: 0 }, { x: 10, y: 0 }, 0).dx).toBe(0)
   })
 
   it('limitar aguanta basura sin explotar', () => {

@@ -145,6 +145,26 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     etiquetaFoto.appendChild(foto)
     fila.appendChild(etiquetaFoto)
 
+    // Solo cuando hay algo que quitar. Antes la unica salida era subir otra foto
+    // encima, asi que una foto mala se quedaba hasta conseguir un reemplazo.
+    if (persona.foto) {
+      const quitarFoto = boton('Quitar foto', async () => {
+        if (!confirm(`¿Quitar la foto de ${persona.nombre}? En la planilla vuelven las iniciales.`)) return
+        const clave = persona.foto
+        // Primero se suelta la referencia, que es lo que pidio quien toca el
+        // boton. El archivo se borra despues y si eso falla queda huerfano, que
+        // molesta mucho menos que ver la foto seguir apareciendo.
+        await guardar(editarPersona(actual, persona.id, { foto: null }))
+        try {
+          await almacen.borrarFoto(clave)
+        } catch {
+          // Sin foto en pantalla igual: el archivo suelto no le hace mal a nadie.
+        }
+      })
+      quitarFoto.dataset.accion = 'quitar-foto'
+      fila.appendChild(quitarFoto)
+    }
+
     fila.appendChild(boton('Quitar', async () => {
       if (!confirm(`¿Quitar a ${persona.nombre} de las listas nuevas? Las listas anteriores no cambian.`)) return
       await guardar(desactivarPersona(actual, persona.id))

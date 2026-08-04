@@ -130,3 +130,59 @@ describe('editar en la lista de personas', () => {
     expect(filaDe('Abi').querySelector('[data-campo="nuevo"]')).not.toBeNull()
   })
 })
+
+describe('quitar la foto', () => {
+  // Se necesita alguien con foto y el archivo en el almacen, que es el estado
+  // real despues de pasar por el editor.
+  async function conFoto() {
+    document.body.innerHTML = '<div id="raiz"></div>'
+    raiz = document.getElementById('raiz')
+    almacen = almacenFalso()
+    const roster = {
+      ...ROSTER,
+      participantes: ROSTER.participantes.map((p, i) => (i === 0 ? { ...p, foto: `${p.id}.jpg` } : p)),
+    }
+    await almacen.guardarFoto(`${roster.participantes[0].id}.jpg`, new Blob(['x']))
+    pantalla = crearPantallaPersonas(raiz, { roster, almacen, alCambiar: () => {} })
+    return roster.participantes[0]
+  }
+  const filaDe = (persona) => raiz.querySelector(`.fila-persona[data-id="${persona.id}"]`)
+
+  it('el boton solo aparece cuando hay foto', async () => {
+    const persona = await conFoto()
+    expect(filaDe(persona).querySelector('[data-accion="quitar-foto"]')).not.toBeNull()
+    const sinFoto = ROSTER.participantes.find((p) => !p.foto && p.activo && p.id !== persona.id)
+    if (sinFoto) {
+      expect(filaDe(sinFoto).querySelector('[data-accion="quitar-foto"]')).toBeNull()
+    }
+  })
+
+  it('suelta la referencia y borra el archivo', async () => {
+    const persona = await conFoto()
+    window.confirm = () => true
+    filaDe(persona).querySelector('[data-accion="quitar-foto"]').click()
+    await new Promise((r) => setTimeout(r, 0))
+    const guardado = pantalla.roster().participantes.find((p) => p.id === persona.id)
+    expect(guardado.foto).toBeNull()
+    expect(await almacen.leerFoto(`${persona.id}.jpg`)).toBeNull()
+  })
+
+  it('no toca nada si se cancela la confirmacion', async () => {
+    const persona = await conFoto()
+    window.confirm = () => false
+    filaDe(persona).querySelector('[data-accion="quitar-foto"]').click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pantalla.roster().participantes.find((p) => p.id === persona.id).foto).toBe(`${persona.id}.jpg`)
+    expect(await almacen.leerFoto(`${persona.id}.jpg`)).not.toBeNull()
+  })
+
+  it('quita la foto igual aunque el borrado del archivo falle', async () => {
+    // El archivo huerfano molesta mucho menos que ver la foto seguir apareciendo.
+    const persona = await conFoto()
+    almacen.borrarFoto = async () => { throw new Error('sin red') }
+    window.confirm = () => true
+    filaDe(persona).querySelector('[data-accion="quitar-foto"]').click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pantalla.roster().participantes.find((p) => p.id === persona.id).foto).toBeNull()
+  })
+})

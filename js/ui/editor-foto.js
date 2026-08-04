@@ -1,5 +1,8 @@
 import { elemento, boton, vaciar } from './componentes.js'
-import { recorteDe, mover, reencuadrar, RECORTE_INICIAL, ZOOM_MINIMO, ZOOM_MAXIMO, limitar } from './recorte.js'
+import {
+  recorteDe, mover, reencuadrar, arrastreEnImagen,
+  RECORTE_INICIAL, ZOOM_MINIMO, ZOOM_MAXIMO, limitar,
+} from './recorte.js'
 import { volcarRecorte, aBlob } from './fotos.js'
 import { dibujarMuestra, CLAVES_MUESTRA } from './muestra-celda.js'
 
@@ -35,7 +38,7 @@ export function crearEditorDeFoto({
   lienzo.className = 'editor-lienzo'
   lienzo.width = LADO_EDITOR
   lienzo.height = LADO_EDITOR
-  lienzo.setAttribute('aria-label', 'Arrastrá para mover la foto')
+  lienzo.setAttribute('aria-label', 'Arrastrá para mover el recuadro de recorte')
 
   const zoom = document.createElement('input')
   zoom.type = 'range'
@@ -124,8 +127,7 @@ export function crearEditorDeFoto({
     if (!arrastrando) return
     evento.preventDefault()
     const escala = Math.min(LADO_EDITOR / mapa.width, LADO_EDITOR / mapa.height)
-    const dx = (arrastrando.x - evento.clientX) / escala
-    const dy = (arrastrando.y - evento.clientY) / escala
+    const { dx, dy } = arrastreEnImagen(arrastrando, { x: evento.clientX, y: evento.clientY }, escala)
     estado = { ...estado, ...mover({ ancho: mapa.width, alto: mapa.height, ...estado }, dx, dy) }
     arrastrando = { x: evento.clientX, y: evento.clientY }
     refrescar()
@@ -186,7 +188,7 @@ export function crearEditorDeFoto({
 
   panel.append(
     elemento('h2', ['editor-titulo'], `Foto de ${persona.nombre}`),
-    elemento('p', ['editor-ayuda'], 'Arrastrá la foto para elegir qué parte se ve. Abajo, cómo queda en la planilla.'),
+    elemento('p', ['editor-ayuda'], 'Arrastrá el recuadro para elegir qué parte se ve. Abajo, cómo queda en la planilla.'),
     lienzo,
     controles,
     elemento('h3', ['editor-subtitulo'], 'Así va a salir'),
