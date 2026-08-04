@@ -15,7 +15,7 @@ export const ESQUINA_VOLUNTARIO_POR_DEFECTO = 'abajo-derecha'
 // una de las "montadas": con el medallon apoyado adentro de la foto, agrandarlo
 // taparia al chico, que es justo lo que no queremos.
 export const TAMANO_VOLUNTARIO_POR_DEFECTO = 'grande'
-export const ASOMO_VOLUNTARIO_POR_DEFECTO = 'montado'
+export const ASOMO_VOLUNTARIO_POR_DEFECTO = 'medio'
 
 export const SALUDO_POR_DEFECTO =
   'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'

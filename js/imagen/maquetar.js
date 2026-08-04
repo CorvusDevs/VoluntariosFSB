@@ -1,9 +1,9 @@
 import {
-  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas, RETRATOS, ESQUINA_POR_DEFECTO, esDerecha, esAbajo, ajustarTexto, anchoDeCeldaRetratos, medidasRetratos, TAMANO_POR_DEFECTO, ASOMO_POR_DEFECTO, esMontado,
+  ANCHO, COLORES, COLUMNAS, FUENTES, GRILLA, anchoDeCelda, anchoDeCeldaGrilla, anchoParaColumnas, columnasNecesarias, medidas, RETRATOS, ESQUINA_POR_DEFECTO, esDerecha, esAbajo, ajustarTexto, anchoDeCeldaRetratos, medidasRetratos, TAMANO_POR_DEFECTO, ASOMO_POR_DEFECTO, esSuperpuesto,
 } from './tema.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import { FORMATO_POR_DEFECTO } from '../modelo/lista.js'
-import { iniciales } from '../util/nombres.js'
+import { iniciales, abreviarApellido } from '../util/nombres.js'
 
 const RELACION_RECORTE = 2.5
 
@@ -38,7 +38,7 @@ export function maquetar(lista, roster, opciones = {}) {
   const esquinaVoluntario = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
   const tamanoVoluntario = lista.opcionesImagen?.tamanoVoluntario ?? TAMANO_POR_DEFECTO
   const asomoVoluntario = lista.opcionesImagen?.asomoVoluntario ?? ASOMO_POR_DEFECTO
-  // Retratos con el medallon montado separa mas las columnas para que dos
+  // Retratos con el medallon superpuesto separa mas las columnas para que dos
   // medallones no se pisen, asi que su ancho no es el mismo que el de la grilla.
   const retratos = medidasRetratos({
     margen: base.margen, columnas: columnasGrilla,
@@ -478,8 +478,11 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
 
   ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,
     color, radio: [0, 0, radioInterno, radioInterno], fila: clave })
-  const nombre = voluntario.nombre + (voluntario.nuevo ? ' (nuevo)' : '')
-  const px = ajustarTexto(nombre, iAncho - borde * 2,
+  const nombre = abreviarApellido(voluntario.nombre) + (voluntario.nuevo ? ' (nuevo)' : '')
+  // Aire propio: con el borde del marco como unico margen, el nombre quedaba
+  // tocando los dos costados del medallon.
+  const pad = Math.round(iAncho * RETRATOS.padNombreMedallon)
+  const px = ajustarTexto(nombre, iAncho - pad * 2,
     Math.round(franja * RETRATOS.factorNombreMedallon), 7, FUENTES.normal, medirTexto)
   ordenes.push({ tipo: 'texto', texto: nombre, x: ix + iAncho / 2, y: iy + iAlto - franja / 2,
     fuente: FUENTES.normal(px), color: COLORES.blanco,
@@ -493,7 +496,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     margen: m.margen, columnas, esquina,
     tamano: m.tamanoVoluntario, asomo: m.asomoVoluntario,
   })
-  const { celda: ancho, alto, altoCelda, anchoMed, altoMed, asoma, asomaLado, separacion, montado } = medidas
+  const { celda: ancho, alto, altoCelda, anchoMed, altoMed, asoma, asomaLado, separacion, superpuesto } = medidas
   const color = colorDeGrupo(grupo.numero).fuerte
   const derecha = esDerecha(esquina)
   const abajo = esAbajo(esquina)
@@ -508,9 +511,9 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   grupo.filas.forEach((fila, i) => {
     const columna = i % columnas
     const x = m.margen + columna * (ancho + separacion)
-    // Montado arriba, la celda baja para dejarle lugar al medallon que asoma por
-    // encima. Montado abajo, lo que asoma cae por debajo y la celda no se mueve.
-    const arriba = cursor + (montado && !abajo ? asoma : 0)
+    // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
+    // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
+    const arriba = cursor + (superpuesto && !abajo ? asoma : 0)
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
@@ -532,15 +535,16 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // Con el medallon abajo, el nombre se corre al lado libre para dejarle el
     // hueco. Es la unica diferencia real entre elegir una esquina de arriba y una
     // de abajo, y le quita al nombre casi la mitad del ancho.
-    // El nombre se corre siempre que el medallon vaya abajo, montado o apoyado.
-    // Montado ya se llevo parte del ancho afuera de la celda, asi que el hueco
-    // que necesita adentro es menor.
-    const hueco = abajo
-      ? (montado ? anchoMed - asomaLado + inset : anchoMed + inset * 2)
+    // El nombre se corre solo si esta fila tiene a alguien acompañando y el
+    // medallon va abajo. Reservarlo siempre dejaba a los chicos sin voluntario
+    // con el nombre corrido contra el borde, sin nada que lo justificara.
+    const hueco = abajo && voluntarios.length > 0
+      ? (superpuesto ? anchoMed - asomaLado + inset : anchoMed + inset * 2)
       : 0
-    const anchoNombre = ancho - hueco - inset * 2
-    const centro = abajo
-      ? (derecha ? x + inset + anchoNombre / 2 : x + ancho - inset - anchoNombre / 2)
+    const pad = Math.round(ancho * RETRATOS.padNombre)
+    const anchoNombre = ancho - hueco - pad * 2
+    const centro = hueco > 0
+      ? (derecha ? x + pad + anchoNombre / 2 : x + ancho - pad - anchoNombre / 2)
       : x + ancho / 2
 
     // Las esquinas de abajo van redondeadas igual que la foto: dibujada como
@@ -548,30 +552,25 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // todas las celdas. El orden es arriba-izq, arriba-der, abajo-der, abajo-izq.
     ordenes.push({ tipo: 'rect', x, y: arriba + alto - altoFranja, ancho, alto: altoFranja,
       color, radio: [0, 0, RETRATOS.radioFoto, RETRATOS.radioFoto], fila: clave })
-    // Si ni achicado entra, se muestra solo el primer nombre: un renglon de mas
-    // empujaria la franja hacia la cara del chico, que es lo unico que no queremos tapar.
-    let nombre = participantes.map((p) => p.nombre).join(' / ')
-    let px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
+    // El apellido va abreviado: en la planilla no hace falta entero, y el lugar
+    // que ocupa es justo el que necesita la foto del voluntario al lado.
+    const nombre = participantes.map((p) => abreviarApellido(p.nombre)).join(' / ')
+    const px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
       FUENTES.titulo, medirTexto)
-    if (medirTexto(nombre, FUENTES.titulo(px)) > anchoNombre) {
-      nombre = nombre.split(' ')[0]
-      px = ajustarTexto(nombre, anchoNombre, pxBase, Math.round(pxBase * RETRATOS.pisoNombre),
-        FUENTES.titulo, medirTexto)
-    }
     ordenes.push({ tipo: 'texto', texto: nombre, x: centro, y: arriba + alto - altoFranja / 2,
       fuente: FUENTES.titulo(px), color: COLORES.blanco,
       alineacion: 'center', lineaBase: 'middle', fila: clave })
 
     voluntarios.forEach((voluntario, n) => {
-      // Montado: pegado al borde de la celda y corrido hacia afuera, arrancando
+      // Superpuesto: pegado al borde de la celda y corrido hacia afuera, arrancando
       // por encima del techo. Apoyado: adentro, separado del borde por el inset.
-      const mx = montado
+      const mx = superpuesto
         ? (derecha ? x + ancho - anchoMed + asomaLado : x - asomaLado)
         : (derecha ? x + ancho - inset - anchoMed : x + inset)
       // Anclar el medallon de abajo al centro de la franja lo hacia sobresalir
       // por debajo de la celda y meterse en la fila siguiente, asi que va contra
       // el borde inferior.
-      const base = montado
+      const base = superpuesto
         ? (abajo ? arriba + alto + asoma - altoMed : arriba - asoma)
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
       // Con el medallon abajo la pila sube, para no salirse por el pie.

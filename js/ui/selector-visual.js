@@ -1,7 +1,7 @@
 import { elemento } from './componentes.js'
 
 // Un selector donde cada opcion se ve, en vez de leerse. Los nombres de estas
-// opciones ("montado sobre la esquina", "apenas asomando") no le dicen nada a
+// opciones ("superpuesto sobre la esquina", "apenas asomando") no le dicen nada a
 // nadie hasta que ve el resultado, y probarlas de a una en un desplegable
 // obligaba a abrir, elegir, mirar la planilla entera y volver.
 //

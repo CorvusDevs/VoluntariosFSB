@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { iniciales, sinAcentos, coincide, ordenarPorNombre } from '../../js/util/nombres.js'
+import { iniciales, sinAcentos, coincide, ordenarPorNombre, abreviarApellido } from '../../js/util/nombres.js'
 
 describe('iniciales', () => {
   it('toma las dos primeras letras de un nombre simple', () => {
@@ -63,5 +63,30 @@ describe('ordenarPorNombre', () => {
     const gente = [{ nombre: 'Rocío' }, { nombre: 'Ángel' }]
     ordenarPorNombre(gente)
     expect(gente[0].nombre).toBe('Rocío')
+  })
+})
+
+describe('abreviarApellido', () => {
+  it('deja el primer nombre y la inicial del apellido', () => {
+    expect(abreviarApellido('Maria Perez')).toBe('Maria P.')
+    expect(abreviarApellido('Francisco Planells')).toBe('Francisco P.')
+  })
+
+  it('no toca un nombre de una sola palabra', () => {
+    expect(abreviarApellido('Ezequiel')).toBe('Ezequiel')
+  })
+
+  it('con varios nombres se queda con el primero y el ultimo apellido', () => {
+    expect(abreviarApellido('Maria de los Angeles Fernandez')).toBe('Maria F.')
+  })
+
+  it('no le pone un segundo punto a lo que ya viene abreviado', () => {
+    expect(abreviarApellido('Ana P.')).toBe('Ana P.')
+  })
+
+  it('aguanta espacios de mas y texto vacio', () => {
+    expect(abreviarApellido('  Juan   Gomez  ')).toBe('Juan G.')
+    expect(abreviarApellido('')).toBe('')
+    expect(abreviarApellido(null)).toBe('')
   })
 })

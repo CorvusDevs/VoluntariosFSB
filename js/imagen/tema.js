@@ -118,6 +118,10 @@ export const RETRATOS = Object.freeze({
   // Franja del nombre del participante, al pie de la foto.
   factorNombre: 0.145,
   aireFranja: 0.055,
+  // Aire a los costados del nombre, adentro de la franja. Con el inset del
+  // medallon alcanzaba justo y el nombre quedaba pegado al borde de la foto.
+  padNombre: 0.075,
+  padNombreMedallon: 0.09,
   // Con el medallon abajo, al nombre le queda menos de la mitad del ancho, asi
   // que el piso tiene que dar mas margen o los nombres largos se pasan de la franja.
   pisoNombre: 0.6,         // no se achica mas alla de esta fraccion
@@ -139,29 +143,29 @@ export const RETRATOS = Object.freeze({
 
 export const ESQUINAS = Object.freeze([
   'abajo-derecha', 'abajo-izquierda', 'arriba-derecha', 'arriba-izquierda',
-  'montado-derecha', 'montado-izquierda',
-  'montado-abajo-derecha', 'montado-abajo-izquierda',
+  'superpuesto-derecha', 'superpuesto-izquierda',
+  'superpuesto-abajo-derecha', 'superpuesto-abajo-izquierda',
 ])
 export const ESQUINA_POR_DEFECTO = 'abajo-derecha'
 
 export function esDerecha(esquina) { return String(esquina).endsWith('-derecha') }
 export function esAbajo(esquina) {
-  return String(esquina).startsWith('abajo-') || String(esquina).startsWith('montado-abajo-')
+  return String(esquina).startsWith('abajo-') || String(esquina).startsWith('superpuesto-abajo-')
 }
-// "Montado" saca el medallon del marco: queda arriba de la esquina, asomando
+// "Superpuesto" saca el medallon del marco: queda arriba de la esquina, asomando
 // hacia arriba y hacia el costado. Se puede agrandar mucho mas sin taparle cara
 // al chico, y lo que sobresale se paga en alto de fila y en ancho de planilla.
-export function esMontado(esquina) { return String(esquina).startsWith('montado-') }
+export function esSuperpuesto(esquina) { return String(esquina).startsWith('superpuesto-') }
 
 // Los tres tamaños y las tres posiciones que se eligen en Vista previa. Son
 // fracciones del ancho de la celda y del alto del medallon, no pixeles, para que
 // sigan valiendo si la celda cambia de tamaño.
 export const TAMANOS_VOLUNTARIO = Object.freeze({ mediano: 0.52, grande: 0.60, enorme: 0.70 })
 export const TAMANO_POR_DEFECTO = 'grande'
-export const ASOMOS_VOLUNTARIO = Object.freeze({ apenas: 0.40, montado: 0.55, alto: 0.70 })
-export const ASOMO_POR_DEFECTO = 'montado'
+export const ASOMOS_VOLUNTARIO = Object.freeze({ apenas: 0.40, medio: 0.55, alto: 0.70 })
+export const ASOMO_POR_DEFECTO = 'medio'
 
-export const MONTADO = Object.freeze({
+export const SUPERPUESTO = Object.freeze({
   costado: 0.18,      // cuanto del medallon queda fuera del costado de la celda
   aireColumna: 0.02,  // respiro entre el medallon que asoma y la columna siguiente
 })
@@ -175,26 +179,26 @@ export function medidasRetratos({
 }) {
   const celda = anchoDeCeldaRetratos(margen)
   const alto = Math.round(celda * RETRATOS.proporcionCelda)
-  const montado = esMontado(esquina)
-  const factor = montado
+  const superpuesto = esSuperpuesto(esquina)
+  const factor = superpuesto
     ? (TAMANOS_VOLUNTARIO[tamano] ?? TAMANOS_VOLUNTARIO[TAMANO_POR_DEFECTO])
     : RETRATOS.factorMedallon
   const anchoMed = Math.round(celda * factor)
   const altoMed = Math.round(anchoMed * RETRATOS.proporcionMedallon)
   const fraccion = ASOMOS_VOLUNTARIO[asomo] ?? ASOMOS_VOLUNTARIO[ASOMO_POR_DEFECTO]
-  const asoma = montado ? Math.round(altoMed * fraccion) : 0
+  const asoma = superpuesto ? Math.round(altoMed * fraccion) : 0
   // Lo que asoma al costado vive en el margen de la imagen, asi que no puede
   // pasarse de el o el medallon se cortaria contra el borde del archivo.
-  const asomaLado = montado
-    ? Math.min(Math.round(anchoMed * MONTADO.costado), Math.max(0, margen - 8))
+  const asomaLado = superpuesto
+    ? Math.min(Math.round(anchoMed * SUPERPUESTO.costado), Math.max(0, margen - 8))
     : 0
   // Las columnas se separan lo necesario para que dos medallones nunca se pisen.
-  const separacion = montado
-    ? Math.max(RETRATOS.separacion, asomaLado + Math.round(celda * MONTADO.aireColumna))
+  const separacion = superpuesto
+    ? Math.max(RETRATOS.separacion, asomaLado + Math.round(celda * SUPERPUESTO.aireColumna))
     : RETRATOS.separacion
   const anchoImagen = margen * 2 + columnas * celda + (columnas - 1) * separacion
   return {
-    celda, alto, montado, anchoMed, altoMed, asoma, asomaLado, separacion, anchoImagen,
+    celda, alto, superpuesto, anchoMed, altoMed, asoma, asomaLado, separacion, anchoImagen,
     altoCelda: alto + RETRATOS.margenInferior + asoma,
   }
 }

@@ -384,30 +384,30 @@ describe('selector de formato', () => {
     tocar(raiz, 'formato', 'retratos')
     expect(valores(raiz, 'esquina-voluntario')).toEqual([
       'abajo-derecha', 'abajo-izquierda', 'arriba-derecha', 'arriba-izquierda',
-      'montado-derecha', 'montado-izquierda',
-      'montado-abajo-derecha', 'montado-abajo-izquierda',
+      'superpuesto-derecha', 'superpuesto-izquierda',
+      'superpuesto-abajo-derecha', 'superpuesto-abajo-izquierda',
     ])
     expect(elegido(raiz, 'esquina-voluntario')).toBe(ESQUINA_VOLUNTARIO_POR_DEFECTO)
   })
 
-  it('el tamaño y el asomo solo aparecen con el medallon montado', () => {
+  it('el tamaño y el asomo solo aparecen con el medallon superpuesto', () => {
     // Con el medallon apoyado no cambian nada, asi que mostrarlos haria creer
     // que hacen algo cuando no.
     tocar(raiz, 'formato', 'retratos')
     expect(raiz.querySelector('[data-campo="tamanoVoluntario"]')).toBeNull()
     expect(raiz.querySelector('[data-campo="asomoVoluntario"]')).toBeNull()
 
-    tocar(raiz, 'esquina-voluntario', 'montado-derecha')
+    tocar(raiz, 'esquina-voluntario', 'superpuesto-derecha')
     expect(valores(raiz, 'tamanoVoluntario')).toEqual(['mediano', 'grande', 'enorme'])
-    expect(valores(raiz, 'asomoVoluntario')).toEqual(['apenas', 'montado', 'alto'])
+    expect(valores(raiz, 'asomoVoluntario')).toEqual(['apenas', 'medio', 'alto'])
     expect(elegido(raiz, 'tamanoVoluntario')).toBe(TAMANO_VOLUNTARIO_POR_DEFECTO)
     expect(elegido(raiz, 'asomoVoluntario')).toBe(ASOMO_VOLUNTARIO_POR_DEFECTO)
   })
 
   it('las esquinas montadas de abajo tambien corren el nombre del chico', () => {
     tocar(raiz, 'formato', 'retratos')
-    tocar(raiz, 'esquina-voluntario', 'montado-abajo-derecha')
-    expect(pantalla.lista().opcionesImagen.esquinaVoluntario).toBe('montado-abajo-derecha')
+    tocar(raiz, 'esquina-voluntario', 'superpuesto-abajo-derecha')
+    expect(pantalla.lista().opcionesImagen.esquinaVoluntario).toBe('superpuesto-abajo-derecha')
   })
 
   it('el formato por defecto es la grilla', () => {

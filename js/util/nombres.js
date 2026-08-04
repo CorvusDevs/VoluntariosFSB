@@ -29,3 +29,18 @@ export function coincide(nombre, busqueda) {
 export function ordenarPorNombre(gente) {
   return [...gente].sort((a, b) => sinAcentos(a.nombre).localeCompare(sinAcentos(b.nombre), 'es'))
 }
+
+// "Maria Perez" -> "Maria P.". En la planilla el apellido casi nunca hace falta:
+// entre once chicos no hay dos Marias, y el lugar que ocupa es justo el que
+// necesita la foto del voluntario al lado del nombre.
+//
+// Se toma el primer nombre y la inicial de la ultima palabra, que es el apellido
+// que la gente usa para desambiguar. Un nombre de una sola palabra queda igual.
+export function abreviarApellido(nombre) {
+  const partes = String(nombre ?? '').trim().split(/\s+/).filter(Boolean)
+  if (partes.length < 2) return partes[0] ?? ''
+  const apellido = partes[partes.length - 1]
+  // Si ya viene abreviado, no le agregamos un segundo punto.
+  if (/^\p{L}\.$/u.test(apellido)) return `${partes[0]} ${apellido}`
+  return `${partes[0]} ${apellido[0].toUpperCase()}.`
+}

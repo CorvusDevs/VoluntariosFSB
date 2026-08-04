@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import {
-  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, esMontado,
+  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, esSuperpuesto,
   TAMANOS_VOLUNTARIO, ASOMOS_VOLUNTARIO, medidasRetratos, anchoDeCeldaRetratos,
 } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
@@ -775,7 +775,7 @@ describe('formato retratos', () => {
     const alto = Math.round(ancho * RETRATOS.proporcionCelda)
     const lado = Math.round(ancho * RETRATOS.factorMedallon)
     const altoMed = Math.round(lado * RETRATOS.proporcionMedallon)
-    ESQUINAS.filter((e) => !esMontado(e)).forEach((esquina) => {
+    ESQUINAS.filter((e) => !esSuperpuesto(e)).forEach((esquina) => {
       const plano = maquetar(enRetratos({ esquinaVoluntario: esquina }), ROSTER, opciones)
       const celdas = celdasDe(plano)
       const marcos = plano.ordenes.filter(
@@ -789,9 +789,38 @@ describe('formato retratos', () => {
     })
   })
 
-  it('el montado sale del marco por arriba y por el costado, a proposito', () => {
-    const medidas = medidasRetratos({ margen: 56, esquina: 'montado-derecha' })
-    const plano = maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha' }), ROSTER, opciones)
+  it('abrevia el apellido en la franja, para dejarle lugar al voluntario', () => {
+    const conApellido = {
+      ...ROSTER,
+      participantes: ROSTER.participantes.map((p, i) => (i === 0 ? { ...p, nombre: 'Maria Perez' } : p)),
+    }
+    const plano = maquetar(enRetratos(), conApellido, opciones)
+    const textos = plano.ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
+    expect(textos).toContain('Maria P.')
+    expect(textos).not.toContain('Maria Perez')
+  })
+
+  it('no corre el nombre del chico que no tiene voluntario', () => {
+    // El hueco del medallon se reservaba siempre, asi que los chicos sin
+    // acompañante quedaban con el nombre corrido contra el borde sin motivo.
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const celdas = celdasDe(plano)
+    const conVoluntario = new Set(
+      LISTA.grupos.flatMap((g) => g.filas.filter((f) => f.voluntarios.length > 0)
+        .map((f) => f.participantes[0])))
+    celdas.forEach((celda) => {
+      const nombre = plano.ordenes.find(
+        (o) => o.tipo === 'texto' && o.color === COLORES.blanco
+          && o.fila === celda.fila && o.y > celda.y + celda.alto * 0.7)
+      if (!nombre) return
+      const centrado = Math.abs(nombre.x - (celda.x + celda.ancho / 2)) < 1
+      expect(centrado, `${celda.fila}: corrido sin voluntario`).toBe(!conVoluntario.has(celda.fila))
+    })
+  })
+
+  it('el superpuesto sale del marco por arriba y por el costado, a proposito', () => {
+    const medidas = medidasRetratos({ margen: 56, esquina: 'superpuesto-derecha' })
+    const plano = maquetar(enRetratos({ esquinaVoluntario: 'superpuesto-derecha' }), ROSTER, opciones)
     const celdas = celdasDe(plano)
     const marcos = plano.ordenes.filter(
       (o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === medidas.anchoMed)
@@ -802,13 +831,13 @@ describe('formato retratos', () => {
     expect(marco.x + medidas.anchoMed).toBeGreaterThan(celda.x + celda.ancho)
   })
 
-  it('dos medallones montados nunca se pisan entre columnas', () => {
+  it('dos medallones superpuestos nunca se pisan entre columnas', () => {
     // La separacion entre columnas crece lo necesario. Sin eso, el medallon que
     // asoma se metia adentro de la foto del chico de al lado.
     Object.keys(TAMANOS_VOLUNTARIO).forEach((tamano) => {
-      const medidas = medidasRetratos({ margen: 56, esquina: 'montado-derecha', tamano })
+      const medidas = medidasRetratos({ margen: 56, esquina: 'superpuesto-derecha', tamano })
       const plano = maquetar(
-        enRetratos({ esquinaVoluntario: 'montado-derecha', tamanoVoluntario: tamano }), ROSTER, opciones)
+        enRetratos({ esquinaVoluntario: 'superpuesto-derecha', tamanoVoluntario: tamano }), ROSTER, opciones)
       const marcos = plano.ordenes
         .filter((o) => o.tipo === 'rect' && o.color === COLORES.blanco && o.ancho === medidas.anchoMed)
         .sort((a, b) => a.y - b.y || a.x - b.x)
@@ -819,9 +848,9 @@ describe('formato retratos', () => {
     })
   })
 
-  it('la imagen se ensancha con el medallon montado, para hacerle lugar', () => {
+  it('la imagen se ensancha con el medallon superpuesto, para hacerle lugar', () => {
     const angosta = maquetar(enRetratos(), ROSTER, opciones)
-    const ancha = maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha' }), ROSTER, opciones)
+    const ancha = maquetar(enRetratos({ esquinaVoluntario: 'superpuesto-derecha' }), ROSTER, opciones)
     expect(ancha.ancho).toBeGreaterThan(angosta.ancho)
     // Y crece de alto, porque cada fila le deja lugar arriba al medallon.
     expect(ancha.alto).toBeGreaterThan(angosta.alto)
@@ -829,20 +858,20 @@ describe('formato retratos', () => {
 
   it('los tres tamaños se distinguen y el mas grande manda', () => {
     const areas = Object.keys(TAMANOS_VOLUNTARIO).map((tamano) =>
-      medidasRetratos({ margen: 56, esquina: 'montado-derecha', tamano }).anchoMed)
+      medidasRetratos({ margen: 56, esquina: 'superpuesto-derecha', tamano }).anchoMed)
     expect(new Set(areas).size).toBe(3)
     expect(areas[0]).toBeLessThan(areas[2])
   })
 
   it('los tres asomos cambian cuanto crece la fila', () => {
     const altos = Object.keys(ASOMOS_VOLUNTARIO).map((asomo) =>
-      maquetar(enRetratos({ esquinaVoluntario: 'montado-derecha', asomoVoluntario: asomo }), ROSTER, opciones).alto)
+      maquetar(enRetratos({ esquinaVoluntario: 'superpuesto-derecha', asomoVoluntario: asomo }), ROSTER, opciones).alto)
     expect(new Set(altos).size).toBe(3)
     expect(altos[0]).toBeLessThan(altos[2])
   })
 
   it('el tamaño y el asomo no tocan nada cuando el medallon va apoyado', () => {
-    // Solo aplican al montado: cambiarlos con la esquina de abajo no puede mover
+    // Solo aplican al superpuesto: cambiarlos con la esquina de abajo no puede mover
     // ni un pixel, o el selector confundiria en vez de ayudar.
     const base = maquetar(enRetratos(), ROSTER, opciones)
     const otro = maquetar(

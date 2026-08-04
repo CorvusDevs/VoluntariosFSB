@@ -89,10 +89,10 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     ['abajo-izquierda', 'Abajo izquierda'],
     ['arriba-derecha', 'Arriba derecha'],
     ['arriba-izquierda', 'Arriba izquierda'],
-    ['montado-derecha', 'Saliente arriba der.'],
-    ['montado-izquierda', 'Saliente arriba izq.'],
-    ['montado-abajo-derecha', 'Saliente abajo der.'],
-    ['montado-abajo-izquierda', 'Saliente abajo izq.'],
+    ['superpuesto-derecha', 'Superpuesto arriba der.'],
+    ['superpuesto-izquierda', 'Superpuesto arriba izq.'],
+    ['superpuesto-abajo-derecha', 'Superpuesto abajo der.'],
+    ['superpuesto-abajo-izquierda', 'Superpuesto abajo izq.'],
   ]
   const TAMANOS_VOLUNTARIO = [
     ['mediano', 'Mediano'],
@@ -101,7 +101,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   ]
   const ASOMOS_VOLUNTARIO = [
     ['apenas', 'Apenas'],
-    ['montado', 'Saliente'],
+    ['medio', 'Intermedio'],
     ['alto', 'Bien arriba'],
   ]
 
@@ -159,11 +159,11 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     })
   }
 
-  // Los dos de abajo solo cambian algo con el medallon montado, asi que aparecen
+  // Los dos de abajo solo cambian algo con el medallon superpuesto, asi que aparecen
   // unicamente ahi: mostrarlos siempre haria creer que hacen algo cuando no.
-  function selectorMontado(campo, rotulo, valores, porDefecto) {
+  function selectorSuperpuesto(campo, rotulo, valores, porDefecto) {
     const esquina = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO
-    if (!String(esquina).startsWith('montado-')) return null
+    if (!String(esquina).startsWith('superpuesto-')) return null
     return selectorVisual({
       campo,
       rotulo,
@@ -184,7 +184,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     const partes = [nombre(FORMATOS, o.formato, FORMATO_POR_DEFECTO)]
     if ((o.formato ?? FORMATO_POR_DEFECTO) === 'retratos') {
       partes.push(nombre(ESQUINAS_VOLUNTARIO, o.esquinaVoluntario, ESQUINA_VOLUNTARIO_POR_DEFECTO))
-      if (String(o.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO).startsWith('montado-')) {
+      if (String(o.esquinaVoluntario ?? ESQUINA_VOLUNTARIO_POR_DEFECTO).startsWith('superpuesto-')) {
         partes.push(nombre(TAMANOS_VOLUNTARIO, o.tamanoVoluntario, TAMANO_VOLUNTARIO_POR_DEFECTO))
       }
     }
@@ -213,10 +213,10 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     caja.appendChild(selectorDeFormato())
     const esquina = selectorDeEsquina()
     if (esquina) caja.appendChild(esquina)
-    const tamano = selectorMontado(
+    const tamano = selectorSuperpuesto(
       'tamanoVoluntario', 'Tamaño del voluntario', TAMANOS_VOLUNTARIO, TAMANO_VOLUNTARIO_POR_DEFECTO)
     if (tamano) caja.appendChild(tamano)
-    const asomo = selectorMontado(
+    const asomo = selectorSuperpuesto(
       'asomoVoluntario', 'Cuánto sobresale', ASOMOS_VOLUNTARIO, ASOMO_VOLUNTARIO_POR_DEFECTO)
     if (asomo) caja.appendChild(asomo)
     return caja
