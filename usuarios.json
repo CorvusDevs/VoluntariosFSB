@@ -45,6 +45,21 @@
         "iv": "dTRkKknklC/Icd/4",
         "datos": "xns7bvDK2YdntAZeF37BqRgWa5YPBD5pZjavWtNvQU1BxUFCttFnJzCaxKDR9TXnt+WIArNKb1HcUs+uVcGuD8kEEqW4NLaluVUjZGaYfF7vnX5+0/YmZeH6JhiZXJJfAXI7uNCHWlPb3K/GHQ=="
       }
+    },
+    {
+      "usuario": "majo",
+      "nombre": "María José Toribio",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "vfh+lf5u20jWKqERcMDEmg=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "kR6PRFAsWDkeK1gQ",
+        "datos": "zjU7X/CPodBBAGj5eBvDa2APjj0TN1RFv5EaJCV8L1BxeXu1bmAG+4Lrhc/GyEKu5cCawZCFz7UEcbX6NDFzA9yv9wpDAZvZ9yt4LqCqoGx1NOoZoUmkgmSEj8CWr63v5rsfX5g/acK7mq8GDA=="
+      }
     }
   ]
 }
