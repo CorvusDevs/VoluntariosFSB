@@ -617,9 +617,11 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     })
 
     // El alto del renglon sale de lo que ese renglon necesita, no de un maximo
-    // fijo para todo el grupo.
+    // fijo para todo el grupo. Y el aire entre renglones es el mismo que deja el
+    // titulo arriba: con 12 px contra 20 los renglones quedaban pegados entre si
+    // y despegados del titulo, que se leia como un error de alineacion.
     if (columna === columnas - 1 || i === grupo.filas.length - 1) {
-      cursor += alto + RETRATOS.margenInferior + asomaFila
+      cursor += alto + m.espacioBajoTitulo + asomaFila
     }
   })
   return cursor

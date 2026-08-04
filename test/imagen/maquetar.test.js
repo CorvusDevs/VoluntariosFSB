@@ -864,6 +864,37 @@ describe('formato retratos', () => {
     })
   })
 
+  it('deja el mismo aire entre renglones que el que deja el titulo arriba', () => {
+    // Con 12 px entre renglones y 20 bajo el titulo, los renglones quedaban
+    // pegados entre si y despegados del titulo: se leia como una desalineacion.
+    // Hacen falta dos renglones DENTRO de un grupo: con uno por grupo se estaria
+    // midiendo la separacion entre grupos, que es otra cosa.
+    const roster = {
+      ...ROSTER,
+      participantes: Array.from({ length: 8 }, (_, n) => ({
+        id: `q${n}`, nombre: `Chico ${n}`, grupo: 1, activo: true, foto: null,
+      })),
+    }
+    const lista = {
+      ...enRetratos(),
+      grupos: [{
+        numero: 1, titulo: 'Grupo 1', subtitulo: '', cancha: '', apoyo: [],
+        filas: roster.participantes.map((p) => ({ participantes: [p.id], voluntarios: [] })),
+      }],
+    }
+    const plano = maquetar(lista, roster, opciones)
+    const medidas = medidasRetratos({ margen: 56 })
+    const titulo = plano.ordenes.find(
+      (o) => o.tipo === 'rect' && o.radio === 16 && o.ancho > medidas.celda * 3)
+    const filas = [...new Set(plano.ordenes
+      .filter((o) => o.tipo === 'rect' && o.ancho === medidas.celda && o.alto === medidas.alto)
+      .map((o) => o.y))].sort((a, b) => a - b)
+    expect(filas.length).toBe(2)
+    const bajoElTitulo = filas[0] - (titulo.y + titulo.alto)
+    const entreRenglones = filas[1] - (filas[0] + medidas.alto)
+    expect(entreRenglones).toBe(bajoElTitulo)
+  })
+
   it('no reserva el sobresalido en los renglones sin acompañante', () => {
     // Reservarlo siempre dejaba 76 px muertos por renglon: en una planilla de 18
     // chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.

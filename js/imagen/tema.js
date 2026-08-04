@@ -199,7 +199,9 @@ export function medidasRetratos({
   const anchoImagen = margen * 2 + columnas * celda + (columnas - 1) * separacion
   return {
     celda, alto, superpuesto, anchoMed, altoMed, asoma, asomaLado, separacion, anchoImagen,
-    altoCelda: alto + RETRATOS.margenInferior + asoma,
+    // Sin el aire entre renglones: ese lo pone el cuerpo, que es el unico que
+    // sabe cuanto deja el titulo arriba y si el renglon lleva medallon.
+    altoCelda: alto + asoma,
   }
 }
 
