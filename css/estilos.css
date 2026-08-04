@@ -595,3 +595,27 @@ html, body { max-width: 100%; overflow-x: hidden; }
   font-size: 14px;
   white-space: nowrap;
 }
+
+/* Sello de versión: discreto, pero siempre a la vista. Existe para contestar
+   "¿ya llegó el cambio?" sin tener que abrir nada. */
+.sello-version {
+  margin: 0;
+  padding: 14px 16px 20px;
+  font-size: 11px;
+  color: var(--texto-suave);
+  opacity: .65;
+  text-align: center;
+}
+/* Solo aparece cuando el servidor tiene otra versión que la cargada. */
+.aviso-version {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #F3E9F7;
+  border-bottom: 1px solid var(--violeta-claro, #D7B9E4);
+  font-size: 14px;
+  color: var(--violeta);
+}
+.aviso-version .boton { padding: 8px 14px; font-size: 14px; white-space: nowrap; }

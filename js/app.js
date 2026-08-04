@@ -11,10 +11,17 @@ import { boton, vaciar, elemento } from './ui/componentes.js'
 import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
 import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
+import { sello, vigilarVersion } from './ui/aviso-version.js'
+import { VERSION } from './version.js'
 
 const RUTA_USUARIOS = 'usuarios.json'
 
 const contenedor = document.getElementById('app')
+
+// Queda a la vista en el arbol y en la consola: preguntar "que version estas
+// corriendo" tiene que ser una mirada, no una sesion de depuracion.
+document.documentElement.dataset.version = VERSION
+console.info(`Voluntarios FSB, versión ${VERSION}`)
 
 // Sin sesion, sesion queda en null y el almacen se queda en modo local: la
 // aplicacion funciona igual en un solo telefono, sin nada de GitHub.
@@ -92,6 +99,7 @@ function dibujar() {
   contenedor.appendChild(navegacion())
   const cuerpo = elemento('div', ['cuerpo'])
   contenedor.appendChild(cuerpo)
+  contenedor.appendChild(sello())
 
   if (pantalla === 'lista') {
     vista = crearPantallaLista(cuerpo, {
@@ -203,6 +211,10 @@ async function cerrarSesion() {
   deposito = null
   mostrarIngreso()
 }
+
+// Arriba de todo y sobre cualquier pantalla, tambien la de ingreso: el aviso
+// tiene que verse aunque nadie haya entrado todavia.
+vigilarVersion(contenedor)
 
 const recordada = await recuperarRecordado()
 if (recordada) await entrar({ ...recordada, recordar: false })
