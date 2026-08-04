@@ -620,8 +620,14 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // fijo para todo el grupo. Y el aire entre renglones es el mismo que deja el
     // titulo arriba: con 12 px contra 20 los renglones quedaban pegados entre si
     // y despegados del titulo, que se leia como un error de alineacion.
-    if (columna === columnas - 1 || i === grupo.filas.length - 1) {
-      cursor += alto + m.espacioBajoTitulo + asomaFila
+    //
+    // Despues del ULTIMO renglon no va: ahi ya ponen lo suyo la separacion entre
+    // grupos y el margen del titulo siguiente. Sumandolo igual daban 92 px al pie
+    // de cada grupo contra 20 entre renglones, que es lo que se veia como un
+    // hueco muerto.
+    const ultimo = i === grupo.filas.length - 1
+    if (columna === columnas - 1 || ultimo) {
+      cursor += alto + asomaFila + (ultimo ? 0 : m.espacioBajoTitulo)
     }
   })
   return cursor

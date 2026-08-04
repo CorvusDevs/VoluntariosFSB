@@ -895,6 +895,25 @@ describe('formato retratos', () => {
     expect(entreRenglones).toBe(bajoElTitulo)
   })
 
+  it('no deja el aire de renglon colgando al pie del grupo', () => {
+    // Ese aire se sumaba tambien despues del ultimo renglon, encima de la
+    // separacion entre grupos y del margen del titulo siguiente: 92 px al pie
+    // contra 20 entre renglones, que se veia como un hueco muerto.
+    const medidas = medidasRetratos({ margen: 56 })
+    const plano = maquetar(enRetratos(), ROSTER, opciones)
+    const titulos = plano.ordenes.filter(
+      (o) => o.tipo === 'rect' && o.radio === 16 && o.ancho > medidas.celda * 3)
+    const filas = [...new Set(plano.ordenes
+      .filter((o) => o.tipo === 'rect' && o.ancho === medidas.celda && o.alto === medidas.alto)
+      .map((o) => o.y))].sort((a, b) => a - b)
+    expect(titulos.length).toBe(2)
+    // El grupo 1 del fixture entra en un renglon: entre su unica fila y el
+    // titulo del grupo 2 no puede haber mas que la separacion entre grupos.
+    const alPie = titulos[1].y - (filas[0] + medidas.alto)
+    const entreRenglones = 20
+    expect(alPie).toBeLessThan(entreRenglones * 4)
+  })
+
   it('no reserva el sobresalido en los renglones sin acompañante', () => {
     // Reservarlo siempre dejaba 76 px muertos por renglon: en una planilla de 18
     // chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
