@@ -772,3 +772,14 @@ html, body { max-width: 100%; overflow-x: hidden; }
 /* Girar, espejar y centrar: acciones de la foto, aparte del deslizante. */
 .editor-herramientas { display: flex; gap: 8px; margin-top: 10px; }
 .editor-herramientas .boton { flex: 1; padding: 10px 8px; font-size: 14px; white-space: nowrap; }
+/* Selector de grupo en la fila de cada participante. */
+.fila-grupo {
+  flex-shrink: 0;
+  padding: 9px 8px;
+  font-family: inherit;
+  font-size: 14px;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  background: var(--fondo);
+  color: var(--texto);
+}

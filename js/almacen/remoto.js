@@ -52,8 +52,9 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       return (await leerJson(RUTA_ROSTER)) ?? { version: 1, participantes: [], voluntarios: [] }
     },
 
-    guardarRoster(roster) {
-      return escribirJson(RUTA_ROSTER, roster, `Cambiar las personas · ${autor}`)
+    guardarRoster(roster, descripcion = null) {
+      const que = descripcion ?? 'Cambiar las personas'
+      return escribirJson(RUTA_ROSTER, roster, `${que} · ${autor}`)
     },
 
     leerLista(fecha) {

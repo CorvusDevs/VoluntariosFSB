@@ -5,10 +5,14 @@ import { crearEditorDeFoto } from './editor-foto.js'
 export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
   let actual = roster
 
-  async function guardar(siguiente) {
+  // `mudanza` avisa que alguien cambio de grupo. Va aparte del roster porque la
+  // planilla del sabado ya armada no se reacomoda sola: sincronizar deja a cada
+  // uno donde esta y solo agrega a los que faltan, asi que sin este aviso el
+  // cambio se guardaba pero el chico seguia apareciendo en el grupo viejo.
+  async function guardar(siguiente, descripcion, mudanza = null) {
     actual = siguiente
-    await almacen.guardarRoster(actual)
-    alCambiar(actual)
+    await almacen.guardarRoster(actual, descripcion)
+    alCambiar(actual, mudanza)
     dibujar()
   }
 
@@ -51,8 +55,9 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
       const siguiente = tipo === 'participante'
         ? agregarParticipante(actual, { nombre: nombre.value, grupo: Number(grupo.value) })
         : agregarVoluntario(actual, { nombre: nombre.value, nuevo: nuevo.checked })
+      const quien = nombre.value.trim()
       nombre.value = ''
-      await guardar(siguiente)
+      await guardar(siguiente, `Agregar a ${quien} como ${tipo}`)
     })
     return caja
   }
@@ -98,9 +103,32 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
         nombre.value = persona.nombre
         return
       }
-      await guardar(editarPersona(actual, persona.id, { nombre: valor }))
+      await guardar(editarPersona(actual, persona.id, { nombre: valor }),
+        `Renombrar a ${persona.nombre} como ${valor}`)
     })
     fila.appendChild(nombre)
+
+    // El grupo se elige al dar de alta, pero los chicos crecen y cambian de
+    // cancha. Rehacerlos para moverlos perderia la foto, el historial y su lugar
+    // en la planilla del sabado.
+    if (tipo === 'participante') {
+      const grupo = document.createElement('select')
+      grupo.className = 'fila-grupo'
+      grupo.dataset.campo = 'grupo'
+      grupo.setAttribute('aria-label', `Grupo de ${persona.nombre}`)
+      grupo.innerHTML = '<option value="1">Grupo 1</option><option value="2">Grupo 2</option>'
+      grupo.value = String(persona.grupo)
+      grupo.addEventListener('change', async () => {
+        const numero = Number(grupo.value)
+        if (numero === persona.grupo) return
+        await guardar(
+          editarPersona(actual, persona.id, { grupo: numero }),
+          `Pasar a ${persona.nombre} al grupo ${numero}`,
+          { id: persona.id, grupo: numero },
+        )
+      })
+      fila.appendChild(grupo)
+    }
 
     // Tanto voluntarios como participantes pueden ser nuevos: en la imagen sale
     // la pastilla, que es lo que le avisa al resto que todavia no se conocen.
@@ -110,7 +138,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
     casilla.dataset.campo = 'nuevo'
     casilla.checked = Boolean(persona.nuevo)
     casilla.addEventListener('change', async () => {
-      await guardar(editarPersona(actual, persona.id, { nuevo: casilla.checked }))
+      await guardar(editarPersona(actual, persona.id, { nuevo: casilla.checked }),
+        `${casilla.checked ? 'Marcar' : 'Desmarcar'} a ${persona.nombre} como nuevo`)
     })
     marcaNueva.append(casilla, document.createTextNode(' Nuevo'))
     fila.appendChild(marcaNueva)
@@ -137,7 +166,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
         alGuardar: async (blob) => {
           const clave = `${persona.id}.jpg`
           await almacen.guardarFoto(clave, blob, persona.nombre)
-          await guardar(editarPersona(actual, persona.id, { foto: clave }))
+          await guardar(editarPersona(actual, persona.id, { foto: clave }),
+            `Cambiar la foto de ${persona.nombre}`)
         },
         alCancelar: () => { foto.value = '' },
       })
@@ -154,7 +184,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
         // Primero se suelta la referencia, que es lo que pidio quien toca el
         // boton. El archivo se borra despues y si eso falla queda huerfano, que
         // molesta mucho menos que ver la foto seguir apareciendo.
-        await guardar(editarPersona(actual, persona.id, { foto: null }))
+        await guardar(editarPersona(actual, persona.id, { foto: null }),
+          `Quitar la foto de ${persona.nombre}`)
         try {
           await almacen.borrarFoto(clave, persona.nombre)
         } catch {
@@ -167,7 +198,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
 
     fila.appendChild(boton('Quitar', async () => {
       if (!confirm(`¿Quitar a ${persona.nombre} de las listas nuevas? Las listas anteriores no cambian.`)) return
-      await guardar(desactivarPersona(actual, persona.id))
+      await guardar(desactivarPersona(actual, persona.id),
+        `Sacar a ${persona.nombre} de las listas nuevas`)
     }))
     return fila
   }

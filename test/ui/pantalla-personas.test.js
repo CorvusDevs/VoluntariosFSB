@@ -186,3 +186,64 @@ describe('quitar la foto', () => {
     expect(pantalla.roster().participantes.find((p) => p.id === persona.id).foto).toBeNull()
   })
 })
+
+describe('cambiar de grupo a alguien ya agregado', () => {
+  const filaDe = (id) => raiz.querySelector(`.fila-persona[data-id="${id}"]`)
+  const grupoDe = (id) => filaDe(id).querySelector('[data-campo="grupo"]')
+
+  it('cada participante trae su grupo actual elegido', () => {
+    ROSTER.participantes.filter((p) => p.activo).forEach((p) => {
+      expect(grupoDe(p.id).value).toBe(String(p.grupo))
+    })
+  })
+
+  it('los voluntarios no tienen grupo, asi que no muestra el selector', () => {
+    const vol = ROSTER.voluntarios.find((v) => v.activo)
+    expect(filaDe(vol.id).querySelector('[data-campo="grupo"]')).toBeNull()
+  })
+
+  it('elegir otro grupo lo guarda en el roster', async () => {
+    const p = ROSTER.participantes.find((x) => x.activo && x.grupo === 1)
+    const selector = grupoDe(p.id)
+    selector.value = '2'
+    selector.dispatchEvent(new Event('change'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pantalla.roster().participantes.find((x) => x.id === p.id).grupo).toBe(2)
+  })
+
+  it('avisa la mudanza, que es lo que mueve al chico en la planilla del dia', async () => {
+    // Sin este aviso el roster quedaba bien y la planilla seguia mostrandolo en
+    // el grupo viejo, porque sincronizar no reacomoda a los que ya estan.
+    document.body.innerHTML = '<div id="r2"></div>'
+    const r2 = document.getElementById('r2')
+    const avisos = []
+    const p2 = crearPantallaPersonas(r2, {
+      roster: ROSTER, almacen: almacenFalso(),
+      alCambiar: (roster, mudanza) => avisos.push(mudanza),
+    })
+    const p = ROSTER.participantes.find((x) => x.activo && x.grupo === 1)
+    const selector = r2.querySelector(`.fila-persona[data-id="${p.id}"] [data-campo="grupo"]`)
+    selector.value = '2'
+    selector.dispatchEvent(new Event('change'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(avisos.at(-1)).toEqual({ id: p.id, grupo: 2 })
+    expect(p2.roster().participantes.find((x) => x.id === p.id).grupo).toBe(2)
+  })
+
+  it('elegir el mismo grupo no guarda ni avisa', async () => {
+    // Tocar el selector y dejarlo igual no tiene por que escribir en GitHub ni
+    // dejar un renglon en el registro.
+    document.body.innerHTML = '<div id="r3"></div>'
+    const r3 = document.getElementById('r3')
+    const avisos = []
+    crearPantallaPersonas(r3, {
+      roster: ROSTER, almacen: almacenFalso(), alCambiar: (...a) => avisos.push(a),
+    })
+    const p = ROSTER.participantes.find((x) => x.activo)
+    const selector = r3.querySelector(`.fila-persona[data-id="${p.id}"] [data-campo="grupo"]`)
+    selector.value = String(p.grupo)
+    selector.dispatchEvent(new Event('change'))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(avisos).toHaveLength(0)
+  })
+})

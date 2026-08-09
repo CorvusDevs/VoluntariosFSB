@@ -6,7 +6,7 @@ import { crearPantallaVistaPrevia } from './ui/pantalla-vista-previa.js'
 import { crearPantallaIngreso } from './ui/pantalla-ingreso.js'
 import { crearPantallaAjustes } from './ui/pantalla-ajustes.js'
 import { crearPantallaRegistro } from './ui/pantalla-registro.js'
-import { crearLista, sincronizarConRoster } from './modelo/lista.js'
+import { crearLista, sincronizarConRoster, moverAGrupo } from './modelo/lista.js'
 import { proximoSabado } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
 import { CONFIG } from './config.js'
@@ -177,10 +177,23 @@ function dibujar() {
     vista = crearPantallaPersonas(cuerpo, {
       roster,
       almacen: deposito,
-      alCambiar: async (siguiente) => {
+      alCambiar: async (siguiente, mudanza) => {
         roster = siguiente
         lista = sincronizarConRoster(lista, roster)
-        await deposito.guardarLista(lista)
+        // Sincronizar deja a cada uno donde esta y solo agrega a los que faltan,
+        // a proposito: la coordinacion a veces mueve a alguien por un sabado
+        // suelto y eso no se pisa. Cambiar el grupo desde Personas si es una
+        // decision explicita, asi que la planilla del dia lo acompaña.
+        if (mudanza) {
+          try {
+            lista = moverAGrupo(lista, mudanza.id, mudanza.grupo)
+          } catch {
+            // No esta en la planilla de hoy, por ejemplo si falta o esta ausente.
+            // El roster ya quedo guardado, que es lo que se pidio.
+          }
+        }
+        await deposito.guardarLista(lista,
+          mudanza ? `Pasar de grupo a alguien en la planilla del ${lista.fecha}` : undefined)
       },
     })
   }
