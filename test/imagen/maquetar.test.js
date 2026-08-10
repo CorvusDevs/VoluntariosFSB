@@ -999,3 +999,74 @@ describe('formato retratos', () => {
     expect(celdasDe(plano)[0].ancho).toBe(anchoDeCeldaRetratos(56))
   })
 })
+
+
+// Retratos con el nombre del voluntario debajo: la celda de Retratos y los
+// nombres como en la grilla, para cuando importa leer de corrido quien acompaña.
+describe('formato retratos con nombre abajo', () => {
+  const conNombre = (extra = {}) => ({
+    ...LISTA,
+    opcionesImagen: { ...LISTA.opcionesImagen, fotos: true, formato: 'retratos-nombre', ...extra },
+  })
+  const medidas = () => medidasRetratos({ margen: 56 })
+  const celdasDe = (plano) => plano.ordenes.filter(
+    (o) => o.tipo === 'rect' && o.radio === RETRATOS.radioFoto && o.alto === medidas().alto)
+
+  it('usa la misma celda que Retratos: foto entera y nombre adentro', () => {
+    const plano = maquetar(conNombre(), ROSTER, opciones)
+    const celda = celdasDe(plano)[0]
+    expect(celda.ancho).toBe(medidas().celda)
+    expect(celda.alto).toBe(medidas().alto)
+    // El nombre del chico, en blanco, adentro de la celda.
+    const nombre = plano.ordenes.find(
+      (o) => o.tipo === 'texto' && o.color === COLORES.blanco && o.fila === celda.fila
+        && o.y > celda.y + celda.alto * 0.7)
+    expect(nombre).toBeDefined()
+    expect(nombre.y).toBeLessThan(celda.y + celda.alto)
+  })
+
+  it('escribe al voluntario debajo de la celda, no como medallon', () => {
+    const plano = maquetar(conNombre(), ROSTER, opciones)
+    const celda = celdasDe(plano)[0]
+    // Ningun marco blanco de medallon.
+    const marcos = plano.ordenes.filter((o) => o.tipo === 'rect' && o.color === COLORES.blanco)
+    expect(marcos).toHaveLength(0)
+    // Y el nombre del voluntario, en magenta, por debajo de la foto.
+    const nombreVol = plano.ordenes.find(
+      (o) => o.tipo === 'texto' && o.color === COLORES.magentaTexto && o.y > celda.y + celda.alto)
+    expect(nombreVol).toBeDefined()
+  })
+
+  it('la esquina, el tamaño y el sobresalido no lo tocan: no tiene medallon', () => {
+    const base = maquetar(conNombre(), ROSTER, opciones)
+    const otro = maquetar(conNombre({
+      esquinaVoluntario: 'superpuesto-abajo-derecha',
+      tamanoVoluntario: 'enorme',
+      asomoVoluntario: 'alto',
+    }), ROSTER, opciones)
+    expect(otro.ancho).toBe(base.ancho)
+    expect(otro.alto).toBe(base.alto)
+  })
+
+  it('no deja el aire del texto en los renglones sin acompañante', () => {
+    const sinNadie = {
+      ...conNombre(),
+      grupos: LISTA.grupos.map((g) => ({ ...g, filas: g.filas.map((f) => ({ ...f, voluntarios: [] })) })),
+    }
+    expect(maquetar(sinNadie, ROSTER, opciones).alto)
+      .toBeLessThan(maquetar(conNombre(), ROSTER, opciones).alto)
+  })
+
+  it('los dos formatos comparten el dibujo de la celda, no una copia', () => {
+    // Si se separaran, un arreglo en uno dejaria al otro atras. La celda tiene
+    // que salir identica en los dos, sin contar lo del voluntario.
+    const deRetratos = maquetar({
+      ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, fotos: true, formato: 'retratos' },
+    }, ROSTER, opciones)
+    const conNombreAbajo = maquetar(conNombre(), ROSTER, opciones)
+    const primeraCelda = (plano) => plano.ordenes.filter(
+      (o) => o.tipo === 'rect' && o.radio === RETRATOS.radioFoto && o.alto === medidas().alto)[0]
+    expect(primeraCelda(conNombreAbajo).ancho).toBe(primeraCelda(deRetratos).ancho)
+    expect(primeraCelda(conNombreAbajo).alto).toBe(primeraCelda(deRetratos).alto)
+  })
+})

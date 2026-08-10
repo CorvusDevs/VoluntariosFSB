@@ -368,14 +368,21 @@ describe('selector de formato', () => {
     expect(rp.querySelector('.selector-visual')).not.toBeNull()
   })
 
-  it('ofrece los cuatro formatos y arranca en el por defecto', () => {
-    expect(valores(raiz, 'formato')).toEqual(['retratos', 'grilla', 'columnas', 'filas'])
+  it('ofrece los cinco formatos y arranca en el por defecto', () => {
+    expect(valores(raiz, 'formato'))
+      .toEqual(['retratos', 'retratos-nombre', 'grilla', 'columnas', 'filas'])
     expect(elegido(raiz, 'formato')).toBe(FORMATO_POR_DEFECTO)
   })
 
   it('cada opcion trae su propio bosquejo dibujado', () => {
     const lienzos = raiz.querySelectorAll('[data-campo="formato"] .bosquejo-lienzo')
-    expect(lienzos).toHaveLength(4)
+    expect(lienzos).toHaveLength(5)
+  })
+
+  it('con el nombre abajo no hay medallon, asi que no hay esquina que elegir', () => {
+    tocar(raiz, 'formato', 'retratos-nombre')
+    expect(raiz.querySelector('[data-campo="esquina-voluntario"]')).toBeNull()
+    expect(raiz.querySelector('[data-campo="tamanoVoluntario"]')).toBeNull()
   })
 
   it('la esquina de los voluntarios solo aparece en el formato retratos', () => {

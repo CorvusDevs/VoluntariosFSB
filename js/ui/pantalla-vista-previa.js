@@ -77,6 +77,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // cargadas, donde una grilla de iniciales grandes se ve peor que una lista.
   const FORMATOS = [
     ['retratos', 'Retratos'],
+    ['retratos-nombre', 'Retratos, nombre abajo'],
     ['grilla', 'Grilla'],
     ['columnas', 'Dos columnas'],
     ['filas', 'Lista'],
@@ -155,6 +156,8 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   }
 
   function selectorDeEsquina() {
+    // Solo en "retratos": es el unico formato donde el voluntario es un medallon
+    // sobre la foto. Con el nombre debajo no hay medallon que ubicar.
     if ((lista.opcionesImagen?.formato ?? FORMATO_POR_DEFECTO) !== 'retratos') return null
     return selectorVisual({
       campo: 'esquina-voluntario',
