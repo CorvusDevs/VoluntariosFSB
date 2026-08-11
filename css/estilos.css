@@ -813,3 +813,30 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .tabla-reporte td[data-estado="falto"] { color: var(--magenta-texto); }
 .tabla-reporte .resumen-reporte { color: var(--texto-suave); font-size: 14px; }
 .acciones-reporte { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+/* Corrección de asistencia. Filas anchas y tocables: se usan de a muchas
+   seguidas y con el telefono en la mano. */
+.columna-asistencia { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+.subtitulo-asistencia { font-size: 15px; font-weight: 500; color: var(--texto-suave); margin: 12px 0 8px; }
+.fila-asistencia {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--linea);
+  border-radius: 12px;
+  background: var(--fondo);
+  font: inherit;
+  font-size: 15px;
+  color: var(--texto);
+  cursor: pointer;
+  text-align: left;
+}
+.marca-asistencia { font-size: 14px; }
+.fila-asistencia[data-estado="vino"] { border-color: var(--turquesa); }
+.fila-asistencia[data-estado="vino"] .marca-asistencia { color: var(--turquesa-texto); }
+.fila-asistencia[data-estado="falto"] { border-color: var(--magenta); }
+.fila-asistencia[data-estado="falto"] .marca-asistencia { color: var(--magenta-texto); }
+.fila-asistencia[data-estado="no-estaba"] { opacity: 0.5; }
