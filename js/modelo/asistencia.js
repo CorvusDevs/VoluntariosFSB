@@ -96,13 +96,18 @@ export const UMBRAL_ALERTA = 3
 // Cuantas faltas seguidas trae hasta hoy, contando desde el ultimo sabado hacia
 // atras. Los sabados en que la persona todavia no estaba se saltean sin cortar
 // la racha, igual que un sabado sin planilla: ni suman ni interrumpen.
+//
+// `almenos` avisa que la cuenta llego al principio de lo que se miro sin
+// encontrar un sabado en que viniera. Quien llama suele mirar solo los ultimos
+// sabados, asi que la racha real puede ser mas larga, y decir el numero pelado
+// seria afirmar de mas.
 function rachaFinal(estados) {
   let faltas = 0
   for (let i = estados.length - 1; i >= 0; i -= 1) {
-    if (estados[i] === VINO) break
+    if (estados[i] === VINO) return { faltas, almenos: false }
     if (estados[i] === FALTO) faltas += 1
   }
-  return faltas
+  return { faltas, almenos: faltas > 0 }
 }
 
 // Un seguimiento silencia UNA racha, no a la persona: vale mientras no haya
@@ -120,10 +125,10 @@ export function rachasDeFalta(historia, seguimientos = []) {
   const alertas = []
   const revisar = (filas) => filas.forEach((fila) => {
     if (fila.persona.activo === false) return
-    const faltas = rachaFinal(fila.estados)
+    const { faltas, almenos } = rachaFinal(fila.estados)
     if (faltas < UMBRAL_ALERTA) return
     if (silenciada(fila, historia.fechas, seguimientos)) return
-    alertas.push({ persona: fila.persona, faltas })
+    alertas.push({ persona: fila.persona, faltas, almenos })
   })
   revisar(historia.participantes)
   revisar(historia.voluntarios)

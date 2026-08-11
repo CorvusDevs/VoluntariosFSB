@@ -228,3 +228,21 @@ describe('hastaHoy', () => {
     expect(hastaHoy(['2026-08-08', '2026-07-25'], '2026-08-11')).toEqual(['2026-07-25', '2026-08-08'])
   })
 })
+
+describe('rachas que llegan al borde de lo que se miro', () => {
+  it('avisa cuando la racha ocupa todo lo mirado', () => {
+    // app.js solo lee los ultimos sabados. Si el primero que mira ya es falta,
+    // la racha puede venir de antes y decir "falto 4" seria afirmar de mas.
+    const h = historial(cuatroSabados([false, false, false, false]), ROSTER, [])
+    const alerta = rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')
+    expect(alerta.faltas).toBe(4)
+    expect(alerta.almenos).toBe(true)
+  })
+
+  it('no lo marca cuando antes de la racha hubo un sabado que vino', () => {
+    const h = historial(cuatroSabados([true, false, false, false]), ROSTER, [])
+    const alerta = rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')
+    expect(alerta.faltas).toBe(3)
+    expect(alerta.almenos).toBe(false)
+  })
+})

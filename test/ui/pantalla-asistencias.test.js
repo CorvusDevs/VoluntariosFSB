@@ -119,3 +119,91 @@ describe('pantalla de asistencias', () => {
     expect(raiz.textContent).toContain('No hay planillas')
   })
 })
+
+describe('corregir a quien no figuraba en la planilla', () => {
+  const rosterConAusente = {
+    version: 1,
+    participantes: [{ id: 'pX', nombre: 'Recien anotada', grupo: 1, activo: true }],
+    voluntarios: [],
+  }
+
+  const abrirCon = async () => {
+    const vista = crearPantallaAsistencias(raiz, { roster: rosterConAusente, almacen: deposito })
+    await esperar()
+    await esperar()
+    return vista
+  }
+
+  it('arranca en "no estaba" si la planilla no la menciona', async () => {
+    await abrirCon()
+    expect(raiz.querySelector('[data-persona="pX"]').dataset.estado).toBe('no-estaba')
+  })
+
+  it('se puede volver a "no estaba" despues de tocarla dos veces', async () => {
+    // Antes el toque alternaba solo entre vino y falto: quien tocaba por error a
+    // alguien que no estaba en la planilla no tenia forma de deshacerlo, y le
+    // quedaba una falta inventada en el reporte.
+    await abrirCon()
+    const toque = async () => {
+      raiz.querySelector('[data-persona="pX"]').click()
+      await esperar()
+    }
+    await toque()
+    expect(raiz.querySelector('[data-persona="pX"]').dataset.estado).toBe('vino')
+    await toque()
+    expect(raiz.querySelector('[data-persona="pX"]').dataset.estado).toBe('falto')
+    await toque()
+    expect(raiz.querySelector('[data-persona="pX"]').dataset.estado).toBe('no-estaba')
+    expect(guardado.at(-1).datos.correcciones).toEqual([])
+  })
+})
+
+describe('cuando el guardado falla', () => {
+  it('no deja la correccion en pantalla como si se hubiera guardado', async () => {
+    // Peor que no poder corregir es creer que se corrigio: el reporte del mes
+    // saldria distinto de lo que quedo en pantalla.
+    deposito.guardarAsistencias = vi.fn(async () => { throw new Error('sin conexión') })
+    await abrir()
+    const antes = raiz.querySelector('[data-persona="p1"]').dataset.estado
+    raiz.querySelector('[data-persona="p1"]').click()
+    await esperar()
+    expect(raiz.querySelector('[data-persona="p1"]').dataset.estado).toBe(antes)
+    expect(raiz.textContent).toContain('No se pudo guardar')
+  })
+})
+
+describe('cambiar de sabado rapido', () => {
+  it('gana el ultimo que se eligio, no el que termine ultimo de leer', async () => {
+    await abrir()
+    // El 01 tarda mas que el 08: sin control de carrera, su respuesta pisaba la
+    // del sabado que la coordinadora tiene elegido en pantalla.
+    // El 01 tarda mas y en el 01 p1 no fue; en el 08 si. Lo que hay que mirar es
+    // el estado dibujado, no el selector: el selector se dibuja de la fecha
+    // elegida y sale bien igual, tapando que los datos son del otro sabado.
+    const vacia = { fecha: '2026-08-01', ausentes: ['p1'], grupos: [{ numero: 1, filas: [], apoyo: [] }] }
+    const demoras = { '2026-08-01': 60, '2026-08-08': 0 }
+    deposito.leerLista = vi.fn((f) => new Promise((r) => {
+      setTimeout(() => r(f === '2026-08-01' ? vacia : LISTA), demoras[f])
+    }))
+    const elegir = (f) => {
+      const s = raiz.querySelector('[data-campo="sabado"]')
+      s.value = f
+      s.dispatchEvent(new Event('change'))
+    }
+    elegir('2026-08-01')
+    elegir('2026-08-08')
+    await new Promise((r) => setTimeout(r, 150))
+    expect(raiz.querySelector('[data-campo="sabado"]').value).toBe('2026-08-08')
+    expect(raiz.querySelector('[data-persona="p1"]').dataset.estado).toBe('vino')
+  })
+})
+
+describe('cuando la lectura falla', () => {
+  it('lo dice en vez de quedarse en "Leyendo" para siempre', async () => {
+    deposito.listarListas = vi.fn(async () => { throw new Error('sin conexión') })
+    await abrir()
+    await esperar()
+    expect(raiz.textContent).not.toContain('Leyendo')
+    expect(raiz.textContent).toContain('No se pudo leer')
+  })
+})

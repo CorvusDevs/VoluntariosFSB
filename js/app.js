@@ -147,8 +147,16 @@ async function anotarSeguimiento(persona, nota) {
     quien: sesion?.nombre ?? 'sin registrar',
     cuando: new Date().toISOString(),
   }]
-  await deposito.guardarSeguimientos({ version: 1, seguimientos },
-    `Anotar un seguimiento de ${persona.nombre}`)
+  try {
+    await deposito.guardarSeguimientos({ version: 1, seguimientos },
+      `Anotar un seguimiento de ${persona.nombre}`)
+  } catch (fallo) {
+    // La nota es lo unico que queda escrito de que alguien se ocupo del tema.
+    // Perderla en silencio, con la franja apagandose igual, seria lo peor de
+    // los dos mundos: sin registro y sin recordatorio.
+    window.alert(`No se pudo guardar la nota sobre ${persona.nombre}: ${fallo.message}`)
+    return
+  }
   alertas = await calcularAlertas()
   dibujar()
 }

@@ -22,16 +22,32 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
   let historia = null
   let cargando = true
   let vivo = true
+  let carga = 0
+  let error = null
 
+  // Cada carga se lleva su numero y su mes. Si mientras se leen las planillas la
+  // coordinadora elige otro mes, la respuesta que llega tarde ya no corresponde
+  // y se descarta: sin esto el selector decia agosto y la tabla mostraba julio.
   async function cargar() {
+    carga += 1
+    const mia = carga
+    const pedido = mes
     cargando = true
+    error = null
     dibujar()
-    const claves = (await almacen.listarListas()).map((l) => l.fecha)
-    const fechas = delMes(claves, mes)
-    const listas = (await Promise.all(fechas.map((f) => almacen.leerLista(f)))).filter(Boolean)
-    const archivo = await almacen.leerAsistencias(mes)
-    if (!vivo) return
-    historia = historial(listas, roster, archivo?.correcciones ?? [])
+    try {
+      const claves = (await almacen.listarListas()).map((l) => l.fecha)
+      const fechas = delMes(claves, pedido)
+      const listas = (await Promise.all(fechas.map((f) => almacen.leerLista(f)))).filter(Boolean)
+      const archivo = await almacen.leerAsistencias(pedido)
+      if (!vivo || mia !== carga) return
+      historia = historial(listas, roster, archivo?.correcciones ?? [])
+    } catch (fallo) {
+      // Red caida o token vencido. Sin esto la pantalla se quedaba en "Leyendo"
+      // para siempre y no habia forma de saber que habia pasado.
+      if (!vivo || mia !== carga) return
+      error = `No se pudo leer: ${fallo.message}`
+    }
     cargando = false
     dibujar()
   }
@@ -128,6 +144,8 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
 
     if (cargando) {
       seccion.appendChild(elemento('p', ['ayuda'], 'Leyendo las planillas del mes…'))
+    } else if (error) {
+      seccion.appendChild(elemento('p', ['error-ajustes'], error))
     } else if (historia.fechas.length === 0) {
       seccion.appendChild(elemento('p', ['ayuda'], 'No hay planillas guardadas de ese mes.'))
     } else {

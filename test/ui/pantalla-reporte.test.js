@@ -127,3 +127,46 @@ describe('pantalla de reporte', () => {
     expect(raiz.textContent).not.toContain('No hay planillas')
   })
 })
+
+describe('cambiar de mes rapido', () => {
+  it('gana el ultimo mes elegido, no el que termine ultimo de leer', async () => {
+    await abrir()
+    // Julio tarda mas que agosto. Sin control de carrera su respuesta pisaba la
+    // tabla del mes que la coordinadora tiene elegido.
+    const julio = {
+      fecha: '2026-07-04',
+      ausentes: ['p1'],
+      grupos: [{ numero: 1, filas: [], apoyo: ['v1'] }, { numero: 2, filas: [], apoyo: [] }],
+    }
+    deposito.listarListas = vi.fn(async () => [{ fecha: '2026-07-04' }, { fecha: '2026-08-01' }])
+    deposito.leerLista = vi.fn((f) => new Promise((r) => {
+      setTimeout(() => r(f === '2026-07-04' ? julio : LISTAS['2026-08-01']), f.startsWith('2026-07') ? 60 : 0)
+    }))
+    const elegir = (m) => {
+      const s = raiz.querySelector('[data-campo="mes"]')
+      s.value = m
+      s.dispatchEvent(new Event('change'))
+    }
+    elegir('2026-07')
+    // La espera es la parte que importa: en la vida real pasan segundos entre un
+    // clic y el otro, asi que la carga de julio ya paso su primer await cuando
+    // se elige agosto. Sin ella la carrera se tapa sola y la prueba no prueba nada.
+    await new Promise((r) => setTimeout(r, 20))
+    elegir('2026-08')
+    await new Promise((r) => setTimeout(r, 200))
+    expect(raiz.querySelector('[data-campo="mes"]').value).toBe('2026-08')
+    expect([...raiz.querySelectorAll('thead th.dia')].map((t) => t.textContent)).toEqual(['1'])
+  })
+})
+
+describe('cuando la lectura falla', () => {
+  it('lo dice en vez de quedarse en "Leyendo" para siempre', async () => {
+    // En modo GitHub esto es una caida de red o un token vencido. Sin el aviso
+    // la pantalla queda congelada y no hay forma de saber que paso.
+    deposito.listarListas = vi.fn(async () => { throw new Error('sin conexión') })
+    await abrir()
+    await esperar()
+    expect(raiz.textContent).not.toContain('Leyendo')
+    expect(raiz.textContent).toContain('No se pudo leer')
+  })
+})

@@ -70,3 +70,27 @@ describe('franja de alerta', () => {
     expect(raiz.textContent).toContain('Alguien viene faltando')
   })
 })
+
+describe('rachas que pueden venir de mas atras', () => {
+  it('dice "al menos" cuando la racha ocupa todo lo que se miro', () => {
+    // La aplicacion lee los ultimos sabados, no el año. Si la racha llega al
+    // borde de esa ventana, el numero exacto no se sabe, y decirlo como si se
+    // supiera es afirmar de mas sobre un chico.
+    raiz.appendChild(crearFranjaAlerta({
+      alertas: [{ persona: { id: 'p1', nombre: 'Gaia' }, faltas: 4, almenos: true }],
+      alSilenciar,
+      alVerElMes,
+    }))
+    expect(raiz.textContent).toContain('faltó al menos 4 sábados seguidos')
+  })
+
+  it('sin el aviso lo dice exacto', () => {
+    raiz.appendChild(crearFranjaAlerta({
+      alertas: [{ persona: { id: 'p1', nombre: 'Gaia' }, faltas: 3, almenos: false }],
+      alSilenciar,
+      alVerElMes,
+    }))
+    expect(raiz.textContent).toContain('faltó 3 sábados seguidos')
+    expect(raiz.textContent).not.toContain('al menos')
+  })
+})

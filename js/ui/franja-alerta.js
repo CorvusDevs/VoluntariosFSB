@@ -13,10 +13,14 @@ export function crearFranjaAlerta({ alertas, alSilenciar, alVerElMes }) {
   caja.appendChild(elemento('h2', ['franja-alerta-titulo'],
     alertas.length === 1 ? 'Alguien viene faltando' : 'Hay quienes vienen faltando'))
 
-  alertas.forEach(({ persona, faltas }) => {
+  alertas.forEach(({ persona, faltas, almenos }) => {
     const fila = elemento('div', ['alerta-persona'])
+    // "al menos" cuando la racha llega al borde de los sabados que se leyeron:
+    // puede venir de mas atras, y dar el numero exacto seria afirmar de mas
+    // sobre un chico.
+    const cuantos = almenos ? `al menos ${faltas}` : `${faltas}`
     fila.appendChild(elemento('span', ['alerta-texto'],
-      `${persona.nombre} faltó ${faltas} sábados seguidos`))
+      `${persona.nombre} faltó ${cuantos} sábados seguidos`))
     const anotar = boton('Anotar y silenciar', async () => {
       // El texto es obligatorio a proposito: silenciar sin decir por que deja a
       // la siguiente coordinadora sin saber si alguien se ocupo del tema.

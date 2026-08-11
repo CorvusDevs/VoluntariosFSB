@@ -15,12 +15,27 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
   let correcciones = []
   let cargando = true
   let vivo = true
+  let error = null
+  // Cada carga se lleva su numero. Si mientras se lee un sabado la coordinadora
+  // elige otro, la respuesta que llega tarde ya no es la que corresponde y se
+  // descarta: sin esto el selector mostraba un sabado y las filas otro.
+  let carga = 0
 
   async function cargarSabados() {
     // Solo sabados que ya pasaron: corregir la asistencia de uno que todavia no
     // llego no quiere decir nada, y verlo en la lista hace dudar de si la
     // planilla del sabado que viene ya cuenta para el reporte.
-    const guardadas = (await almacen.listarListas()).map((l) => l.fecha)
+    let guardadas
+    try {
+      guardadas = (await almacen.listarListas()).map((l) => l.fecha)
+    } catch (fallo) {
+      // Sin esto la pantalla se quedaba en "Leyendo" para siempre.
+      if (!vivo) return
+      error = `No se pudo leer: ${fallo.message}`
+      cargando = false
+      dibujar()
+      return
+    }
     fechas = hastaHoy(guardadas, hoyISO()).reverse()
     if (!vivo) return
     fecha = fechas[0] ?? null
@@ -33,16 +48,25 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
   }
 
   async function cargarSabado() {
+    carga += 1
+    const mia = carga
     cargando = true
     dibujar()
-    lista = await almacen.leerLista(fecha)
-    const archivo = await almacen.leerAsistencias(mesDe(fecha))
-    if (!vivo) return
-    // Se calcula una vez por sabado y no una vez por fila: recorrer la planilla
-    // entera por cada persona es el mismo trabajo repetido tantas veces como
-    // gente haya.
-    derivado = estadoDeSabado(lista, roster)
-    correcciones = archivo?.correcciones ?? []
+    const pedida = fecha
+    try {
+      lista = await almacen.leerLista(pedida)
+      const archivo = await almacen.leerAsistencias(mesDe(pedida))
+      if (!vivo || mia !== carga) return
+      // Se calcula una vez por sabado y no una vez por fila: recorrer la
+      // planilla entera por cada persona es el mismo trabajo repetido tantas
+      // veces como gente haya.
+      derivado = estadoDeSabado(lista, roster)
+      correcciones = archivo?.correcciones ?? []
+      error = null
+    } catch (fallo) {
+      if (!vivo || mia !== carga) return
+      error = `No se pudo leer: ${fallo.message}`
+    }
     cargando = false
     dibujar()
   }
@@ -53,12 +77,24 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
     return derivado.get(id) ?? NO_ESTABA
   }
 
+  // El toque avanza al estado siguiente y vuelve al principio. El principio es
+  // lo que dice la planilla, asi que a quien no figura en ella se la puede
+  // devolver a "no estaba": antes el toque alternaba solo entre vino y falto y
+  // quien la tocaba por error le dejaba una falta inventada en el reporte, sin
+  // forma de deshacerla.
+  function proximoEstado(actual, base) {
+    const vuelta = base === VINO ? [VINO, FALTO] : base === FALTO ? [FALTO, VINO] : [NO_ESTABA, VINO, FALTO]
+    return vuelta[(vuelta.indexOf(actual) + 1) % vuelta.length]
+  }
+
   async function alternar(persona) {
-    const siguiente = estadoDe(persona.id) === VINO ? FALTO : VINO
+    const base = derivado.get(persona.id) ?? NO_ESTABA
+    const siguiente = proximoEstado(estadoDe(persona.id), base)
     const resto = correcciones.filter((c) => !(c.fecha === fecha && c.persona === persona.id))
     // Si la correccion coincide con lo que ya dice la planilla, no es una
     // correccion: se borra en vez de guardar una diferencia que no difiere.
-    correcciones = siguiente === derivado.get(persona.id)
+    const previas = correcciones
+    correcciones = siguiente === base
       ? resto
       : [...resto, {
         fecha,
@@ -68,8 +104,17 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
       }]
     dibujar()
     const mes = mesDe(fecha)
-    await almacen.guardarAsistencias(mes, { version: 1, mes, correcciones },
-      `Corregir la asistencia del ${fecha}`)
+    try {
+      await almacen.guardarAsistencias(mes, { version: 1, mes, correcciones },
+        `Corregir la asistencia del ${fecha}`)
+      error = null
+    } catch (fallo) {
+      // Sin esto la correccion quedaba en pantalla como si se hubiera guardado.
+      // Peor que no poder corregir es creer que se corrigio.
+      correcciones = previas
+      error = `No se pudo guardar: ${fallo.message}`
+      dibujar()
+    }
   }
 
   function filaPersona(persona) {
@@ -92,6 +137,12 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
     vaciar(raiz)
     const seccion = elemento('section', ['seccion'])
     seccion.appendChild(elemento('h2', [], 'Asistencia de un sábado'))
+
+    if (error && fechas.length === 0) {
+      seccion.appendChild(elemento('p', ['error-ajustes'], error))
+      raiz.appendChild(seccion)
+      return
+    }
 
     if (fechas.length === 0 && !cargando) {
       seccion.appendChild(elemento('p', ['ayuda'], 'No hay planillas guardadas para corregir.'))
@@ -124,6 +175,7 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
 
     seccion.appendChild(elemento('p', ['ayuda'],
       'Sale de la planilla de ese día. Tocá a quien no coincida con lo que pasó.'))
+    if (error) seccion.appendChild(elemento('p', ['error-ajustes'], error))
     const bloque = (titulo, gente) => {
       seccion.appendChild(elemento('h3', ['subtitulo-asistencia'], titulo))
       const columna = elemento('div', ['columna-asistencia'])
