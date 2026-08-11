@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  estadoDeSabado, historial, rachasDeFalta, UMBRAL_ALERTA, VINO, FALTO, NO_ESTABA,
+  estadoDeSabado, historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA, VINO, FALTO, NO_ESTABA,
 } from '../../js/modelo/asistencia.js'
 
 const ROSTER = {
@@ -205,5 +205,26 @@ describe('rachasDeFalta', () => {
     const h = historial(cuatroSabados([false, false, false, false]), ROSTER, [])
     const alertas = rachasDeFalta(h, [])
     expect(alertas[0].faltas).toBeGreaterThanOrEqual(alertas[alertas.length - 1].faltas)
+  })
+})
+
+describe('hastaHoy', () => {
+  it('deja pasar los sabados que ya ocurrieron', () => {
+    expect(hastaHoy(['2026-08-01', '2026-08-08'], '2026-08-11')).toEqual(['2026-08-01', '2026-08-08'])
+  })
+
+  it('descarta el sabado que todavia no llego', () => {
+    // La planilla del sabado que viene es un plan, no evidencia: se crea con
+    // todos presentes, y ese "vino" imaginario cortaba toda racha de faltas.
+    // Con esto adentro la alerta no saltaba nunca.
+    expect(hastaHoy(['2026-08-08', '2026-08-15'], '2026-08-11')).toEqual(['2026-08-08'])
+  })
+
+  it('el sabado de hoy si cuenta', () => {
+    expect(hastaHoy(['2026-08-15'], '2026-08-15')).toEqual(['2026-08-15'])
+  })
+
+  it('devuelve las fechas ordenadas', () => {
+    expect(hastaHoy(['2026-08-08', '2026-07-25'], '2026-08-11')).toEqual(['2026-07-25', '2026-08-08'])
   })
 })

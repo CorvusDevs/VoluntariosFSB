@@ -88,6 +88,18 @@ describe('pantalla de reporte', () => {
     expect(raiz.querySelector('table')).toBeNull()
   })
 
+  it('no cuenta la planilla del sabado que todavia no llego', async () => {
+    // Una planilla nueva trae a todos presentes porque es un plan. Mostrarla en
+    // el reporte diria que fue gente que todavia no fue, y en la alerta ese
+    // "vino" del futuro cortaba cualquier racha de faltas.
+    const futuro = new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString().slice(0, 10)
+    const mes = futuro.slice(0, 7)
+    deposito.listarListas = vi.fn(async () => [{ fecha: futuro }])
+    await abrir(mes)
+    expect(deposito.leerLista).not.toHaveBeenCalled()
+    expect(raiz.textContent).toContain('No hay planillas')
+  })
+
   it('ofrece las dos descargas', async () => {
     await abrir()
     expect(raiz.querySelector('[data-accion="descargar-png"]')).not.toBeNull()

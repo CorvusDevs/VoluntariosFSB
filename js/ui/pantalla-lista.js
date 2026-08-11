@@ -7,7 +7,7 @@ import {
 import { crearPila } from '../modelo/deshacer.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 
-export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFecha }) {
+export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFecha, franja = null }) {
   const pila = crearPila(lista)
   let seleccionado = null
   // Cuando se esta eligiendo el apoyo de un grupo, guarda su numero. Reusa el
@@ -381,6 +381,10 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     recordarAbiertos()
     vaciar(raiz)
     raiz.appendChild(encabezado())
+    // El aviso de faltas lo arma app.js, que es quien puede leer los sabados
+    // anteriores. Aca solo se le da su lugar, arriba de todo: mas abajo, en el
+    // telefono, nadie lo ve.
+    if (franja) raiz.appendChild(franja)
     raiz.appendChild(barra())
     // Los grupos van envueltos para poder ponerlos en una columna aparte de los
     // voluntarios en pantalla ancha. En el telefono el envoltorio no hace nada.

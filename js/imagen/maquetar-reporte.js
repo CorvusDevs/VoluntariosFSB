@@ -27,6 +27,8 @@ function mesEnPalabras(mes) {
 
 const diaDe = (fecha) => String(Number(fecha.slice(8, 10)))
 
+const FUENTE_TITULO = '500 34px Poppins'
+
 export function maquetarReporte({ historia, mes, medirTexto }) {
   const fuenteNombre = '400 22px Poppins'
   const anchoNombre = Math.max(
@@ -34,13 +36,20 @@ export function maquetarReporte({ historia, mes, medirTexto }) {
     ...[...historia.participantes, ...historia.voluntarios]
       .map((f) => medirTexto(f.persona.nombre, fuenteNombre) + 24),
   )
-  const ancho = MARGEN * 2 + anchoNombre + historia.fechas.length * ANCHO_COLUMNA + ANCHO_RESUMEN
+  const titulo = `Asistencia de ${mesEnPalabras(mes)}`
+  // El titulo tambien manda sobre el ancho. Con pocos sabados la tabla es
+  // angosta y el titulo se salia por la derecha: fillText no recorta, dibuja
+  // fuera del lienzo y ahi se pierde. Visto en el navegador con dos sabados.
+  const ancho = Math.max(
+    MARGEN * 2 + anchoNombre + historia.fechas.length * ANCHO_COLUMNA + ANCHO_RESUMEN,
+    MARGEN * 2 + medirTexto(titulo, FUENTE_TITULO),
+  )
   const ordenes = []
   let y = 0
 
   ordenes.push({ tipo: 'rect', x: 0, y: 0, ancho, alto: ALTO_TITULO, color: COLORES.violeta })
-  ordenes.push({ tipo: 'texto', texto: `Asistencia de ${mesEnPalabras(mes)}`,
-    x: MARGEN, y: 58, fuente: '500 34px Poppins', color: '#FFFFFF' })
+  ordenes.push({ tipo: 'texto', texto: titulo,
+    x: MARGEN, y: 58, fuente: FUENTE_TITULO, color: '#FFFFFF' })
   y = ALTO_TITULO + 20
 
   const columnaX = (i) => MARGEN + anchoNombre + i * ANCHO_COLUMNA

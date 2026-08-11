@@ -6,8 +6,12 @@ import { crearPantallaVistaPrevia } from './ui/pantalla-vista-previa.js'
 import { crearPantallaIngreso } from './ui/pantalla-ingreso.js'
 import { crearPantallaAjustes } from './ui/pantalla-ajustes.js'
 import { crearPantallaRegistro } from './ui/pantalla-registro.js'
+import { crearPantallaReporte } from './ui/pantalla-reporte.js'
+import { crearPantallaAsistencias } from './ui/pantalla-asistencias.js'
+import { crearFranjaAlerta } from './ui/franja-alerta.js'
+import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
 import { crearLista, sincronizarConRoster, moverAGrupo } from './modelo/lista.js'
-import { proximoSabado } from './util/fechas.js'
+import { proximoSabado, hoyISO } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
 import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
@@ -35,6 +39,9 @@ let pantalla = 'lista'
 // La pantalla que se esta mostrando. Algunas tienen trabajo en curso (fotos que
 // se decodifican, un lienzo que se repinta) y hay que avisarles que se van.
 let vista = null
+// Las alertas se calculan una vez por sesion: leer los ultimos sabados en cada
+// redibujado seria una llamada a GitHub por cada toque en la pantalla.
+let alertas = []
 
 function olvidarVista() {
   if (typeof vista?.destruir === 'function') vista.destruir()
@@ -71,6 +78,9 @@ function navegacion() {
     return b
   }
   nav.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
+  // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
+  // y la foto de cada chico, asi que la asistencia no agrega exposicion.
+  nav.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
   if (esAdmin(sesion)) {
@@ -100,6 +110,49 @@ async function cargarFoto(clave) {
   return createImageBitmap(blob)
 }
 
+// Mira solo los ultimos sabados que hagan falta para decidir una racha. Cada
+// sabado es un archivo aparte, y leer el año entero al abrir la aplicacion un
+// viernes a la noche se nota.
+const SABADOS_A_MIRAR = UMBRAL_ALERTA + 1
+
+async function calcularAlertas() {
+  try {
+    const guardadas = (await deposito.listarListas()).map((l) => l.fecha)
+    // hastaHoy saca la planilla del sabado que viene, que existe desde que se
+    // abre la aplicacion y trae a todos presentes. Sin esto la alerta no
+    // saltaba nunca: ese "vino" del futuro cortaba cualquier racha.
+    const fechas = hastaHoy(guardadas, hoyISO()).slice(-SABADOS_A_MIRAR)
+    if (fechas.length < UMBRAL_ALERTA) return []
+    const listas = (await Promise.all(fechas.map((f) => deposito.leerLista(f)))).filter(Boolean)
+    const meses = [...new Set(fechas.map((f) => f.slice(0, 7)))]
+    const archivos = await Promise.all(meses.map((m) => deposito.leerAsistencias(m)))
+    const correcciones = archivos.flatMap((a) => a?.correcciones ?? [])
+    const guardados = await deposito.leerSeguimientos()
+    return rachasDeFalta(historial(listas, roster, correcciones), guardados?.seguimientos ?? [])
+  } catch {
+    // Un aviso que no se pudo calcular no puede impedir armar la planilla, que
+    // es para lo que se abre la aplicacion.
+    return []
+  }
+}
+
+async function anotarSeguimiento(persona, nota) {
+  const guardados = (await deposito.leerSeguimientos())?.seguimientos ?? []
+  const seguimientos = [...guardados, {
+    persona: persona.id,
+    // La fecha de la planilla abierta, no la del reloj: es la que se compara
+    // contra los sabados para saber si volvio despues de la nota.
+    desde: lista.fecha,
+    nota,
+    quien: sesion?.nombre ?? 'sin registrar',
+    cuando: new Date().toISOString(),
+  }]
+  await deposito.guardarSeguimientos({ version: 1, seguimientos },
+    `Anotar un seguimiento de ${persona.nombre}`)
+  alertas = await calcularAlertas()
+  dibujar()
+}
+
 function dibujar() {
   olvidarVista()
   vaciar(contenedor)
@@ -112,6 +165,11 @@ function dibujar() {
     vista = crearPantallaLista(cuerpo, {
       lista,
       roster,
+      franja: crearFranjaAlerta({
+        alertas,
+        alSilenciar: anotarSeguimiento,
+        alVerElMes: () => { pantalla = 'reporte'; dibujar() },
+      }),
       alCambiar: async (siguiente, descripcion) => {
         lista = siguiente
         await deposito.guardarLista(lista, descripcion)
@@ -140,6 +198,16 @@ function dibujar() {
         await deposito.guardarLista(lista, descripcion)
       },
     })
+  } else if (pantalla === 'reporte') {
+    vista = crearPantallaReporte(cuerpo, {
+      roster,
+      almacen: deposito,
+      // Arranca en el mes de la planilla abierta, que es de lo que se viene
+      // hablando: pedir el mes antes de mostrar nada seria un paso de mas.
+      mes: lista.fecha.slice(0, 7),
+    })
+  } else if (pantalla === 'asistencias') {
+    vista = crearPantallaAsistencias(cuerpo, { roster, almacen: deposito })
   } else if (pantalla === 'registro' && esAdmin(sesion)) {
     // Se lee del repositorio privado, asi que sin sesion de GitHub no hay nada
     // que mostrar: en modo local los cambios no dejan rastro compartido.
@@ -219,6 +287,13 @@ async function abrirAplicacion() {
     lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
     pantalla = 'lista'
     dibujar()
+    // Despues de dibujar y sin await en el camino critico: la planilla tiene que
+    // aparecer ya, y el aviso se suma cuando este listo.
+    calcularAlertas().then((nuevas) => {
+      if (nuevas.length === 0) return
+      alertas = nuevas
+      if (pantalla === 'lista') dibujar()
+    })
   } catch (fallo) {
     // Un token vencido o un repositorio mal escrito no pueden dejar la
     // pantalla en blanco un viernes a la noche.

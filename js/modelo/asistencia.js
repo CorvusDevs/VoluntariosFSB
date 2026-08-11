@@ -129,3 +129,14 @@ export function rachasDeFalta(historia, seguimientos = []) {
   revisar(historia.voluntarios)
   return alertas.sort((a, b) => b.faltas - a.faltas)
 }
+
+// Solo los sabados que ya ocurrieron. La planilla del sabado que viene existe
+// desde que se abre la aplicacion y viene con todos presentes, porque es un plan
+// y no lo que paso. Contarla metia un "vino" imaginario al final de la historia
+// que cortaba cualquier racha de faltas, y con eso la alerta no saltaba nunca.
+//
+// Verificado en el navegador: con la planilla del 15 adentro, tres faltas
+// seguidas de Gaia daban racha 0.
+export function hastaHoy(fechas, hoy) {
+  return [...fechas].filter((f) => f <= hoy).sort()
+}

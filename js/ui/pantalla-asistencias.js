@@ -1,6 +1,6 @@
 import { elemento, vaciar } from './componentes.js'
-import { estadoDeSabado, VINO, FALTO, NO_ESTABA } from '../modelo/asistencia.js'
-import { formatearFechaLarga } from '../util/fechas.js'
+import { estadoDeSabado, hastaHoy, VINO, FALTO, NO_ESTABA } from '../modelo/asistencia.js'
+import { formatearFechaLarga, hoyISO } from '../util/fechas.js'
 
 const mesDe = (fecha) => fecha.slice(0, 7)
 
@@ -17,7 +17,11 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
   let vivo = true
 
   async function cargarSabados() {
-    fechas = (await almacen.listarListas()).map((l) => l.fecha).sort().reverse()
+    // Solo sabados que ya pasaron: corregir la asistencia de uno que todavia no
+    // llego no quiere decir nada, y verlo en la lista hace dudar de si la
+    // planilla del sabado que viene ya cuenta para el reporte.
+    const guardadas = (await almacen.listarListas()).map((l) => l.fecha)
+    fechas = hastaHoy(guardadas, hoyISO()).reverse()
     if (!vivo) return
     fecha = fechas[0] ?? null
     if (!fecha) {

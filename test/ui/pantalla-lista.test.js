@@ -444,3 +444,28 @@ describe('el elegidor se abre donde se tocó', () => {
     expect(raiz.querySelector('.voluntarios')).not.toBeNull()
   })
 })
+
+describe('franja de alerta en armar lista', () => {
+  it('sin franja la pantalla se dibuja igual', () => {
+    expect(raiz.querySelector('.franja-alerta')).toBeNull()
+    expect(raiz.querySelectorAll('.grupo')).toHaveLength(2)
+  })
+
+  it('la franja que recibe va arriba de todo, antes de los grupos', () => {
+    document.body.innerHTML = '<div id="raiz"></div>'
+    const otra = document.getElementById('raiz')
+    const franja = document.createElement('section')
+    franja.className = 'franja-alerta'
+    crearPantallaLista(otra, {
+      lista: crearLista('2026-08-08', ROSTER),
+      roster: ROSTER,
+      alCambiar: () => {},
+      franja,
+    })
+    const dibujada = otra.querySelector('.franja-alerta')
+    expect(dibujada).not.toBeNull()
+    // Antes de los grupos: si aparece abajo, en el telefono nadie la ve.
+    expect(dibujada.compareDocumentPosition(otra.querySelector('.grupos')))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+  })
+})

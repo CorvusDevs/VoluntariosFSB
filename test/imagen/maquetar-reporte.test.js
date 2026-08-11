@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { maquetarReporte } from '../../js/imagen/maquetar-reporte.js'
 import { TIPOS } from '../../js/imagen/pintar.js'
 
-const medir = (texto) => texto.length * 8
+// Sensible a la fuente, porque el titulo va en 34px y todo lo demas en 20 o 22:
+// un medidor de ancho fijo decia que el titulo entraba cuando en pantalla se
+// salia del lienzo.
+const anchoDe = (fuente) => Number(String(fuente).match(/(\d+)px/)?.[1] ?? 20) * 0.55
+const medir = (texto, fuente) => texto.length * anchoDe(fuente)
 
 const HISTORIA = {
   fechas: ['2026-08-01', '2026-08-08', '2026-08-15'],
@@ -65,17 +69,19 @@ describe('maquetarReporte', () => {
   })
 
   it('el ancho crece con la cantidad de sabados', () => {
-    const corta = maquetarReporte({
+    // Con tres sabados y menos manda el ancho del titulo, asi que la comparacion
+    // se hace donde la tabla ya es lo mas ancho: cinco columnas contra diez.
+    const conSabados = (cuantos) => maquetarReporte({
       historia: {
-        ...HISTORIA,
-        fechas: ['2026-08-01'],
-        participantes: HISTORIA.participantes.map((f) => ({ ...f, estados: ['vino'] })),
-        voluntarios: HISTORIA.voluntarios.map((f) => ({ ...f, estados: ['vino'] })),
+        fechas: Array.from({ length: cuantos }, (_, i) => `2026-08-${String(i + 1).padStart(2, '0')}`),
+        participantes: [{ persona: { id: 'p1', nombre: 'Gaia' },
+          estados: Array(cuantos).fill('vino'), vino: cuantos, de: cuantos }],
+        voluntarios: [],
       },
       mes: '2026-08',
       medirTexto: medir,
     })
-    expect(corta.ancho).toBeLessThan(maquetar().ancho)
+    expect(conSabados(5).ancho).toBeLessThan(conSabados(10).ancho)
   })
 
   it('el nombre largo ensancha la imagen en vez de desbordarla', () => {
@@ -89,6 +95,19 @@ describe('maquetarReporte', () => {
       medirTexto: medir,
     })
     expect(largo.ancho).toBeGreaterThan(maquetar().ancho)
+  })
+
+  it('la imagen es al menos tan ancha como su titulo', () => {
+    // Con pocos sabados el ancho lo fijaban las columnas, y el titulo se salia
+    // por la derecha: fillText no recorta, simplemente dibuja fuera del lienzo.
+    // Verificado en el navegador: "Asistencia de agosto de 2026" cortado en 488.
+    const corto = maquetarReporte({
+      historia: { fechas: [], participantes: [], voluntarios: [] },
+      mes: '2026-09',
+      medirTexto: medir,
+    })
+    const titulo = corto.ordenes.find((o) => o.tipo === 'texto' && o.texto.startsWith('Asistencia'))
+    expect(titulo.x + medir(titulo.texto, titulo.fuente)).toBeLessThanOrEqual(corto.ancho)
   })
 
   it('no dibuja nada fuera del lienzo', () => {

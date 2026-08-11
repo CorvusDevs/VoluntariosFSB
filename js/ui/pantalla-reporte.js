@@ -1,16 +1,21 @@
 import { elemento, boton, vaciar } from './componentes.js'
-import { historial, VINO, FALTO } from '../modelo/asistencia.js'
+import { historial, hastaHoy, VINO, FALTO } from '../modelo/asistencia.js'
 import { aCSV, descargarCSV } from '../reporte/csv.js'
 import { maquetarReporte } from '../imagen/maquetar-reporte.js'
 import { pintar } from '../imagen/pintar.js'
 import { medidorDesde, esperarFuentes, descargar } from '../imagen/exportar.js'
+import { hoyISO } from '../util/fechas.js'
 
 const MARCA = { [VINO]: '✓', [FALTO]: '✗' }
 const diaDe = (fecha) => String(Number(fecha.slice(8, 10)))
 
 // Las listas se guardan una por fecha, asi que el mes es un prefijo de la clave:
 // no hay indice que consultar ni fecha que parsear.
-const delMes = (fechas, mes) => fechas.filter((f) => f.startsWith(`${mes}-`)).sort()
+//
+// hastaHoy saca la planilla del sabado que viene: se crea con todos presentes
+// porque es un plan, y mostrarla como asistencia diria que fue gente que
+// todavia no fue.
+const delMes = (fechas, mes) => hastaHoy(fechas.filter((f) => f.startsWith(`${mes}-`)), hoyISO())
 
 export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial }) {
   let mes = mesInicial
