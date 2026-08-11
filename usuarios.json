@@ -60,6 +60,21 @@
         "iv": "DtWBpn/t6LeUV1as",
         "datos": "YFP/o+MSr4fhffd1CXWBnUXVHBreaw8edyqbsSpkokYlPhxZ/WuzJtSV0shoiwljnV5voNDJW8juadDkLtbhSsnfon8C5Us5sKlGmZtQv996QqZIapiWp+qyf9neLyzH7oClYpm/76lfFK/CPw=="
       }
+    },
+    {
+      "usuario": "renataperez",
+      "nombre": "Renata Pérez",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "tVIeJ0O+9ZBVW0unHmaaCg=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "rxksbV496diuoiWj",
+        "datos": "vl8yTB/Ne0eSTAiCRsF46Z/PRvWHcykR73mbozy60QywYaEBykhwm0jksJ9Vn68Vm6hvGecLUBVCGICQywDhMx6ZDdfwxR1oBnnKI1kUew54PoXeWodrDlkV83baIGqBZ5zE0KxSF0YWa1NN3g=="
+      }
     }
   ]
 }
