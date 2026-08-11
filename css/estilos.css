@@ -798,3 +798,18 @@ html, body { max-width: 100%; overflow-x: hidden; }
   background: var(--fondo);
   color: var(--texto);
 }
+
+/* Reporte de asistencia. La tabla puede tener cinco columnas de sabados mas el
+   nombre, asi que scrollea sola adentro de su caja: la pagina nunca se mueve
+   para el costado, que en el telefono es lo que rompe la lectura. */
+.tabla-envoltorio { overflow-x: auto; margin: 12px 0; }
+.tabla-reporte { border-collapse: collapse; font-size: 15px; }
+.tabla-reporte th, .tabla-reporte td { padding: 8px 10px; text-align: left; white-space: nowrap; }
+.tabla-reporte th.dia, .tabla-reporte td.casilla { text-align: center; min-width: 34px; }
+.tabla-reporte thead th { font-weight: 500; color: var(--texto-suave); border-bottom: 1px solid var(--linea); }
+.tabla-reporte .seccion-reporte { padding-top: 16px; font-weight: 500; color: var(--violeta); }
+.tabla-reporte tbody tr:nth-child(even) { background: #FBF8FC; }
+.tabla-reporte td[data-estado="vino"] { color: var(--turquesa-texto); }
+.tabla-reporte td[data-estado="falto"] { color: var(--magenta-texto); }
+.tabla-reporte .resumen-reporte { color: var(--texto-suave); font-size: 14px; }
+.acciones-reporte { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
