@@ -44,3 +44,48 @@ export function estadoDeSabado(lista, roster) {
   })
   return estado
 }
+
+// El historial de un periodo: una fila por persona, una columna por sabado que
+// tuvo planilla. Los sabados sin planilla no existen para el reporte: no hay
+// forma de distinguir "no hubo futbol" de "no se cargo", asi que no se afirma
+// nada sobre ellos.
+//
+// `correcciones` son solo las diferencias contra lo derivado, tal como se
+// guardan en asistencias/AAAA-MM.json. La lista vacia es el caso normal.
+export function historial(listas, roster, correcciones = []) {
+  const ordenadas = [...listas].sort((a, b) => a.fecha.localeCompare(b.fecha))
+  const fechas = ordenadas.map((l) => l.fecha)
+  const conocidas = new Set(fechas)
+
+  const porFecha = new Map(ordenadas.map((l) => [l.fecha, estadoDeSabado(l, roster)]))
+  correcciones.forEach((c) => {
+    // Una correccion de un sabado que no tiene planilla no tiene donde apoyarse.
+    if (!conocidas.has(c.fecha)) return
+    porFecha.get(c.fecha).set(c.persona, c.vino ? VINO : FALTO)
+  })
+
+  const fila = (persona, recortarArranque) => {
+    let estados = fechas.map((f) => porFecha.get(f).get(persona.id) ?? NO_ESTABA)
+    if (recortarArranque) {
+      // Del voluntario, "no aparece" y "todavia no estaba" son el mismo dato en
+      // una planilla suelta. Se separan aca: hasta que se lo ve por primera vez
+      // no habia nada que faltar.
+      const primero = estados.indexOf(VINO)
+      const hasta = primero === -1 ? estados.length : primero
+      estados = estados.map((e, i) => (i < hasta ? NO_ESTABA : e))
+    }
+    const posibles = estados.filter((e) => e !== NO_ESTABA)
+    return {
+      persona,
+      estados,
+      vino: posibles.filter((e) => e === VINO).length,
+      de: posibles.length,
+    }
+  }
+
+  return {
+    fechas,
+    participantes: (roster.participantes ?? []).map((p) => fila(p, false)),
+    voluntarios: (roster.voluntarios ?? []).map((v) => fila(v, true)),
+  }
+}
