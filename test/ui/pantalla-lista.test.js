@@ -58,6 +58,18 @@ describe('pantalla de armado', () => {
     expect(pantalla.lista().grupos[0].filas[0].voluntarios).toContain('v1')
   })
 
+  it('describe el resultado del emparejamiento para confirmarlo en pantalla', () => {
+    let confirmacion = null
+    pantalla = crearPantallaLista(raiz, {
+      lista: crearLista('2026-08-08', ROSTER),
+      roster: ROSTER,
+      alCambiar: (_lista, _descripcion, mensaje) => { confirmacion = mensaje },
+    })
+    porNombre('.columna-participantes .ficha', 'Gonzalo').click()
+    porNombre('.columna-voluntarios .ficha', 'Abi').click()
+    expect(confirmacion).toBe('Gonzalo quedó con Abi')
+  })
+
   it('tocar un segundo voluntario lo suma a la misma fila', () => {
     porNombre('.columna-participantes .ficha', 'Gonzalo').click()
     porNombre('.columna-voluntarios .ficha', 'Abi').click()

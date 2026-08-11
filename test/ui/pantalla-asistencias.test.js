@@ -118,6 +118,15 @@ describe('pantalla de asistencias', () => {
     await abrir()
     expect(raiz.textContent).toContain('No hay planillas')
   })
+
+  it('sin planillas permite volver a armar la lista', async () => {
+    deposito.listarListas = vi.fn(async () => [])
+    const alIrALista = vi.fn()
+    crearPantallaAsistencias(raiz, { roster: ROSTER, almacen: deposito, alIrALista })
+    await esperar()
+    raiz.querySelector('[data-accion="ir-a-lista"]').click()
+    expect(alIrALista).toHaveBeenCalledOnce()
+  })
 })
 
 describe('corregir a quien no figuraba en la planilla', () => {

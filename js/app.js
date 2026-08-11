@@ -42,6 +42,47 @@ let vista = null
 // Las alertas se calculan una vez por sesion: leer los ultimos sabados en cada
 // redibujado seria una llamada a GitHub por cada toque en la pantalla.
 let alertas = []
+let ocultarEstadoGuardado = null
+let intentoGuardado = 0
+
+function cambiarEstadoGuardado(estado, mensaje, alReintentar = null) {
+  const indicador = contenedor.querySelector('[data-estado-guardado]')
+  if (!indicador) return
+  if (ocultarEstadoGuardado) clearTimeout(ocultarEstadoGuardado)
+  vaciar(indicador)
+  indicador.hidden = false
+  indicador.dataset.estado = estado
+  indicador.appendChild(elemento('span', ['estado-guardado-texto'], mensaje))
+  if (alReintentar) {
+    const reintentar = boton('Reintentar', alReintentar, ['boton-reintentar'])
+    reintentar.dataset.accion = 'reintentar-guardado'
+    indicador.appendChild(reintentar)
+  }
+  if (estado === 'guardado') {
+    ocultarEstadoGuardado = setTimeout(() => { indicador.hidden = true }, 1800)
+  }
+}
+
+async function guardarListaConEstado(siguiente, descripcion, confirmacion = null) {
+  intentoGuardado += 1
+  const esteIntento = intentoGuardado
+  lista = siguiente
+  cambiarEstadoGuardado('guardando', 'Guardando…')
+  try {
+    await deposito.guardarLista(siguiente, descripcion)
+    if (esteIntento === intentoGuardado) {
+      cambiarEstadoGuardado('guardado', confirmacion ?? 'Guardado')
+    }
+    return true
+  } catch (fallo) {
+    if (esteIntento === intentoGuardado) {
+      cambiarEstadoGuardado('error', `No se pudo guardar: ${fallo.message}`, () => {
+        guardarListaConEstado(siguiente, descripcion, confirmacion)
+      })
+    }
+    return false
+  }
+}
 
 function olvidarVista() {
   if (typeof vista?.destruir === 'function') vista.destruir()
@@ -70,22 +111,28 @@ async function guardarArchivoUsuarios(archivo, descripcion = 'Cambiar los acceso
 }
 
 function navegacion() {
-  const nav = elemento('nav', ['navegacion'])
+  const caja = elemento('div', ['navegacion-contenedor'])
   const ir = (destino, etiqueta) => {
     const b = boton(etiqueta, () => { pantalla = destino; dibujar() })
     b.dataset.pantalla = destino
-    if (pantalla === destino) b.classList.add('activa')
+    if (pantalla === destino) {
+      b.classList.add('activa')
+      b.setAttribute('aria-current', 'page')
+    }
     return b
   }
-  nav.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
+
+  const escritorio = elemento('nav', ['navegacion', 'navegacion-escritorio'])
+  escritorio.setAttribute('aria-label', 'Secciones')
+  escritorio.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
   // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
   // y la foto de cada chico, asi que la asistencia no agrega exposicion.
-  nav.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'))
+  escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
   if (esAdmin(sesion)) {
-    nav.appendChild(ir('registro', 'Registro'))
-    nav.appendChild(ir('ajustes', 'Ajustes'))
+    escritorio.appendChild(ir('registro', 'Registro'))
+    escritorio.appendChild(ir('ajustes', 'Ajustes'))
   }
 
   if (sesion) {
@@ -93,13 +140,47 @@ function navegacion() {
     // encontrarlo, y en su telefono el token quedaria guardado sin salida.
     const salir = boton('Cerrar sesión', cerrarSesion)
     salir.dataset.accion = 'cerrar-sesion'
-    nav.appendChild(salir)
+    escritorio.appendChild(salir)
   } else {
     const entrar = boton('Ingresar', mostrarIngreso)
     entrar.dataset.accion = 'ingresar'
-    nav.appendChild(entrar)
+    escritorio.appendChild(entrar)
   }
-  return nav
+
+  // En el teléfono las tareas de todos los sábados quedan a un toque del pulgar.
+  // Vista previa, reportes y cuenta siguen disponibles en Más, sin gastar dos
+  // filas antes de que aparezca la planilla.
+  const movil = elemento('nav', ['navegacion-movil'])
+  movil.setAttribute('aria-label', 'Secciones principales')
+  movil.append(ir('lista', 'Lista'), ir('personas', 'Personas'), ir('asistencias', 'Asistencia'))
+
+  const mas = document.createElement('details')
+  mas.className = 'navegacion-mas'
+  const resumen = elemento('summary', ['boton-navegacion'], 'Más')
+  resumen.setAttribute('aria-label', 'Más secciones')
+  const destinosSecundarios = ['vista-previa', 'reporte', 'registro', 'ajustes']
+  if (destinosSecundarios.includes(pantalla)) {
+    resumen.classList.add('activa')
+    resumen.setAttribute('aria-current', 'page')
+  }
+  mas.appendChild(resumen)
+  const menu = elemento('div', ['menu-navegacion'])
+  menu.append(ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'))
+  if (esAdmin(sesion)) menu.append(ir('registro', 'Registro'), ir('ajustes', 'Ajustes'))
+  if (sesion) {
+    const salir = boton('Cerrar sesión', cerrarSesion)
+    salir.dataset.accion = 'cerrar-sesion-movil'
+    menu.appendChild(salir)
+  } else {
+    const entrar = boton('Ingresar', mostrarIngreso)
+    entrar.dataset.accion = 'ingresar-movil'
+    menu.appendChild(entrar)
+  }
+  mas.appendChild(menu)
+  movil.appendChild(mas)
+
+  caja.append(escritorio, movil)
+  return caja
 }
 
 // El deposito guarda las fotos como blobs. El pintor necesita algo que
@@ -165,6 +246,12 @@ function dibujar() {
   olvidarVista()
   vaciar(contenedor)
   contenedor.appendChild(navegacion())
+  const estadoGuardado = elemento('div', ['estado-guardado'])
+  estadoGuardado.dataset.estadoGuardado = ''
+  estadoGuardado.setAttribute('role', 'status')
+  estadoGuardado.setAttribute('aria-live', 'polite')
+  estadoGuardado.hidden = true
+  contenedor.appendChild(estadoGuardado)
   const cuerpo = elemento('div', ['cuerpo'])
   contenedor.appendChild(cuerpo)
   contenedor.appendChild(sello())
@@ -178,9 +265,8 @@ function dibujar() {
         alSilenciar: anotarSeguimiento,
         alVerElMes: () => { pantalla = 'reporte'; dibujar() },
       }),
-      alCambiar: async (siguiente, descripcion) => {
-        lista = siguiente
-        await deposito.guardarLista(lista, descripcion)
+      alCambiar: async (siguiente, descripcion, confirmacion) => {
+        await guardarListaConEstado(siguiente, descripcion, confirmacion)
       },
       // Las listas se guardan por fecha: cambiar la fecha es abrir otra lista.
       // Si no hay ninguna guardada para ese dia, empezamos una con los mismos
@@ -202,8 +288,7 @@ function dibujar() {
       roster,
       cargarFoto,
       alCambiar: async (siguiente, descripcion) => {
-        lista = siguiente
-        await deposito.guardarLista(lista, descripcion)
+        await guardarListaConEstado(siguiente, descripcion)
       },
     })
   } else if (pantalla === 'reporte') {
@@ -213,9 +298,14 @@ function dibujar() {
       // Arranca en el mes de la planilla abierta, que es de lo que se viene
       // hablando: pedir el mes antes de mostrar nada seria un paso de mas.
       mes: lista.fecha.slice(0, 7),
+      alIrALista: () => { pantalla = 'lista'; dibujar() },
     })
   } else if (pantalla === 'asistencias') {
-    vista = crearPantallaAsistencias(cuerpo, { roster, almacen: deposito })
+    vista = crearPantallaAsistencias(cuerpo, {
+      roster,
+      almacen: deposito,
+      alIrALista: () => { pantalla = 'lista'; dibujar() },
+    })
   } else if (pantalla === 'registro' && esAdmin(sesion)) {
     // Se lee del repositorio privado, asi que sin sesion de GitHub no hay nada
     // que mostrar: en modo local los cambios no dejan rastro compartido.
@@ -268,7 +358,7 @@ function dibujar() {
             // El roster ya quedo guardado, que es lo que se pidio.
           }
         }
-        await deposito.guardarLista(lista,
+        await guardarListaConEstado(lista,
           mudanza ? `Pasar de grupo a alguien en la planilla del ${lista.fecha}` : undefined)
       },
     })

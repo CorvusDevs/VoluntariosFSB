@@ -1,0 +1,18 @@
+# Este repositorio es el sitio publico completo. La lista permite solamente las
+# superficies conocidas del proyecto y bloquea cualquier archivo nuevo fuera de
+# ellas hasta que se revise de forma explicita.
+.claude/launch.json
+.gitignore
+.push-allowed
+assets/**
+css/**
+docs/**
+herramientas/**
+index.html
+js/**
+package-lock.json
+package.json
+sw.js
+test/**
+version.json
+vitest.config.js

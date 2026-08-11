@@ -89,6 +89,17 @@ describe('pantalla de reporte', () => {
     expect(raiz.querySelector('table')).toBeNull()
   })
 
+  it('desde un mes vacio permite volver a armar la lista', async () => {
+    deposito.listarListas = vi.fn(async () => [])
+    const alIrALista = vi.fn()
+    crearPantallaReporte(raiz, {
+      roster: ROSTER, almacen: deposito, mes: '2026-01', alIrALista,
+    })
+    await esperar()
+    raiz.querySelector('[data-accion="ir-a-lista"]').click()
+    expect(alIrALista).toHaveBeenCalledOnce()
+  })
+
   it('no cuenta la planilla del sabado que todavia no llego', async () => {
     // Una planilla nueva trae a todos presentes porque es un plan. Mostrarla en
     // el reporte diria que fue gente que todavia no fue, y en la alerta ese

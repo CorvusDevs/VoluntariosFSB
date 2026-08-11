@@ -17,7 +17,7 @@ const diaDe = (fecha) => String(Number(fecha.slice(8, 10)))
 // todavia no fue.
 const delMes = (fechas, mes) => hastaHoy(fechas.filter((f) => f.startsWith(`${mes}-`)), hoyISO())
 
-export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial }) {
+export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, alIrALista = null }) {
   let mes = mesInicial
   let historia = null
   let cargando = true
@@ -181,7 +181,17 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
     } else if (error) {
       seccion.appendChild(elemento('p', ['error-ajustes'], error))
     } else if (historia.fechas.length === 0) {
-      seccion.appendChild(elemento('p', ['ayuda'], 'No hay planillas guardadas de ese mes.'))
+      const vacio = elemento('div', ['estado-vacio'])
+      vacio.append(
+        elemento('h3', [], 'No hay planillas guardadas de este mes'),
+        elemento('p', ['ayuda'], 'Cuando armes una lista, la asistencia va a aparecer acá.'),
+      )
+      if (alIrALista) {
+        const ir = boton('Ir a Armar lista', alIrALista, ['boton-principal'])
+        ir.dataset.accion = 'ir-a-lista'
+        vacio.appendChild(ir)
+      }
+      seccion.appendChild(vacio)
     } else {
       const casilla = document.createElement('input')
       casilla.type = 'checkbox'

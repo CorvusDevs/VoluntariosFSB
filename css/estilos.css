@@ -43,11 +43,12 @@ body {
   color: var(--texto);
   cursor: pointer;
 }
-.ficha.seleccionada {
+.ficha.seleccionada:not(.quitable) {
   border-color: var(--violeta);
   background: #F3E9F7;
   color: var(--violeta);
 }
+.ficha.seleccionada.sin-asignar::before { background: var(--fondo); }
 .ficha.atenuada { opacity: 0.45; }
 .pastilla {
   font-size: 11px;
@@ -863,3 +864,235 @@ html, body { max-width: 100%; overflow-x: hidden; }
    y bajan sola: es preferible a achicar la letra o a un scroll horizontal que
    tape media tabla. */
 .tablas-reporte { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
+
+/* ---------------------------------------------------------------------------
+   Tablero de jornada.
+
+   En el teléfono se priorizan las tres tareas de todos los sábados. Los otros
+   destinos viven en Más. En pantalla ancha vuelve la navegación completa.
+--------------------------------------------------------------------------- */
+
+.navegacion-movil { display: none; }
+
+.resumen-jornada { display: none; }
+.campos-jornada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.grupo {
+  position: relative;
+  margin: 8px 12px 16px;
+  padding: 16px 16px 18px 20px;
+  border: 1px solid var(--linea);
+  border-radius: 16px;
+  background: var(--fondo);
+  overflow: hidden;
+}
+.grupo::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--turquesa);
+}
+.grupo-2::before { background: var(--magenta); }
+.grupo-titulo h2 { line-height: 1.25; }
+.estado-grupo {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 4px 0 14px;
+}
+.pastilla-estado {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.pastilla-estado[data-estado="pendiente"] { background: #FBEAF0; color: var(--magenta-texto); }
+.pastilla-estado[data-estado="completo"] { background: #E6F7F4; color: var(--turquesa-texto); }
+.voluntarios-libres { font-size: 12px; color: var(--texto-suave); }
+
+.ficha.sin-asignar { border-color: #D7CDD9; }
+.ficha.sin-asignar::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--magenta);
+}
+.ficha.asignada {
+  border-color: #A7DED8;
+  background: #F1FAF8;
+}
+.ficha.seleccionada:not(.quitable) {
+  border-color: var(--violeta);
+  background: var(--violeta);
+  color: var(--fondo);
+}
+.ficha.seleccionada:not(.quitable) .ficha-detalle { color: var(--fondo); opacity: .85; }
+.ficha.atenuada { opacity: 1; color: var(--texto-suave); background: #F6F4F6; }
+
+.boton:focus-visible,
+.ficha:focus-visible,
+.boton-navegacion:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid rgba(102, 45, 125, .32);
+  outline-offset: 2px;
+}
+
+@media (max-width: 899px) {
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+
+  .navegacion-escritorio { display: none; }
+  .navegacion-movil {
+    position: fixed;
+    z-index: 40;
+    inset: auto 0 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 4px;
+    padding: 7px 8px calc(7px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--linea);
+    background: rgba(255, 255, 255, .97);
+    box-shadow: 0 -4px 18px rgba(44, 44, 42, .08);
+  }
+  .navegacion-movil > .boton,
+  .boton-navegacion {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    min-height: 50px;
+    padding: 7px 4px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--texto-suave);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    list-style: none;
+  }
+  .boton-navegacion::-webkit-details-marker { display: none; }
+  .navegacion-movil .activa { background: #F3E9F7; color: var(--violeta); }
+  .navegacion-mas { position: relative; }
+  .menu-navegacion {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 10px);
+    display: grid;
+    gap: 6px;
+    width: max-content;
+    min-width: 180px;
+    padding: 8px;
+    border: 1px solid var(--linea);
+    border-radius: 14px;
+    background: var(--fondo);
+    box-shadow: 0 10px 32px rgba(44, 44, 42, .16);
+  }
+  .navegacion-mas:not([open]) .menu-navegacion { display: none; }
+  .menu-navegacion .boton { width: 100%; text-align: left; }
+
+  .encabezado-lista { display: block; padding: 12px 16px; }
+  .resumen-jornada {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .resumen-jornada-texto { display: flex; flex-direction: column; min-width: 0; }
+  .resumen-jornada-texto strong { font-size: 16px; font-weight: 500; color: var(--texto); }
+  .resumen-jornada-texto span {
+    overflow: hidden;
+    font-size: 13px;
+    color: var(--texto-suave);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .boton-editar-jornada { min-height: 40px; padding: 7px 12px; font-size: 13px; flex-shrink: 0; }
+  .campos-jornada { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--linea); }
+  .encabezado-lista.abierta .campos-jornada { display: flex; }
+  .campos-jornada .campo:last-child { flex: 1 1 100%; }
+  .campos-jornada .campo:last-child input { width: 100%; }
+
+  .grupo { margin-inline: 12px; }
+  .barra { padding-top: 10px; padding-bottom: 4px; }
+  .barra-seleccion { bottom: calc(65px + env(safe-area-inset-bottom)); }
+}
+
+@media (min-width: 900px) {
+  .grupo { margin-inline: 16px 0; }
+  .cuerpo:has(.grupos) .voluntarios { margin-top: 8px; }
+}
+
+/* Confirmación de guardado. Es breve, textual y no bloquea el trabajo. */
+.estado-guardado {
+  position: fixed;
+  z-index: 60;
+  top: 12px;
+  right: 12px;
+  max-width: min(320px, calc(100vw - 24px));
+  padding: 8px 12px;
+  border: 1px solid var(--linea);
+  border-radius: 18px;
+  background: var(--fondo);
+  box-shadow: 0 6px 22px rgba(44, 44, 42, .14);
+  font-size: 13px;
+  color: var(--texto-suave);
+  pointer-events: none;
+}
+.estado-guardado[hidden] { display: none; }
+.estado-guardado[data-estado="guardando"] { color: var(--violeta); }
+.estado-guardado[data-estado="guardado"] { border-color: #A7DED8; color: var(--turquesa-texto); }
+.estado-guardado[data-estado="error"] {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-color: #EAB0C9;
+  background: #FBEAF0;
+  color: var(--magenta-texto);
+  pointer-events: auto;
+}
+.estado-guardado-texto { min-width: 0; }
+.boton-reintentar {
+  flex-shrink: 0;
+  min-height: 34px;
+  padding: 5px 10px;
+  border-color: var(--magenta-texto);
+  background: var(--fondo);
+  color: var(--magenta-texto);
+  font-size: 12px;
+}
+
+/* Los estados vacíos explican el siguiente paso en vez de dejar una pantalla
+   sin salida. Mantienen el lenguaje de los grupos, sin sumar otra decoración. */
+.estado-vacio {
+  max-width: 520px;
+  margin-top: 18px;
+  padding: 18px;
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--turquesa);
+  border-radius: 4px 14px 14px 4px;
+  background: #F7FBFA;
+}
+.estado-vacio h3 { margin: 0 0 6px; font-size: 16px; font-weight: 500; }
+.estado-vacio .ayuda { margin: 0 0 14px; line-height: 1.5; color: var(--texto-suave); }
+
+@media (max-width: 899px) {
+  .estado-guardado {
+    top: auto;
+    bottom: calc(144px + env(safe-area-inset-bottom));
+  }
+}

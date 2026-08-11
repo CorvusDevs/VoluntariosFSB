@@ -1,4 +1,4 @@
-import { elemento, vaciar } from './componentes.js'
+import { elemento, boton, vaciar } from './componentes.js'
 import { estadoDeSabado, hastaHoy, VINO, FALTO, NO_ESTABA } from '../modelo/asistencia.js'
 import { formatearFechaLarga, hoyISO } from '../util/fechas.js'
 
@@ -7,7 +7,7 @@ const mesDe = (fecha) => fecha.slice(0, 7)
 // Corregir la asistencia de un sabado que ya paso. La planilla no se toca: ya
 // se mando por WhatsApp y reescribirla haria que lo guardado deje de coincidir
 // con la imagen que recibio la gente. Lo que se guarda es la diferencia.
-export function crearPantallaAsistencias(raiz, { roster, almacen }) {
+export function crearPantallaAsistencias(raiz, { roster, almacen, alIrALista = null }) {
   let fechas = []
   let fecha = null
   let lista = null
@@ -145,7 +145,17 @@ export function crearPantallaAsistencias(raiz, { roster, almacen }) {
     }
 
     if (fechas.length === 0 && !cargando) {
-      seccion.appendChild(elemento('p', ['ayuda'], 'No hay planillas guardadas para corregir.'))
+      const vacio = elemento('div', ['estado-vacio'])
+      vacio.append(
+        elemento('h3', [], 'No hay planillas guardadas para corregir'),
+        elemento('p', ['ayuda'], 'Primero armá y guardá la lista de un sábado.'),
+      )
+      if (alIrALista) {
+        const ir = boton('Ir a Armar lista', alIrALista, ['boton-principal'])
+        ir.dataset.accion = 'ir-a-lista'
+        vacio.appendChild(ir)
+      }
+      seccion.appendChild(vacio)
       raiz.appendChild(seccion)
       return
     }

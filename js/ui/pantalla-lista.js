@@ -44,7 +44,10 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       const siguiente = agregarApoyo(estado(), apoyoDe, id)
       pila.registrar(siguiente)
       apoyoDe = null
-      alCambiar(siguiente, `Sumar a ${nombreDe(id)} como apoyo del ${grupo?.titulo ?? 'grupo'}`)
+      const voluntario = nombreDe(id)
+      const titulo = grupo?.titulo ?? 'grupo'
+      alCambiar(siguiente, `Sumar a ${voluntario} como apoyo del ${titulo}`,
+        `${voluntario} quedó como apoyo del ${titulo}`)
       dibujar()
       return
     }
@@ -56,9 +59,10 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     pila.registrar(siguiente)
     const quien = nombreDe(seleccionado)
     seleccionado = null
-    alCambiar(siguiente, yaEsta
-      ? `Quitar a ${nombreDe(id)} de ${quien}`
-      : `Asignar a ${nombreDe(id)} con ${quien}`)
+    const voluntario = nombreDe(id)
+    alCambiar(siguiente,
+      yaEsta ? `Quitar a ${voluntario} de ${quien}` : `Asignar a ${voluntario} con ${quien}`,
+      yaEsta ? `${voluntario} ya no acompaña a ${quien}` : `${quien} quedó con ${voluntario}`)
     dibujar()
   }
 
@@ -96,10 +100,27 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   function encabezado() {
     const caja = elemento('header', ['encabezado-lista'])
 
+    const resumen = elemento('div', ['resumen-jornada'])
+    const texto = elemento('div', ['resumen-jornada-texto'])
+    texto.append(
+      elemento('strong', [], formatearFechaLarga(estado().fecha)),
+      elemento('span', [], `${estado().hora} · ${estado().lugar}`),
+    )
+    const editar = boton('Editar', () => {
+      const abierta = caja.classList.toggle('abierta')
+      editar.setAttribute('aria-expanded', String(abierta))
+      editar.textContent = abierta ? 'Cerrar' : 'Editar'
+    }, ['boton-editar-jornada'])
+    editar.setAttribute('aria-expanded', 'false')
+    resumen.append(texto, editar)
+    caja.appendChild(resumen)
+
+    const campos = elemento('div', ['campos-jornada'])
+
     // Un solo campo de fecha. El rotulo lleva la fecha escrita en español porque
     // el control nativo la muestra en el idioma del telefono, y en iOS sale en
     // ingles. Asi no hacen falta dos campos para lo mismo.
-    caja.appendChild(campo(formatearFechaLarga(estado().fecha), 'date', 'fecha', estado().fecha, (valor) => {
+    campos.appendChild(campo(formatearFechaLarga(estado().fecha), 'date', 'fecha', estado().fecha, (valor) => {
       if (!valor) return
       // La lista se guarda por fecha, asi que cambiarla significa abrir otra lista.
       // Quien nos usa decide si hay una guardada o hay que empezar de cero.
@@ -107,8 +128,9 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       else actualizar({ fecha: valor })
     }))
 
-    caja.appendChild(campo('Hora', 'time', 'hora', estado().hora, (valor) => actualizar({ hora: valor })))
-    caja.appendChild(campo('Lugar', 'text', 'lugar', estado().lugar, (valor) => actualizar({ lugar: valor })))
+    campos.appendChild(campo('Hora', 'time', 'hora', estado().hora, (valor) => actualizar({ hora: valor })))
+    campos.appendChild(campo('Lugar', 'text', 'lugar', estado().lugar, (valor) => actualizar({ lugar: valor })))
+    caja.appendChild(campos)
     return caja
   }
 
@@ -172,7 +194,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
   }
 
   function dibujarGrupo(grupo) {
-    const caja = elemento('section', ['grupo'])
+    const caja = elemento('section', ['grupo', `grupo-${grupo.numero}`])
     const encabezado = elemento('header', ['grupo-encabezado'])
 
     // El lapiz va al lado del titulo y no debajo: ocupaba un renglon entero
@@ -192,8 +214,17 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     encabezado.appendChild(linea)
 
     const cuenta = contarPendientes(estado(), grupo.numero, roster)
-    encabezado.appendChild(elemento('p', ['pendientes'],
-      `${cuenta.participantesSinVoluntario} sin acompañante · ${cuenta.voluntariosSinAsignar} voluntarios libres`))
+    const estados = elemento('div', ['estado-grupo', 'pendientes'])
+    const pendientes = elemento('span', ['pastilla-estado'])
+    pendientes.dataset.estado = cuenta.participantesSinVoluntario === 0 ? 'completo' : 'pendiente'
+    pendientes.textContent = cuenta.participantesSinVoluntario === 0
+      ? 'Todos acompañados'
+      : `${cuenta.participantesSinVoluntario} sin acompañante`
+    estados.append(
+      pendientes,
+      elemento('span', ['voluntarios-libres'], `${cuenta.voluntariosSinAsignar} voluntarios libres`),
+    )
+    encabezado.appendChild(estados)
     encabezado.appendChild(panel)
     caja.appendChild(encabezado)
 
@@ -205,6 +236,7 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
         const persona = porId.get(id)
         const detalle = fila.voluntarios.map((v) => porId.get(v)?.nombre).filter(Boolean).join(' / ')
         const el = ficha(persona, { seleccionada: seleccionado === id, detalle })
+        el.classList.add(detalle ? 'asignada' : 'sin-asignar')
         el.addEventListener('click', () => alTocarParticipante(id))
         columna.appendChild(el)
         if (seleccionado === id) {
@@ -320,6 +352,8 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
 
   function barraApoyo() {
     const caja = elemento('div', ['barra-seleccion'])
+    caja.setAttribute('role', 'status')
+    caja.setAttribute('aria-live', 'polite')
     const grupo = estado().grupos.find((g) => g.numero === apoyoDe)
     caja.appendChild(elemento('span', ['barra-seleccion-texto'],
       `Elegí el apoyo de ${grupo?.titulo ?? 'el grupo'}`))
@@ -334,7 +368,10 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
 
   function barraSeleccion() {
     const caja = elemento('div', ['barra-seleccion'])
-    caja.appendChild(elemento('span', ['barra-seleccion-texto'], `Asignando a ${nombreDe(seleccionado)}`))
+    caja.setAttribute('role', 'status')
+    caja.setAttribute('aria-live', 'polite')
+    caja.appendChild(elemento('span', ['barra-seleccion-texto'],
+      `Elegí acompañante para ${nombreDe(seleccionado)}`))
 
     const acciones = elemento('div', ['barra-seleccion-acciones'])
     // "Hoy no viene" vive ahora al final de la bandeja de voluntarios, junto a
