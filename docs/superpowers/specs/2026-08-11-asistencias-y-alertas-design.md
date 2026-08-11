@@ -47,9 +47,14 @@ La regla del voluntario es una decisión consciente del usuario: cuenta falta a 
 
 ### 4.1 Desde cuándo cuenta cada persona
 
-**Desde el primer sábado en que aparece en una planilla.** Antes de esa fecha su casilla es "todavía no estaba", ni presente ni ausente.
+La ficha de una persona no guarda fecha de alta (`js/modelo/roster.js`: `id`, `nombre`, `grupo`, `nuevo`, `foto`, `activo`, `notas`). Sin una regla de arranque, alguien dado de alta en agosto figuraría faltando todos los sábados de enero a julio, y dispararía la alerta el día que entra.
 
-La ficha de una persona no guarda fecha de alta (`js/modelo/roster.js`: `id`, `nombre`, `grupo`, `nuevo`, `foto`, `activo`, `notas`). Sin esta regla, alguien dado de alta en agosto figuraría faltando todos los sábados de enero a julio, y dispararía la alerta el día que entra.
+La regla es distinta para cada uno, porque la evidencia es distinta:
+
+- **Participante**: si no está ni en un grupo ni en `ausentes`, esa planilla no dice nada de él, y su casilla es "todavía no estaba". Sale solo, sin regla extra. Una falta suya siempre es una falta registrada a mano, incluso la del primer sábado.
+- **Voluntario**: su ausencia es inferida, no registrada, así que "no aparece" y "todavía no estaba" son el mismo dato. Se resuelve mirando toda la historia: **los sábados anteriores al primero en que se lo ve en una planilla son "todavía no estaba"**, y de ahí en adelante no aparecer es faltar.
+
+Consecuencia asumida: un voluntario que se suma al plantel y falta a sus primeros sábados no acumula racha hasta la primera vez que va.
 
 ### 4.2 Quién queda afuera
 
