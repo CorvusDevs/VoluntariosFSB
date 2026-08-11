@@ -840,3 +840,21 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .fila-asistencia[data-estado="falto"] { border-color: var(--magenta); }
 .fila-asistencia[data-estado="falto"] .marca-asistencia { color: var(--magenta-texto); }
 .fila-asistencia[data-estado="no-estaba"] { opacity: 0.5; }
+
+/* Aviso de faltas. Turquesa y no rojo: no es un error de la aplicacion ni una
+   urgencia, es algo que alguien tiene que mirar cuando pueda. */
+.franja-alerta {
+  margin: 12px 16px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--turquesa);
+  border-left: 3px solid var(--turquesa);
+  border-radius: 4px 12px 12px 4px;
+  background: #F1FAF8;
+}
+.franja-alerta-titulo { margin: 0 0 8px; font-size: 15px; font-weight: 500; color: var(--turquesa-texto); }
+.alerta-persona {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 8px;
+}
+.alerta-texto { font-size: 15px; }
+.franja-alerta .boton { padding: 8px 14px; font-size: 14px; min-height: 40px; }
