@@ -89,3 +89,43 @@ export function historial(listas, roster, correcciones = []) {
     voluntarios: (roster.voluntarios ?? []).map((v) => fila(v, true)),
   }
 }
+
+// Tres faltas seguidas. El usuario lo pidio como "mas de 2 veces seguidas".
+export const UMBRAL_ALERTA = 3
+
+// Cuantas faltas seguidas trae hasta hoy, contando desde el ultimo sabado hacia
+// atras. Los sabados en que la persona todavia no estaba se saltean sin cortar
+// la racha, igual que un sabado sin planilla: ni suman ni interrumpen.
+function rachaFinal(estados) {
+  let faltas = 0
+  for (let i = estados.length - 1; i >= 0; i -= 1) {
+    if (estados[i] === VINO) break
+    if (estados[i] === FALTO) faltas += 1
+  }
+  return faltas
+}
+
+// Un seguimiento silencia UNA racha, no a la persona: vale mientras no haya
+// vuelto a venir despues de anotarlo. Si volvio y arranco otra racha, la alerta
+// tiene que aparecer de nuevo, porque es informacion nueva.
+function silenciada(fila, fechas, seguimientos) {
+  const suyos = seguimientos.filter((s) => s.persona === fila.persona.id)
+  if (suyos.length === 0) return false
+  const ultimo = suyos.map((s) => s.desde).sort().at(-1)
+  const vinoDespues = fechas.some((f, i) => f > ultimo && fila.estados[i] === VINO)
+  return !vinoDespues
+}
+
+export function rachasDeFalta(historia, seguimientos = []) {
+  const alertas = []
+  const revisar = (filas) => filas.forEach((fila) => {
+    if (fila.persona.activo === false) return
+    const faltas = rachaFinal(fila.estados)
+    if (faltas < UMBRAL_ALERTA) return
+    if (silenciada(fila, historia.fechas, seguimientos)) return
+    alertas.push({ persona: fila.persona, faltas })
+  })
+  revisar(historia.participantes)
+  revisar(historia.voluntarios)
+  return alertas.sort((a, b) => b.faltas - a.faltas)
+}

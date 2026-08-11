@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { estadoDeSabado, historial, VINO, FALTO, NO_ESTABA } from '../../js/modelo/asistencia.js'
+import {
+  estadoDeSabado, historial, rachasDeFalta, UMBRAL_ALERTA, VINO, FALTO, NO_ESTABA,
+} from '../../js/modelo/asistencia.js'
 
 const ROSTER = {
   version: 1,
@@ -140,5 +142,68 @@ describe('historial', () => {
     const martin = historial(SABADOS, ROSTER, []).voluntarios.find((f) => f.persona.id === 'v3')
     expect(martin.vino).toBe(1)
     expect(martin.de).toBe(1)
+  })
+})
+
+const cuatroSabados = (estadosP1) => estadosP1.map((vino, i) => ({
+  fecha: `2026-08-0${i + 1}`,
+  grupos: [
+    { numero: 1, filas: vino ? [{ participantes: ['p1'], voluntarios: ['v1'] }] : [], apoyo: [] },
+    { numero: 2, filas: [], apoyo: [] },
+  ],
+  ausentes: vino ? [] : ['p1'],
+}))
+
+describe('rachasDeFalta', () => {
+  it('el umbral es tres faltas seguidas', () => {
+    expect(UMBRAL_ALERTA).toBe(3)
+  })
+
+  it('con dos faltas seguidas no avisa', () => {
+    const h = historial(cuatroSabados([true, true, false, false]), ROSTER, [])
+    expect(rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')).toBeUndefined()
+  })
+
+  it('con tres faltas seguidas avisa', () => {
+    const h = historial(cuatroSabados([true, false, false, false]), ROSTER, [])
+    const alerta = rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')
+    expect(alerta.faltas).toBe(3)
+  })
+
+  it('cuenta solo la racha que llega hasta el ultimo sabado', () => {
+    // Falto tres, volvio: el problema se termino.
+    const h = historial(cuatroSabados([false, false, false, true]), ROSTER, [])
+    expect(rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')).toBeUndefined()
+  })
+
+  it('no avisa por quien esta dado de baja', () => {
+    const roster = { ...ROSTER, participantes: ROSTER.participantes.map((p) => ({ ...p, activo: false })) }
+    const h = historial(cuatroSabados([true, false, false, false]), roster, [])
+    expect(rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')).toBeUndefined()
+  })
+
+  it('un seguimiento anotado apaga la alerta', () => {
+    const h = historial(cuatroSabados([true, false, false, false]), ROSTER, [])
+    const seguimientos = [{ persona: 'p1', desde: '2026-08-02', nota: 'Hable con la mama' }]
+    expect(rachasDeFalta(h, seguimientos).find((a) => a.persona.id === 'p1')).toBeUndefined()
+  })
+
+  it('vuelve a avisar si falto tres veces mas despues de haber vuelto', () => {
+    // Silenciada en la racha vieja; despues volvio y arranco otra racha.
+    const listas = cuatroSabados([false, false, false, true])
+      .concat([4, 5, 6].map((d) => ({
+        fecha: `2026-08-0${d + 1}`,
+        grupos: [{ numero: 1, filas: [], apoyo: [] }, { numero: 2, filas: [], apoyo: [] }],
+        ausentes: ['p1'],
+      })))
+    const h = historial(listas, ROSTER, [])
+    const seguimientos = [{ persona: 'p1', desde: '2026-08-01', nota: 'vieja' }]
+    expect(rachasDeFalta(h, seguimientos).find((a) => a.persona.id === 'p1').faltas).toBe(3)
+  })
+
+  it('ordena por racha mas larga primero', () => {
+    const h = historial(cuatroSabados([false, false, false, false]), ROSTER, [])
+    const alertas = rachasDeFalta(h, [])
+    expect(alertas[0].faltas).toBeGreaterThanOrEqual(alertas[alertas.length - 1].faltas)
   })
 })
