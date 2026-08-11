@@ -171,3 +171,48 @@ describe('descripcion de la accion en el registro', () => {
     expect(cliente.escrituras.at(-1).mensaje).toBe('Cambiar la planilla del 2026-08-08 · Ana')
   })
 })
+
+describe('asistencias y seguimientos', () => {
+  const conAutor = () => {
+    const cliente = clienteFalso()
+    return { cliente, almacen: crearAlmacenRemoto({ cliente, autor: 'Ana' }) }
+  }
+
+  it('lee las correcciones del mes', async () => {
+    const { cliente, almacen: deposito } = conAutor()
+    cliente.archivos['asistencias/2026-08.json'] = {
+      texto: JSON.stringify({
+        version: 1,
+        mes: '2026-08',
+        correcciones: [{ fecha: '2026-08-15', persona: 'p1', vino: false }],
+      }),
+      sha: 'abc',
+    }
+    expect((await deposito.leerAsistencias('2026-08')).correcciones).toHaveLength(1)
+  })
+
+  it('un mes sin correcciones no es un error', async () => {
+    const { almacen: deposito } = conAutor()
+    expect(await deposito.leerAsistencias('2026-01')).toBeNull()
+  })
+
+  it('guarda las correcciones con quien las hizo en el mensaje', async () => {
+    const { cliente, almacen: deposito } = conAutor()
+    await deposito.guardarAsistencias('2026-08', { version: 1, mes: '2026-08', correcciones: [] },
+      'Corregir la asistencia del 2026-08-15')
+    expect(cliente.escrituras.at(-1).ruta).toBe('asistencias/2026-08.json')
+    expect(cliente.escrituras.at(-1).mensaje).toBe('Corregir la asistencia del 2026-08-15 · Ana')
+  })
+
+  it('guarda los seguimientos', async () => {
+    const { cliente, almacen: deposito } = conAutor()
+    await deposito.guardarSeguimientos({ version: 1, seguimientos: [] }, 'Anotar un seguimiento de Gaia')
+    expect(cliente.archivos['seguimientos.json']).toBeDefined()
+    expect(cliente.escrituras.at(-1).mensaje).toBe('Anotar un seguimiento de Gaia · Ana')
+  })
+
+  it('sin seguimientos guardados devuelve null en vez de romper', async () => {
+    const { almacen: deposito } = conAutor()
+    expect(await deposito.leerSeguimientos()).toBeNull()
+  })
+})

@@ -1,10 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 
-const FUNCIONES = [
-  'borrarFoto', 'guardarFoto', 'guardarLista', 'guardarRoster',
-  'leerFoto', 'leerLista', 'leerRoster', 'listarListas',
-].sort()
+// Lo que importa es que los dos respaldos expongan LA MISMA interfaz: el resto
+// de la aplicacion no sabe cual esta usando. Antes esto era una lista de ocho
+// nombres escrita a mano, y agregarle una funcion a los dos respaldos rompia la
+// prueba sin que nada estuviera mal. Ahora se comparan entre si.
+//
+// Estas cuatro si van nombradas, porque sostienen la pantalla principal: si
+// alguna desaparece de los dos a la vez, la aplicacion no abre y la comparacion
+// sola no lo notaria.
+const IMPRESCINDIBLES = ['leerRoster', 'leerLista', 'guardarLista', 'listarListas'].sort()
 
 // El selector guarda el modo y la instancia en variables de modulo, asi que
 // cada prueba arranca con el modulo recien cargado para no heredar estado.
@@ -32,13 +37,16 @@ describe('modo', () => {
 })
 
 describe('construccion del almacen', () => {
-  it('en local expone las ocho funciones', async () => {
-    expect(Object.keys(await indice.almacen()).sort()).toEqual(FUNCIONES)
+  it('los dos respaldos exponen exactamente la misma interfaz', async () => {
+    const local = Object.keys(await indice.almacen()).sort()
+    indice.configurar({ modo: 'github', token: 'x' })
+    const remoto = Object.keys(await indice.almacen()).sort()
+    expect(remoto).toEqual(local)
   })
 
-  it('en github expone exactamente las mismas ocho', async () => {
-    indice.configurar({ modo: 'github', token: 'x' })
-    expect(Object.keys(await indice.almacen()).sort()).toEqual(FUNCIONES)
+  it('no falta ninguna de las funciones que sostienen la pantalla principal', async () => {
+    const local = Object.keys(await indice.almacen())
+    IMPRESCINDIBLES.forEach((nombre) => expect(local).toContain(nombre))
   })
 
   // Construir el almacen remoto no pide nada: recien la primera lectura verifica

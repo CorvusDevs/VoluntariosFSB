@@ -75,3 +75,30 @@ describe('almacen local', () => {
     expect((await otro.leerRoster()).participantes).toHaveLength(ROSTER.participantes.length)
   })
 })
+
+describe('asistencias y seguimientos', () => {
+  it('guarda y lee las correcciones de un mes', async () => {
+    await almacen.guardarAsistencias('2026-08', {
+      version: 1,
+      mes: '2026-08',
+      correcciones: [{ fecha: '2026-08-15', persona: 'p1', vino: false }],
+    })
+    expect((await almacen.leerAsistencias('2026-08')).correcciones).toHaveLength(1)
+  })
+
+  it('un mes sin correcciones devuelve null', async () => {
+    expect(await almacen.leerAsistencias('2026-01')).toBeNull()
+  })
+
+  it('guarda y lee los seguimientos', async () => {
+    await almacen.guardarSeguimientos({
+      version: 1,
+      seguimientos: [{ persona: 'p1', desde: '2026-08-15', nota: 'ok' }],
+    })
+    expect((await almacen.leerSeguimientos()).seguimientos).toHaveLength(1)
+  })
+
+  it('sin seguimientos guardados devuelve null', async () => {
+    expect(await almacen.leerSeguimientos()).toBeNull()
+  })
+})

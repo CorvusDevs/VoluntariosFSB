@@ -3,6 +3,8 @@ import { ConflictoError } from './github.js'
 const RUTA_ROSTER = 'roster.json'
 const rutaLista = (fecha) => `listas/${fecha}.json`
 const rutaFoto = (clave) => `fotos/${clave}`
+const RUTA_SEGUIMIENTOS = 'seguimientos.json'
+const rutaAsistencias = (mes) => `asistencias/${mes}.json`
 
 export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
   const shas = new Map()
@@ -75,6 +77,27 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
         .filter((a) => a.nombre.endsWith('.json'))
         .map((a) => ({ fecha: a.nombre.replace(/\.json$/, ''), sha: a.sha }))
         .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+    },
+
+    // Correcciones de asistencia, un archivo por mes. Guarda solo las
+    // diferencias contra lo que dice la planilla, asi que el archivo que no
+    // existe significa "la planilla tenia razon", que es el caso normal.
+    leerAsistencias(mes) {
+      return leerJson(rutaAsistencias(mes))
+    },
+
+    guardarAsistencias(mes, datos, descripcion = null) {
+      const que = descripcion ?? `Corregir la asistencia de ${mes}`
+      return escribirJson(rutaAsistencias(mes), datos, `${que} · ${autor}`)
+    },
+
+    leerSeguimientos() {
+      return leerJson(RUTA_SEGUIMIENTOS)
+    },
+
+    guardarSeguimientos(datos, descripcion = null) {
+      const que = descripcion ?? 'Anotar un seguimiento'
+      return escribirJson(RUTA_SEGUIMIENTOS, datos, `${que} · ${autor}`)
     },
 
     async leerFoto(clave) {

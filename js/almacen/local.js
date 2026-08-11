@@ -1,6 +1,13 @@
 const BASE = 'voluntarios-fsb'
-const VERSION = 1
-const DEPOSITOS = { roster: 'roster', listas: 'listas', fotos: 'fotos' }
+// La 2 suma los depositos de asistencias y seguimientos. Subir el numero es
+// obligatorio: onupgradeneeded no vuelve a correr con la misma version, asi que
+// sin esto los depositos nuevos no existen en las bases ya creadas, que son
+// todas las que estan andando hoy.
+const VERSION = 2
+const DEPOSITOS = {
+  roster: 'roster', listas: 'listas', fotos: 'fotos',
+  asistencias: 'asistencias', seguimientos: 'seguimientos',
+}
 
 function abrir() {
   return new Promise((resolver, rechazar) => {
@@ -10,6 +17,8 @@ function abrir() {
       if (!db.objectStoreNames.contains(DEPOSITOS.roster)) db.createObjectStore(DEPOSITOS.roster)
       if (!db.objectStoreNames.contains(DEPOSITOS.listas)) db.createObjectStore(DEPOSITOS.listas)
       if (!db.objectStoreNames.contains(DEPOSITOS.fotos)) db.createObjectStore(DEPOSITOS.fotos)
+      if (!db.objectStoreNames.contains(DEPOSITOS.asistencias)) db.createObjectStore(DEPOSITOS.asistencias)
+      if (!db.objectStoreNames.contains(DEPOSITOS.seguimientos)) db.createObjectStore(DEPOSITOS.seguimientos)
     }
     solicitud.onsuccess = () => {
       const db = solicitud.result
@@ -64,6 +73,28 @@ export async function crearAlmacenLocal() {
     async listarListas() {
       const claves = await operar(db, DEPOSITOS.listas, 'readonly', (d) => d.getAllKeys())
       return [...claves].sort().reverse().map((fecha) => ({ fecha, sha: null }))
+    },
+
+    // Las correcciones de asistencia van por mes, con la misma clave que usa el
+    // almacen remoto para el nombre del archivo.
+    async leerAsistencias(mes) {
+      const guardado = await operar(db, DEPOSITOS.asistencias, 'readonly', (d) => d.get(mes))
+      return guardado ?? null
+    },
+
+    async guardarAsistencias(mes, datos) {
+      await operar(db, DEPOSITOS.asistencias, 'readwrite', (d) => d.put(datos, mes))
+      return { sha: null }
+    },
+
+    async leerSeguimientos() {
+      const guardado = await operar(db, DEPOSITOS.seguimientos, 'readonly', (d) => d.get('actual'))
+      return guardado ?? null
+    },
+
+    async guardarSeguimientos(datos) {
+      await operar(db, DEPOSITOS.seguimientos, 'readwrite', (d) => d.put(datos, 'actual'))
+      return { sha: null }
     },
 
     async leerFoto(clave) {
