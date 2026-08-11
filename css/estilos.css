@@ -858,3 +858,8 @@ html, body { max-width: 100%; overflow-x: hidden; }
 }
 .alerta-texto { font-size: 15px; }
 .franja-alerta .boton { padding: 8px 14px; font-size: 14px; min-height: 40px; }
+
+/* Las dos tablas del reporte, una al lado de la otra. En el telefono no entran
+   y bajan sola: es preferible a achicar la letra o a un scroll horizontal que
+   tape media tabla. */
+.tablas-reporte { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }

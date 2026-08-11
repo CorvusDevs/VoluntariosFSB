@@ -52,8 +52,9 @@ describe('pantalla de reporte', () => {
 
   it('dibuja una columna por sabado con planilla', async () => {
     await abrir()
-    // Nombre, dos sabados, y el resumen.
-    expect(raiz.querySelectorAll('thead th')).toHaveLength(4)
+    // Nombre, dos sabados, y el resumen. Por tabla: con los voluntarios al
+    // costado hay dos, y cada una lleva su propio encabezado de dias.
+    expect(raiz.querySelector('table').querySelectorAll('thead th')).toHaveLength(4)
   })
 
   it('dibuja una fila por persona', async () => {
@@ -155,7 +156,8 @@ describe('cambiar de mes rapido', () => {
     elegir('2026-08')
     await new Promise((r) => setTimeout(r, 200))
     expect(raiz.querySelector('[data-campo="mes"]').value).toBe('2026-08')
-    expect([...raiz.querySelectorAll('thead th.dia')].map((t) => t.textContent)).toEqual(['1'])
+    expect([...raiz.querySelector('table').querySelectorAll('thead th.dia')]
+      .map((t) => t.textContent)).toEqual(['1'])
   })
 })
 
@@ -168,5 +170,67 @@ describe('cuando la lectura falla', () => {
     await esperar()
     expect(raiz.textContent).not.toContain('Leyendo')
     expect(raiz.textContent).toContain('No se pudo leer')
+  })
+})
+
+describe('grupos y voluntarios al costado', () => {
+  const conGrupos = () => {
+    deposito.leerLista = vi.fn(async (fecha) => ({
+      ...LISTAS[fecha],
+      grupos: [
+        { numero: 1, titulo: 'Los grandes', filas: LISTAS[fecha].grupos[0].filas, apoyo: LISTAS[fecha].grupos[0].apoyo },
+        { numero: 2, titulo: 'Los chicos', filas: [{ participantes: ['p2'], voluntarios: [] }], apoyo: [] },
+      ],
+    }))
+  }
+
+  beforeEach(() => {
+    ROSTER.participantes = [
+      { id: 'p1', nombre: 'Gaia', grupo: 1, activo: true },
+      { id: 'p2', nombre: 'Nikita', grupo: 2, activo: true },
+    ]
+  })
+
+  it('la opcion viene activada', async () => {
+    await abrir()
+    expect(raiz.querySelector('[data-campo="al-costado"]').checked).toBe(true)
+  })
+
+  it('activada, dibuja dos tablas: participantes y voluntarios', async () => {
+    await abrir()
+    expect(raiz.querySelectorAll('table')).toHaveLength(2)
+  })
+
+  it('desactivada, vuelve a una sola tabla apilada', async () => {
+    await abrir()
+    const casilla = raiz.querySelector('[data-campo="al-costado"]')
+    casilla.checked = false
+    casilla.dispatchEvent(new Event('change'))
+    expect(raiz.querySelectorAll('table')).toHaveLength(1)
+  })
+
+  it('titula cada grupo con el rotulo de la planilla', async () => {
+    conGrupos()
+    await abrir()
+    expect(raiz.textContent).toContain('Los grandes')
+    expect(raiz.textContent).toContain('Los chicos')
+  })
+
+  it('sin rotulo guardado cae en el numero de grupo', async () => {
+    await abrir()
+    expect(raiz.textContent).toContain('Grupo 1')
+    expect(raiz.textContent).toContain('Grupo 2')
+  })
+
+  it('cada participante queda en la seccion de su grupo', async () => {
+    await abrir()
+    const secciones = [...raiz.querySelectorAll('tbody tr')].map((tr) => tr.textContent)
+    const iUno = secciones.findIndex((t) => t.includes('Grupo 1'))
+    const iDos = secciones.findIndex((t) => t.includes('Grupo 2'))
+    const iGaia = secciones.findIndex((t) => t.includes('Gaia'))
+    const iNikita = secciones.findIndex((t) => t.includes('Nikita'))
+    expect(iGaia).toBeGreaterThan(iUno)
+    expect(iGaia).toBeLessThan(iDos)
+    expect(iNikita).toBeGreaterThan(iDos)
   })
 })

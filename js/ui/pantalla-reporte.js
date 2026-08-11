@@ -1,5 +1,5 @@
 import { elemento, boton, vaciar } from './componentes.js'
-import { historial, hastaHoy, VINO, FALTO } from '../modelo/asistencia.js'
+import { historial, hastaHoy, agruparPorGrupo, VINO, FALTO } from '../modelo/asistencia.js'
 import { aCSV, descargarCSV } from '../reporte/csv.js'
 import { maquetarReporte } from '../imagen/maquetar-reporte.js'
 import { pintar } from '../imagen/pintar.js'
@@ -24,6 +24,14 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
   let vivo = true
   let carga = 0
   let error = null
+  // Los rotulos de grupo salen de la ultima planilla del mes: se editan desde
+  // Armar lista, asi que escribir "Grupo 1" a mano haria que el reporte y la
+  // planilla se contradigan.
+  let titulos = {}
+  // Voluntarios al costado en vez de abajo. Viene activado porque el reporte se
+  // lee de un vistazo en un telefono, y apilarlo todo obliga a seguir con la
+  // mirada una columna larguisima.
+  let alCostado = true
 
   // Cada carga se lleva su numero y su mes. Si mientras se leen las planillas la
   // coordinadora elige otro mes, la respuesta que llega tarde ya no corresponde
@@ -42,6 +50,9 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
       const archivo = await almacen.leerAsistencias(pedido)
       if (!vivo || mia !== carga) return
       historia = historial(listas, roster, archivo?.correcciones ?? [])
+      titulos = Object.fromEntries((listas.at(-1)?.grupos ?? [])
+        .filter((g) => g.titulo)
+        .map((g) => [g.numero, g.titulo]))
     } catch (fallo) {
       // Red caida o token vencido. Sin esto la pantalla se quedaba en "Leyendo"
       // para siempre y no habia forma de saber que habia pasado.
@@ -52,7 +63,18 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
     dibujar()
   }
 
-  function tabla() {
+  // Los participantes van repartidos por grupo, que es como se juega el sabado.
+  const seccionesDeParticipantes = () => agruparPorGrupo(historia.participantes)
+    .map((b) => ({ titulo: titulos[b.numero] ?? `Grupo ${b.numero ?? '?'}`, filas: b.filas }))
+
+  const seccionesDeVoluntarios = () => (historia.voluntarios.length === 0
+    ? []
+    : [{ titulo: 'Voluntarios', filas: historia.voluntarios }])
+
+  // Una tabla por columna. Con los voluntarios al costado son dos tablas
+  // hermanas y no una sola con todo apilado: asi cada una lleva su encabezado de
+  // dias y en el telefono, cuando no entran, se acomodan una debajo de la otra.
+  function tabla(secciones) {
     const t = document.createElement('table')
     t.className = 'tabla-reporte'
     const cabeza = document.createElement('thead')
@@ -64,7 +86,7 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
     t.appendChild(cabeza)
 
     const cuerpo = document.createElement('tbody')
-    const seccion = (titulo, filas) => {
+    secciones.forEach(({ titulo, filas }) => {
       if (filas.length === 0) return
       const encabezado = document.createElement('tr')
       const celda = elemento('th', ['seccion-reporte'], titulo)
@@ -85,18 +107,30 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
         tr.appendChild(elemento('td', ['resumen-reporte'], `${fila.vino} de ${fila.de}`))
         cuerpo.appendChild(tr)
       })
-    }
-    seccion('Participantes', historia.participantes)
-    seccion('Voluntarios', historia.voluntarios)
+    })
     t.appendChild(cuerpo)
     return t
+  }
+
+  function tablas() {
+    const caja = elemento('div', ['tablas-reporte'])
+    const voluntarios = seccionesDeVoluntarios()
+    if (alCostado && voluntarios.length > 0) {
+      caja.appendChild(tabla(seccionesDeParticipantes()))
+      caja.appendChild(tabla(voluntarios))
+    } else {
+      caja.appendChild(tabla([...seccionesDeParticipantes(), ...voluntarios]))
+    }
+    return caja
   }
 
   async function lienzoDelReporte() {
     await esperarFuentes()
     const lienzo = document.createElement('canvas')
     const ctx = lienzo.getContext('2d')
-    const plano = maquetarReporte({ historia, mes, medirTexto: medidorDesde(ctx) })
+    const plano = maquetarReporte({
+      historia, mes, medirTexto: medidorDesde(ctx), titulos, columnas: alCostado,
+    })
     // Densidad 2 para que el texto no se vea borroso al abrirlo en el telefono.
     const densidad = 2
     lienzo.width = plano.ancho * densidad
@@ -117,7 +151,7 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
     })
     png.dataset.accion = 'descargar-png'
     const csv = boton('Descargar CSV', () => {
-      descargarCSV(aCSV(historia), `asistencia-${mes}.csv`)
+      descargarCSV(aCSV(historia, titulos), `asistencia-${mes}.csv`)
     })
     csv.dataset.accion = 'descargar-csv'
     caja.append(png, csv)
@@ -149,8 +183,17 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial })
     } else if (historia.fechas.length === 0) {
       seccion.appendChild(elemento('p', ['ayuda'], 'No hay planillas guardadas de ese mes.'))
     } else {
+      const casilla = document.createElement('input')
+      casilla.type = 'checkbox'
+      casilla.dataset.campo = 'al-costado'
+      casilla.checked = alCostado
+      casilla.addEventListener('change', () => { alCostado = casilla.checked; dibujar() })
+      const opcion = elemento('label', ['opcion'])
+      opcion.append(casilla, document.createTextNode(' Voluntarios al costado'))
+      seccion.appendChild(opcion)
+
       const envoltorio = elemento('div', ['tabla-envoltorio'])
-      envoltorio.appendChild(tabla())
+      envoltorio.appendChild(tablas())
       seccion.appendChild(envoltorio)
       const cuantos = historia.fechas.length
       seccion.appendChild(elemento('p', ['ayuda'],

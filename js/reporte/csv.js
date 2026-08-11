@@ -15,10 +15,14 @@ const CASILLA = { [VINO]: 'Si', [FALTO]: 'No' }
 // como UTF-8. Sin el, "Gaía" llega como "GaÃ­a" y el reporte parece roto.
 const BOM = '﻿'
 
-export function aCSV(historia) {
+// `titulos` son los rotulos de grupo tal como los escribio la coordinacion. Se
+// editan desde Armar lista, asi que poner "Grupo 1" a mano haria que el CSV y la
+// planilla se contradigan.
+export function aCSV(historia, titulos = {}) {
   const encabezado = ['Tipo', 'Nombre', ...historia.fechas, 'Vino', 'De']
+  const tipoDe = (persona) => titulos[persona.grupo] ?? `Grupo ${persona.grupo ?? '?'}`
   const fila = (tipo) => (f) => [
-    tipo,
+    typeof tipo === 'function' ? campo(tipo(f.persona)) : tipo,
     campo(f.persona.nombre),
     // La casilla vacia es "todavia no estaba": ni si ni no, que en una planilla
     // de calculo se suma mal.
@@ -29,7 +33,7 @@ export function aCSV(historia) {
 
   return BOM + [
     encabezado.map(campo).join(','),
-    ...historia.participantes.map(fila('Participante')),
+    ...historia.participantes.map(fila(tipoDe)),
     ...historia.voluntarios.map(fila('Voluntario')),
   ].join('\n')
 }

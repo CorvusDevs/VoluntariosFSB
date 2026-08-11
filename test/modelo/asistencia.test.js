@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  estadoDeSabado, historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA, VINO, FALTO, NO_ESTABA,
+  estadoDeSabado, historial, rachasDeFalta, hastaHoy, agruparPorGrupo,
+  UMBRAL_ALERTA, VINO, FALTO, NO_ESTABA,
 } from '../../js/modelo/asistencia.js'
 
 const ROSTER = {
@@ -244,5 +245,36 @@ describe('rachas que llegan al borde de lo que se miro', () => {
     const alerta = rachasDeFalta(h, []).find((a) => a.persona.id === 'p1')
     expect(alerta.faltas).toBe(3)
     expect(alerta.almenos).toBe(false)
+  })
+})
+
+describe('agruparPorGrupo', () => {
+  const filas = [
+    { persona: { id: 'p1', nombre: 'Gaia', grupo: 1 } },
+    { persona: { id: 'p3', nombre: 'Nikita', grupo: 2 } },
+    { persona: { id: 'p2', nombre: 'Santiago', grupo: 1 } },
+  ]
+
+  it('separa por numero de grupo', () => {
+    const bloques = agruparPorGrupo(filas)
+    expect(bloques.map((b) => b.numero)).toEqual([1, 2])
+    expect(bloques[0].filas.map((f) => f.persona.nombre)).toEqual(['Gaia', 'Santiago'])
+    expect(bloques[1].filas.map((f) => f.persona.nombre)).toEqual(['Nikita'])
+  })
+
+  it('no devuelve un grupo sin nadie', () => {
+    const soloUno = agruparPorGrupo(filas.filter((f) => f.persona.grupo === 1))
+    expect(soloUno.map((b) => b.numero)).toEqual([1])
+  })
+
+  it('sin nadie devuelve una lista vacia', () => {
+    expect(agruparPorGrupo([])).toEqual([])
+  })
+
+  it('junta en un bloque aparte a quien no tiene grupo', () => {
+    // No deberia pasar, pero perder a alguien del reporte por un dato raro es
+    // peor que mostrarlo suelto.
+    const bloques = agruparPorGrupo([...filas, { persona: { id: 'pX', nombre: 'Sin grupo' } }])
+    expect(bloques.at(-1).filas.map((f) => f.persona.nombre)).toEqual(['Sin grupo'])
   })
 })

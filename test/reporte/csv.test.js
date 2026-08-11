@@ -4,7 +4,7 @@ import { aCSV } from '../../js/reporte/csv.js'
 const HISTORIA = {
   fechas: ['2026-08-01', '2026-08-08'],
   participantes: [
-    { persona: { id: 'p1', nombre: 'Gaia' }, estados: ['vino', 'falto'], vino: 1, de: 2 },
+    { persona: { id: 'p1', nombre: 'Gaia', grupo: 1 }, estados: ['vino', 'falto'], vino: 1, de: 2 },
   ],
   voluntarios: [
     { persona: { id: 'v1', nombre: 'Abi, la grande' }, estados: ['no-estaba', 'vino'], vino: 1, de: 1 },
@@ -17,7 +17,7 @@ describe('aCSV', () => {
   })
 
   it('escribe una fila por persona', () => {
-    expect(aCSV(HISTORIA).split('\n')[1]).toBe('Participante,Gaia,Si,No,1,2')
+    expect(aCSV(HISTORIA).split('\n')[1]).toBe('Grupo 1,Gaia,Si,No,1,2')
   })
 
   it('entrecomilla el nombre que tiene una coma', () => {
@@ -28,9 +28,9 @@ describe('aCSV', () => {
   it('duplica la comilla que venga adentro del nombre', () => {
     const historia = {
       ...HISTORIA,
-      participantes: [{ persona: { id: 'p1', nombre: 'Juan "Pipa"' }, estados: ['vino', 'vino'], vino: 2, de: 2 }],
+      participantes: [{ persona: { id: 'p1', nombre: 'Juan "Pipa"', grupo: 2 }, estados: ['vino', 'vino'], vino: 2, de: 2 }],
     }
-    expect(aCSV(historia).split('\n')[1]).toBe('Participante,"Juan ""Pipa""",Si,Si,2,2')
+    expect(aCSV(historia).split('\n')[1]).toBe('Grupo 2,"Juan ""Pipa""",Si,Si,2,2')
   })
 
   it('deja la casilla vacia cuando la persona todavia no estaba', () => {
@@ -44,5 +44,22 @@ describe('aCSV', () => {
   it('un mes sin nadie sigue teniendo encabezado', () => {
     const vacia = { fechas: [], participantes: [], voluntarios: [] }
     expect(aCSV(vacia)).toBe('﻿Tipo,Nombre,Vino,De')
+  })
+})
+
+describe('el grupo en el CSV', () => {
+  it('usa el rotulo que le puso la coordinacion', () => {
+    // Los titulos se editan desde Armar lista: escribir "Grupo 1" a mano haria
+    // que el CSV y la planilla se contradigan.
+    const filas = aCSV(HISTORIA, { 1: 'Los grandes' }).split('\n')
+    expect(filas[1].startsWith('Los grandes,')).toBe(true)
+  })
+
+  it('sin rotulo cae en el numero de grupo', () => {
+    expect(aCSV(HISTORIA).split('\n')[1].startsWith('Grupo 1,')).toBe(true)
+  })
+
+  it('el voluntario sigue diciendo Voluntario', () => {
+    expect(aCSV(HISTORIA).split('\n')[2].startsWith('Voluntario,')).toBe(true)
   })
 })

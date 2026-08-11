@@ -145,3 +145,21 @@ export function rachasDeFalta(historia, seguimientos = []) {
 export function hastaHoy(fechas, hoy) {
   return [...fechas].filter((f) => f <= hoy).sort()
 }
+
+// Separa las filas del reporte por grupo, en el orden en que se juega. Los
+// grupos son dos, pero se derivan de la gente y no de una lista fija: un grupo
+// sin nadie no merece un titulo vacio en el reporte.
+//
+// Quien no tenga grupo cae en un bloque al final. No deberia pasar, pero
+// perderlo del reporte por un dato raro es peor que mostrarlo suelto.
+export function agruparPorGrupo(filas) {
+  const bloques = new Map()
+  filas.forEach((fila) => {
+    const numero = fila.persona.grupo ?? null
+    if (!bloques.has(numero)) bloques.set(numero, [])
+    bloques.get(numero).push(fila)
+  })
+  return [...bloques.entries()]
+    .sort((a, b) => (a[0] ?? Infinity) - (b[0] ?? Infinity))
+    .map(([numero, suyas]) => ({ numero, filas: suyas }))
+}

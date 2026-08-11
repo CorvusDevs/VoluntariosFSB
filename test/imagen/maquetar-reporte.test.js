@@ -11,8 +11,8 @@ const medir = (texto, fuente) => texto.length * anchoDe(fuente)
 const HISTORIA = {
   fechas: ['2026-08-01', '2026-08-08', '2026-08-15'],
   participantes: [
-    { persona: { id: 'p1', nombre: 'Gaia' }, estados: ['vino', 'falto', 'vino'], vino: 2, de: 3 },
-    { persona: { id: 'p2', nombre: 'Santiago' }, estados: ['vino', 'vino', 'vino'], vino: 3, de: 3 },
+    { persona: { id: 'p1', nombre: 'Gaia', grupo: 1 }, estados: ['vino', 'falto', 'vino'], vino: 2, de: 3 },
+    { persona: { id: 'p2', nombre: 'Santiago', grupo: 1 }, estados: ['vino', 'vino', 'vino'], vino: 3, de: 3 },
   ],
   voluntarios: [
     { persona: { id: 'v1', nombre: 'Abi' }, estados: ['no-estaba', 'vino', 'vino'], vino: 2, de: 2 },
@@ -45,10 +45,15 @@ describe('maquetarReporte', () => {
     expect(textos).toContain('Abi')
   })
 
-  it('separa participantes de voluntarios con dos titulos', () => {
-    const textos = textosDe(maquetar())
-    expect(textos).toContain('Participantes')
+  it('titula el bloque de cada grupo y el de voluntarios', () => {
+    // Los participantes ya no van bajo un unico "Participantes": van repartidos
+    // por grupo, que es como se juega el sabado.
+    const textos = textosDe(maquetarReporte({
+      historia: HISTORIA, mes: '2026-08', medirTexto: medir, titulos: { 1: 'Grupo 1' },
+    }))
+    expect(textos).toContain('Grupo 1')
     expect(textos).toContain('Voluntarios')
+    expect(textos).not.toContain('Participantes')
   })
 
   it('encabeza cada columna con el dia del mes', () => {
@@ -126,5 +131,107 @@ describe('maquetarReporte', () => {
     })
     expect(vacio.alto).toBeGreaterThan(0)
     expect(textosDe(vacio)).toContain('Asistencia de enero de 2026')
+  })
+})
+
+const HISTORIA_DOS_GRUPOS = {
+  fechas: ['2026-08-01', '2026-08-08'],
+  participantes: [
+    { persona: { id: 'p1', nombre: 'Gaia', grupo: 1 }, estados: ['vino', 'vino'], vino: 2, de: 2 },
+    { persona: { id: 'p3', nombre: 'Nikita', grupo: 2 }, estados: ['vino', 'falto'], vino: 1, de: 2 },
+    { persona: { id: 'p2', nombre: 'Santiago', grupo: 1 }, estados: ['vino', 'vino'], vino: 2, de: 2 },
+  ],
+  voluntarios: [
+    { persona: { id: 'v1', nombre: 'Abi' }, estados: ['vino', 'vino'], vino: 2, de: 2 },
+  ],
+}
+
+const TITULOS = { 1: 'Grupo 1', 2: 'Grupo 2' }
+const conGrupos = (opciones = {}) => maquetarReporte({
+  historia: HISTORIA_DOS_GRUPOS, mes: '2026-08', medirTexto: medir, titulos: TITULOS, ...opciones,
+})
+
+describe('participantes separados por grupo', () => {
+  it('titula cada grupo con el nombre que le puso la coordinacion', () => {
+    // Los rotulos se editan desde Armar lista, asi que el reporte no puede
+    // escribir "Grupo 1" a mano.
+    const textos = textosDe(conGrupos({ titulos: { 1: 'Los grandes', 2: 'Los chicos' } }))
+    expect(textos).toContain('Los grandes')
+    expect(textos).toContain('Los chicos')
+    expect(textos).not.toContain('Participantes')
+  })
+
+  it('cada uno queda bajo su grupo', () => {
+    const textos = textosDe(conGrupos())
+    expect(textos.indexOf('Gaia')).toBeGreaterThan(textos.indexOf('Grupo 1'))
+    expect(textos.indexOf('Nikita')).toBeGreaterThan(textos.indexOf('Grupo 2'))
+    expect(textos.indexOf('Santiago')).toBeLessThan(textos.indexOf('Grupo 2'))
+  })
+
+  it('un grupo sin nadie no deja un titulo suelto', () => {
+    const soloUno = maquetarReporte({
+      historia: { ...HISTORIA_DOS_GRUPOS, participantes: [HISTORIA_DOS_GRUPOS.participantes[0]] },
+      mes: '2026-08', medirTexto: medir, titulos: TITULOS,
+    })
+    expect(textosDe(soloUno)).not.toContain('Grupo 2')
+  })
+})
+
+describe('voluntarios al costado', () => {
+  it('por defecto la imagen es mas ancha y mas baja', () => {
+    // El reporte se lee de un vistazo en el telefono: apilar todo hacia abajo
+    // obliga a seguir con la mirada una columna larguisima.
+    const alCostado = conGrupos()
+    const apilado = conGrupos({ columnas: false })
+    expect(alCostado.alto).toBeLessThan(apilado.alto)
+    expect(alCostado.ancho).toBeGreaterThan(apilado.ancho)
+  })
+
+  it('los voluntarios arrancan a la derecha de los participantes', () => {
+    const plano = conGrupos()
+    const xDe = (t) => plano.ordenes.find((o) => o.tipo === 'texto' && o.texto === t).x
+    expect(xDe('Abi')).toBeGreaterThan(xDe('Gaia'))
+  })
+
+  it('apilado, los voluntarios quedan debajo', () => {
+    const plano = conGrupos({ columnas: false })
+    const orden = (t) => plano.ordenes.find((o) => o.tipo === 'texto' && o.texto === t)
+    expect(orden('Abi').y).toBeGreaterThan(orden('Gaia').y)
+    expect(orden('Abi').x).toBe(orden('Gaia').x)
+  })
+
+  it('nada se dibuja fuera del lienzo con las dos columnas', () => {
+    const plano = conGrupos()
+    plano.ordenes.filter((o) => o.tipo === 'rect').forEach((o) => {
+      expect(o.x + o.ancho).toBeLessThanOrEqual(plano.ancho + 0.5)
+    })
+    plano.ordenes.filter((o) => o.tipo === 'texto').forEach((o) => {
+      expect(o.y).toBeLessThanOrEqual(plano.alto)
+    })
+  })
+
+  it('sin voluntarios no deja una columna vacia a la derecha', () => {
+    const plano = maquetarReporte({
+      historia: { ...HISTORIA_DOS_GRUPOS, voluntarios: [] },
+      mes: '2026-08', medirTexto: medir, titulos: TITULOS,
+    })
+    const sinColumnas = maquetarReporte({
+      historia: { ...HISTORIA_DOS_GRUPOS, voluntarios: [] },
+      mes: '2026-08', medirTexto: medir, titulos: TITULOS, columnas: false,
+    })
+    expect(plano.ancho).toBe(sinColumnas.ancho)
+  })
+})
+
+describe('color de los titulos', () => {
+  it('los voluntarios se distinguen de los grupos, esten donde esten', () => {
+    // El color viajaba deducido de en que arreglo estaba la seccion, asi que
+    // apilar en vez de poner al costado se lo cambiaba sin motivo.
+    const colorDe = (plano, texto) => plano.ordenes
+      .find((o) => o.tipo === 'texto' && o.texto === texto).color
+    const alCostado = conGrupos()
+    const apilado = conGrupos({ columnas: false })
+    expect(colorDe(alCostado, 'Voluntarios')).toBe(colorDe(apilado, 'Voluntarios'))
+    expect(colorDe(alCostado, 'Voluntarios')).not.toBe(colorDe(alCostado, 'Grupo 1'))
   })
 })
