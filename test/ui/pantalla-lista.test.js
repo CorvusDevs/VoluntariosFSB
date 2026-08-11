@@ -296,9 +296,23 @@ describe('pantalla de armado', () => {
 })
 
 describe('ausencias desde la pantalla', () => {
-  it('la barra de seleccion ofrece sacar al participante de la jornada', () => {
+  it('la bandeja de voluntarios ofrece sacar al participante de la jornada', () => {
     porNombre('.columna-participantes .ficha', 'Gonzalo').click()
-    expect(raiz.querySelector('[data-accion="sacar-de-lista"]')).not.toBeNull()
+    const sacar = raiz.querySelector('[data-accion="sacar-de-lista"]')
+    expect(sacar).not.toBeNull()
+    // Al final de la bandeja, no en la barra de abajo: es una respuesta mas a
+    // "quien lo acompaña", y buscarla al pie de la pantalla era otro viaje.
+    expect(sacar.closest('.columna-voluntarios')).not.toBeNull()
+    expect(sacar.closest('.barra-seleccion')).toBeNull()
+    expect(sacar.parentElement.lastElementChild).toBe(sacar)
+  })
+
+  it('no aparece donde no se esta eligiendo por un participante', () => {
+    // Sin nadie tocado, la bandeja al pie es solo el plantel.
+    expect(raiz.querySelector('[data-accion="sacar-de-lista"]')).toBeNull()
+    // Y el apoyo es de un voluntario: no hay chico al que marcarle la falta.
+    raiz.querySelector('[data-accion="sumar-apoyo-1"]').click()
+    expect(raiz.querySelector('[data-accion="sacar-de-lista"]')).toBeNull()
   })
 
   it('sacarlo lo quita de su grupo y lo lista como ausente', () => {

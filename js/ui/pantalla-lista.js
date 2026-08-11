@@ -208,7 +208,8 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
         el.addEventListener('click', () => alTocarParticipante(id))
         columna.appendChild(el)
         if (seleccionado === id) {
-          columna.appendChild(elegidor(`Elegí quién acompaña a ${persona?.nombre ?? ''}`))
+          columna.appendChild(elegidor(`Elegí quién acompaña a ${persona?.nombre ?? ''}`,
+            { conAusencia: true }))
         }
       })
     })
@@ -254,7 +255,12 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
 
   // Las fichas de voluntario se arman aparte porque salen en dos lugares: al pie
   // como plantel completo, y colgadas del participante que se acaba de tocar.
-  function columnaDeVoluntarios() {
+  //
+  // `conAusencia` agrega "Hoy no viene" al final de la bandeja. Va aca y no en la
+  // barra de abajo porque es una respuesta mas a la misma pregunta: se toca al
+  // chico y se contesta quien lo acompaña, o que hoy no vino. Tenerlo al pie de
+  // la pantalla obligaba a buscarlo lejos de donde estaba la vista.
+  function columnaDeVoluntarios({ conAusencia = false } = {}) {
     const columna = elemento('div', ['columna', 'columna-voluntarios'])
     const asignados = voluntariosAsignados()
     // Quienes ya acompañan al participante seleccionado se marcan aparte y dicen
@@ -274,16 +280,33 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
       el.addEventListener('click', () => alTocarVoluntario(voluntario.id))
       columna.appendChild(el)
     })
+    if (conAusencia) columna.appendChild(botonDeAusencia())
     return columna
+  }
+
+  // No siempre van los mismos chicos, asi que sacar a alguien de la jornada tiene
+  // que estar donde ya lo tenes elegido, no en otra pantalla.
+  function botonDeAusencia() {
+    const sacar = boton('Hoy no viene', () => {
+      const quien = seleccionado
+      const siguiente = quitarDeLista(estado(), quien)
+      pila.registrar(siguiente)
+      seleccionado = null
+      alCambiar(siguiente, `Marcar que ${nombreDe(quien)} hoy no viene`)
+      dibujar()
+    })
+    sacar.dataset.accion = 'sacar-de-lista'
+    sacar.classList.add('boton-ausencia')
+    return sacar
   }
 
   // El elegidor se abre justo debajo de lo que se toco. Antes habia que bajar
   // hasta el final de la pagina por cada asignacion y volver a subir para la
   // siguiente, que en el telefono era la mitad del trabajo.
-  function elegidor(titulo) {
+  function elegidor(titulo, opciones = {}) {
     const caja = elemento('div', ['elegidor'])
     caja.appendChild(elemento('p', ['elegidor-titulo'], titulo))
-    caja.appendChild(columnaDeVoluntarios())
+    caja.appendChild(columnaDeVoluntarios(opciones))
     return caja
   }
 
@@ -314,25 +337,16 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     caja.appendChild(elemento('span', ['barra-seleccion-texto'], `Asignando a ${nombreDe(seleccionado)}`))
 
     const acciones = elemento('div', ['barra-seleccion-acciones'])
-    // No siempre van los mismos chicos, asi que sacar a alguien de la jornada
-    // tiene que estar donde ya lo tenes elegido, no en otra pantalla.
-    const sacar = boton(`Hoy no viene`, () => {
-      const quien = seleccionado
-      const siguiente = quitarDeLista(estado(), quien)
-      pila.registrar(siguiente)
-      seleccionado = null
-      alCambiar(siguiente, `Marcar que ${nombreDe(quien)} hoy no viene`)
-      dibujar()
-    })
-    sacar.dataset.accion = 'sacar-de-lista'
-
+    // "Hoy no viene" vive ahora al final de la bandeja de voluntarios, junto a
+    // las otras respuestas posibles. Repetirlo aca dejaba dos botones iguales en
+    // pantalla a la vez, que es una pregunta de mas.
     const cancelar = boton('Cancelar', () => {
       seleccionado = null
       dibujar()
     })
     cancelar.dataset.accion = 'cancelar'
 
-    acciones.append(sacar, cancelar)
+    acciones.append(cancelar)
     caja.appendChild(acciones)
     return caja
   }
