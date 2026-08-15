@@ -299,6 +299,15 @@ describe('directorio de Personas', () => {
     expect(nombresDirectorio()).toContain('Gonzalo')
   })
 
+  it('muestra un interruptor Nuevo etiquetado y agrupa las acciones del editor', () => {
+    tarjeta('Gonzalo').querySelector('button').click()
+    const editor = raiz.querySelector('.persona-editor')
+    const interruptor = editor.querySelector('input[role=switch]')
+    expect(interruptor).not.toBeNull()
+    expect(interruptor.closest('label').textContent).toContain('Marcar como nuevo')
+    expect(editor.querySelector('.persona-acciones')).not.toBeNull()
+  })
+
   it('mueve participantes seleccionados en bloque y avisa la mudanza', async () => {
     const avisos = []
     document.body.innerHTML = '<div id="masivo"></div>'

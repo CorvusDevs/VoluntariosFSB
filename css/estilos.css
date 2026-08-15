@@ -494,7 +494,7 @@ input.fila-nombre:focus {
 .personas-cabecera { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .personas-cabecera h2 { margin: 0 auto 0 0; }
 .personas-resumen, .personas-deshacer, .personas-masivas { margin: 0 16px 12px; padding: 10px 12px; border-radius: 10px; background: #F1EAF5; color: var(--violeta); }
-.personas-filtros input, .persona-formulario input, .persona-formulario select, .persona-formulario textarea, .personas-personalizacion select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; }
+.personas-filtros input, .persona-formulario input:not([type=checkbox]), .persona-formulario select, .persona-formulario textarea, .personas-personalizacion select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; }
 .personas-chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 2px; }
 .chip { flex: 0 0 auto; min-height: 36px; padding: 6px 10px; font-size: 14px; }
 .chip.activa { background: var(--violeta); color: var(--fondo); }
@@ -516,6 +516,16 @@ input.fila-nombre:focus {
 .persona-editor, .personas-personalizacion { position: fixed; z-index: 3; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow: auto; border-radius: 18px 18px 0 0; background: var(--fondo); box-shadow: 0 -12px 36px rgba(41, 23, 58, .18); }
 .persona-editor h2, .personas-personalizacion h2 { margin-top: 0; }
 .persona-formulario, .personas-personalizacion { display: flex; flex-direction: column; gap: 12px; }
+.persona-estado { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 10px; cursor: pointer; }
+.persona-estado-texto { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--texto-suave); }
+.persona-estado-texto strong { color: var(--texto); font-size: 15px; }
+.persona-estado input[type=checkbox] { appearance: none; position: relative; flex: 0 0 auto; width: 44px; height: 26px; margin: 0; border: 1px solid var(--texto-suave); border-radius: 999px; background: var(--fondo); transition: background 160ms ease, border-color 160ms ease; }
+.persona-estado input[type=checkbox]::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--texto-suave); transition: transform 160ms ease, background 160ms ease; }
+.persona-estado input[type=checkbox]:checked { border-color: var(--violeta); background: var(--violeta); }
+.persona-estado input[type=checkbox]:checked::after { transform: translateX(18px); background: var(--fondo); }
+.persona-estado input[type=checkbox]:focus-visible { outline: 2px solid var(--violeta); outline-offset: 3px; }
+.persona-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.persona-acciones .boton { flex: 1 1 148px; padding: 10px 14px; }
 .personas-masivas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .personas-masivas .boton { font-size: 14px; }
 
@@ -527,6 +537,23 @@ input.fila-nombre:focus {
   .personas-resultados { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 32px; }
   .personas-filtros { display: grid; grid-template-columns: minmax(280px, 1fr) auto; column-gap: 20px; align-items: center; }
   .personas-chips { padding: 0 0 2px; }
+}
+
+@media (min-width: 900px) {
+  .persona-editor {
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
+    box-sizing: border-box;
+    width: min(640px, calc(100vw - 48px));
+    max-height: min(720px, calc(100vh - 64px));
+    padding: 24px;
+    border: 1px solid var(--linea);
+    border-radius: 18px;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 18px 48px rgba(41, 23, 58, .22);
+  }
 }
 
 /* Selector de formato de la imagen. */
