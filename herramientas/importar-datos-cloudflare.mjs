@@ -8,6 +8,7 @@ import path from 'node:path'
 const DUENIO = 'CorvusDevs'
 const REPOSITORIO = 'VoluntariosFSB-datos'
 const ARCHIVOS_POR_LOTE = 20
+const BYTES_POR_FRAGMENTO = 30 * 1024
 
 export function rutaDocumentoValida(ruta) {
   return ruta === 'roster.json'
@@ -60,10 +61,19 @@ SELECT ${literal(ruta)}, ${literal(contenido)}, 1, 'migracion', CURRENT_TIMESTAM
 WHERE NOT EXISTS (SELECT 1 FROM documentos WHERE ruta = ${literal(ruta)});`
 }
 
-function sqlFoto(clave, datos, tipo) {
-  return `INSERT INTO fotos (clave, datos, tipo, revision, actualizado_por, actualizado_en)
-SELECT ${literal(clave)}, ${blob(datos)}, ${literal(tipo)}, 1, 'migracion', CURRENT_TIMESTAMP
-WHERE NOT EXISTS (SELECT 1 FROM fotos WHERE clave = ${literal(clave)});`
+export function sentenciasFoto(clave, datos, tipo) {
+  const seguro = literal(clave)
+  const sentencias = [`INSERT INTO fotos (clave, datos, tipo, revision, actualizado_por, actualizado_en)
+SELECT ${seguro}, zeroblob(0), ${literal(tipo)}, 1, 'migracion', CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM fotos WHERE clave = ${seguro});`]
+  for (let inicio = 0; inicio < datos.length; inicio += BYTES_POR_FRAGMENTO) {
+    const fragmento = datos.subarray(inicio, inicio + BYTES_POR_FRAGMENTO)
+    // La longitud esperada hace que el reintento continue una foto incompleta,
+    // pero no vuelva a agregar bytes si la foto ya se terminó de importar.
+    sentencias.push(`UPDATE fotos SET datos = CAST(datos || ${blob(fragmento)} AS BLOB)
+WHERE clave = ${seguro} AND length(CAST(datos AS BLOB)) = ${inicio};`)
+  }
+  return sentencias
 }
 
 function tipoFoto(ruta) {
@@ -83,7 +93,7 @@ function argumentos(argumentos) {
   return salida
 }
 
-export async function prepararImportacion({ token, destino }) {
+export async function prepararImportacion({ token, destino, seco = false }) {
   const entradas = await leerArbol(token)
   const elegidas = entradas.filter((entrada) => rutaDocumentoValida(entrada.path) || claveFoto(entrada.path))
   const documentos = []
@@ -112,14 +122,16 @@ export async function prepararImportacion({ token, destino }) {
   }
   await fs.mkdir(destino, { recursive: true, mode: 0o700 })
   await fs.writeFile(path.join(destino, 'resumen.json'), `${JSON.stringify(resumen, null, 2)}\n`, { mode: 0o600 })
-  const sentencias = [
-    ...documentos.map((item) => sqlDocumento(item.ruta, item.contenido)),
-    ...fotos.map((item) => sqlFoto(item.clave, item.datos, item.tipo)),
-  ]
-  for (let inicio = 0; inicio < sentencias.length; inicio += ARCHIVOS_POR_LOTE) {
-    const lote = sentencias.slice(inicio, inicio + ARCHIVOS_POR_LOTE)
-    await fs.writeFile(path.join(destino, `lote-${String(inicio / ARCHIVOS_POR_LOTE + 1).padStart(3, '0')}.sql`),
-      `BEGIN;\n${lote.join('\n')}\nCOMMIT;\n`, { mode: 0o600 })
+  if (!seco) {
+    const sentencias = [
+      ...documentos.map((item) => sqlDocumento(item.ruta, item.contenido)),
+      ...fotos.flatMap((item) => sentenciasFoto(item.clave, item.datos, item.tipo)),
+    ]
+    for (let inicio = 0; inicio < sentencias.length; inicio += ARCHIVOS_POR_LOTE) {
+      const lote = sentencias.slice(inicio, inicio + ARCHIVOS_POR_LOTE)
+      await fs.writeFile(path.join(destino, `lote-${String(inicio / ARCHIVOS_POR_LOTE + 1).padStart(3, '0')}.sql`),
+        `${lote.join('\n')}\n`, { mode: 0o600 })
+    }
   }
   return resumen
 }
@@ -128,7 +140,7 @@ async function principal() {
   const { seco, destino } = argumentos(process.argv.slice(2))
   const token = process.env.VFSB_GITHUB_TOKEN
   if (!token) throw new Error('Falta VFSB_GITHUB_TOKEN. No pegues el token en comandos ni archivos.')
-  const resumen = await prepararImportacion({ token, destino })
+  const resumen = await prepararImportacion({ token, destino, seco })
   console.log(JSON.stringify({ ...resumen.totales, destino, seco }, null, 2))
   if (!seco) console.log('SQL temporal preparado. Revisá resumen.json antes de ejecutar cada lote con Wrangler D1.')
 }

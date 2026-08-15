@@ -33,7 +33,7 @@ El importador se ejecuta fuera del repositorio público y necesita un token temp
 node herramientas/importar-datos-cloudflare.mjs --dry-run --out /private/tmp/vfsb-importacion
 ```
 
-El primer paso descarga y valida los archivos, pero no modifica D1. Revisá `resumen.json` y sus huellas SHA-256. Después, ejecutá cada `lote-*.sql` con `wrangler d1 execute ... --remote --file`. Los lotes son idempotentes: no sustituyen información que ya se haya escrito en D1. Borrá la carpeta temporal al terminar.
+El primer paso descarga y valida los archivos, pero no modifica D1. Revisá `resumen.json` y sus huellas SHA-256. Después, ejecutá cada `lote-*.sql` con `wrangler d1 execute ... --remote --file`. Las fotos se fragmentan para respetar el límite de 100 KB por sentencia de D1. Los lotes son idempotentes: no sustituyen información que ya se haya escrito en D1. Borrá la carpeta temporal al terminar.
 
 ## Modelo inicial
 
