@@ -269,6 +269,16 @@ describe('directorio de Personas', () => {
     expect(raiz.querySelectorAll('.persona-tarjeta').length).toBeGreaterThan(0)
   })
 
+  it('permite salir del filtro Archivadas con un segundo toque', () => {
+    const archivadas = () => [...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Archivadas')
+    archivadas().click()
+    expect(archivadas().getAttribute('aria-pressed')).toBe('true')
+    expect(nombresDirectorio()).toContain('Ezequiel')
+    archivadas().click()
+    expect(archivadas().getAttribute('aria-pressed')).toBe('false')
+    expect(nombresDirectorio()).not.toContain('Ezequiel')
+  })
+
   it('agrega una persona desde el editor', async () => {
     [...raiz.querySelectorAll('button')].find((e) => e.textContent === 'Agregar persona').click()
     const editor = raiz.querySelector('.persona-editor')
