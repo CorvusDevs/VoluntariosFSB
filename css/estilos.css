@@ -527,8 +527,21 @@ input.fila-nombre:focus {
 .persona-edad { margin: -4px 0 0; color: var(--violeta); font-size: 14px; font-weight: 700; }
 .persona-bio .campo { display: grid; gap: 6px; }
 .persona-bio input, .persona-bio textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; background: var(--fondo); }
-.campo-anio-nacimiento { order: -1; }
-.selector-anio-nacimiento { box-sizing: border-box; width: 100%; min-height: 48px; padding: 9px 12px; font: inherit; font-weight: 700; color: var(--violeta); border: 2px solid var(--violeta); border-radius: 10px; background: var(--fondo); }
+.selector-fecha { position: relative; }
+.selector-fecha-disparador { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 48px; padding: 9px 12px; color: var(--texto); background: var(--fondo); border: 1px solid var(--linea); border-radius: 10px; font: inherit; text-align: left; }
+.selector-fecha-disparador::after { content: '⌄'; color: var(--violeta); font-size: 22px; line-height: 1; }
+.selector-fecha-disparador[aria-expanded=true] { border-color: var(--violeta); box-shadow: 0 0 0 3px #E9DBEF; }
+.selector-fecha-panel { position: absolute; z-index: 5; top: calc(100% + 6px); left: 0; width: min(340px, calc(100vw - 64px)); padding: 12px; border: 1px solid var(--linea); border-radius: 14px; background: var(--fondo); box-shadow: 0 12px 28px rgba(41, 23, 58, .18); }
+.selector-fecha-cabecera { display: grid; grid-template-columns: 36px minmax(0, 1fr) minmax(86px, .7fr) 36px; gap: 6px; align-items: center; }
+.selector-fecha-cabecera select, .selector-fecha-navegar { min-width: 0; min-height: 40px; padding: 6px; color: var(--texto); background: #FAF8FB; border: 1px solid var(--linea); border-radius: 8px; font: inherit; }
+.selector-fecha-navegar { font-size: 26px; line-height: 1; color: var(--violeta); }
+.selector-fecha-navegar:disabled { opacity: .4; }
+.selector-fecha-semana, .selector-fecha-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; margin-top: 10px; text-align: center; }
+.selector-fecha-semana { color: var(--texto-suave); font-size: 12px; font-weight: 700; }
+.selector-fecha-dia { min-height: 36px; padding: 0; color: var(--texto); background: transparent; border: 0; border-radius: 8px; font: inherit; }
+.selector-fecha-dia:hover, .selector-fecha-dia:focus-visible { color: var(--violeta); background: #F1EAF5; }
+.selector-fecha-dia.seleccionado { color: var(--fondo); background: var(--violeta); }
+@media (max-width: 480px) { .selector-fecha-panel { width: calc(100vw - 64px); } }
 .vista-tarjeta-personal { display: grid; gap: 8px; margin-top: 18px; padding: 14px; border: 1px solid var(--linea); border-radius: 14px; background: #FAF8FB; }
 .vista-tarjeta-personal h3 { margin: 0; color: var(--violeta); }
 .vista-tarjeta-personal .ayuda-ajustes { margin: 0; }

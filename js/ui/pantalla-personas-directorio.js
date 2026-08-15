@@ -6,6 +6,7 @@ import { edadDesdeAnio, perfilDe } from '../modelo/perfil.js'
 import { maquetarPerfil } from '../imagen/maquetar-perfil.js'
 import { descargar, esperarFuentes, medidorDesde } from '../imagen/exportar.js'
 import { pintar } from '../imagen/pintar.js'
+import { crearSelectorFecha } from './selector-fecha.js'
 
 const AJUSTES = { resumen: true, fotos: true, estado: true, orden: 'nombre' }
 const tipoDe = (p) => p.id.startsWith('v_') ? 'voluntario' : 'participante'
@@ -90,25 +91,16 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     const bio = elemento('fieldset', ['persona-bio']); bio.appendChild(elemento('legend', [], 'Perfil personal'))
     const campoPerfil = (clave, rotulo, tipo = 'text', ayuda = '') => { const etiqueta = elemento('label', ['campo']); etiqueta.appendChild(elemento('span', ['campo-rotulo'], rotulo)); const entrada = document.createElement(tipo === 'textarea' ? 'textarea' : 'input'); if (tipo !== 'textarea') entrada.type = tipo; else entrada.rows = 3; entrada.value = perfil[clave] ?? ''; entrada.dataset.perfil = clave; if (ayuda) entrada.placeholder = ayuda; etiqueta.appendChild(entrada); bio.appendChild(etiqueta); return entrada }
     const hoy = new Date()
-    const selectorAnio = document.createElement('select')
-    selectorAnio.className = 'selector-anio-nacimiento'
-    selectorAnio.setAttribute('aria-label', 'Año de nacimiento')
-    selectorAnio.appendChild(new Option('Elegir año', ''))
-    for (let anio = hoy.getFullYear(); anio >= 1900; anio -= 1) selectorAnio.appendChild(new Option(String(anio), String(anio)))
-    const etiquetaAnio = elemento('label', ['campo', 'campo-anio-nacimiento'])
-    etiquetaAnio.append(elemento('span', ['campo-rotulo'], 'Año de nacimiento'), selectorAnio)
-    bio.appendChild(etiquetaAnio)
-    const nacimiento = campoPerfil('anioNacimiento', 'Fecha de nacimiento', 'date')
-    nacimiento.max = hoy.toISOString().slice(0, 10)
-    const sincronizarAnio = () => { selectorAnio.value = /^\d{4}/.test(nacimiento.value) ? nacimiento.value.slice(0, 4) : '' }
+    const maximo = hoy.toISOString().slice(0, 10)
+    const nacimiento = crearSelectorFecha({ clave: 'anioNacimiento', rotulo: 'Fecha de nacimiento', valor: perfil.anioNacimiento, max: maximo }).entrada
+    bio.appendChild(nacimiento.closest('.selector-fecha'))
     const edad = elemento('p', ['persona-edad'])
     const actualizarEdad = () => { const valor = edadDesdeAnio(nacimiento.value); edad.textContent = valor === null ? 'Edad: agregar una fecha de nacimiento válida' : `Edad: ${valor} años` }
-    selectorAnio.addEventListener('change', () => { if (!selectorAnio.value) return; const [, mes = '01', dia = '01'] = nacimiento.value.split('-'); nacimiento.value = `${selectorAnio.value}-${mes}-${dia}`; actualizarEdad() })
-    nacimiento.addEventListener('input', () => { sincronizarAnio(); actualizarEdad() })
-    sincronizarAnio()
+    nacimiento.addEventListener('input', actualizarEdad)
     actualizarEdad()
     bio.appendChild(edad)
-    campoPerfil('desde', 'En la organización desde', 'date')
+    const desde = crearSelectorFecha({ clave: 'desde', rotulo: 'En la organización desde', valor: perfil.desde, max: maximo })
+    bio.appendChild(desde.campo)
     campoPerfil('leGusta', 'Le gusta', 'textarea', 'Actividades, intereses o motivadores')
     campoPerfil('noLeGusta', 'Prefiere evitar', 'textarea', 'Situaciones, sonidos o actividades')
     campoPerfil('necesidades', 'Necesidades y apoyos', 'textarea', 'Información útil para acompañar a la persona')

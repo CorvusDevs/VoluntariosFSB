@@ -292,7 +292,7 @@ describe('directorio de Personas', () => {
     const editor = raiz.querySelector('.persona-editor')
     editor.querySelector('input:not([type=checkbox])').value = 'Valentina'
     editor.querySelector('select').value = 'participante'
-    editor.querySelector('button').click()
+    ;[...editor.querySelectorAll('button')].find((e) => e.textContent === 'Agregar persona').click()
     await esperar()
     expect(nombresDirectorio()).toContain('Valentina')
   })
@@ -319,12 +319,17 @@ describe('directorio de Personas', () => {
   it('guarda el perfil personal y ofrece descargar una tarjeta', async () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')
-    const selectorAnio = editor.querySelector('.selector-anio-nacimiento')
-    expect(selectorAnio.getAttribute('aria-label')).toBe('Año de nacimiento')
-    expect(editor.querySelector('.persona-bio .campo').textContent).toContain('Año de nacimiento')
-    selectorAnio.value = '2014'
-    selectorAnio.dispatchEvent(new Event('change'))
-    expect(editor.querySelector('[data-perfil="anioNacimiento"]').value).toBe('2014-01-01')
+    const selectorNacimiento = editor.querySelector('.selector-fecha')
+    const selectorDesde = editor.querySelectorAll('.selector-fecha')[1]
+    expect(selectorNacimiento.querySelector('button').getAttribute('aria-label')).toBe('Fecha de nacimiento')
+    expect(selectorDesde.querySelector('button').getAttribute('aria-label')).toBe('En la organización desde')
+    selectorNacimiento.querySelector('button').click()
+    expect(selectorNacimiento.querySelector('[role=dialog]')).not.toBeNull()
+    const anio = selectorNacimiento.querySelector('.selector-fecha-anio')
+    anio.value = '2014'
+    anio.dispatchEvent(new Event('change'))
+    selectorNacimiento.querySelector('.selector-fecha-dia:not(:disabled)').click()
+    expect(editor.querySelector('[data-perfil="anioNacimiento"]').value).toMatch(/^2014-/)
     expect(editor.querySelector('.vista-tarjeta-personal .ayuda-ajustes').textContent).toContain('actualiza mientras editás')
     editor.querySelector('[data-perfil="anioNacimiento"]').value = '2014-02-10'
     editor.querySelector('[data-perfil="anioNacimiento"]').dispatchEvent(new Event('input'))
