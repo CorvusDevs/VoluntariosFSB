@@ -321,6 +321,10 @@ describe('directorio de Personas', () => {
     const editor = raiz.querySelector('.persona-editor')
     const selectorAnio = editor.querySelector('.selector-anio-nacimiento')
     expect(selectorAnio.getAttribute('aria-label')).toBe('Año de nacimiento')
+    expect(editor.querySelector('.persona-bio .campo').textContent).toContain('Año de nacimiento')
+    selectorAnio.value = '2014'
+    selectorAnio.dispatchEvent(new Event('change'))
+    expect(editor.querySelector('[data-perfil="anioNacimiento"]').value).toBe('2014-01-01')
     expect(editor.querySelector('.vista-tarjeta-personal .ayuda-ajustes').textContent).toContain('actualiza mientras editás')
     editor.querySelector('[data-perfil="anioNacimiento"]').value = '2014-02-10'
     editor.querySelector('[data-perfil="anioNacimiento"]').dispatchEvent(new Event('input'))
