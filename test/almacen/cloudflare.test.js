@@ -27,4 +27,16 @@ describe('almacén Cloudflare', () => {
     const almacen = crearAlmacenCloudflare({ fetchFn: async () => json({ error: 'No está.' }, 404) })
     await expect(almacen.leerFoto('p_1.jpg')).resolves.toBeNull()
   })
+
+  it('reutiliza una foto ya leída durante la sesión', async () => {
+    let lecturas = 0
+    const almacen = crearAlmacenCloudflare({ fetchFn: async () => {
+      lecturas += 1
+      return new Response(new Blob(['foto'], { type: 'image/jpeg' }))
+    } })
+    const primera = await almacen.leerFoto('p_1.jpg')
+    const segunda = await almacen.leerFoto('p_1.jpg')
+    expect(lecturas).toBe(1)
+    expect(segunda).toBe(primera)
+  })
 })

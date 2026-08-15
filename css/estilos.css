@@ -502,8 +502,11 @@ input.fila-nombre:focus {
 .personas-directorio h3 { margin: 4px 0 8px; font-size: 14px; color: var(--texto-suave); }
 .persona-tarjeta { display: flex; align-items: center; border-bottom: 1px solid var(--linea); }
 .persona-abrir { display: flex; flex: 1; gap: 12px; align-items: center; min-width: 0; padding: 10px 0; color: var(--texto); background: transparent; border: 0; text-align: left; }
-.persona-avatar { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: #F1EAF5; color: var(--violeta); font-size: 13px; font-weight: 700; }
+.persona-avatar { position: relative; display: grid; place-items: center; overflow: hidden; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: #F1EAF5; color: var(--violeta); font-size: 13px; font-weight: 700; }
 .persona-avatar.con-foto { background: var(--verde); color: white; }
+.persona-miniatura { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 220ms ease-out; }
+.persona-miniatura.lista { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .persona-miniatura { transition: none; } }
 .persona-texto { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
 .persona-texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .persona-detalle { font-size: 13px; color: var(--texto-suave); }

@@ -10,6 +10,8 @@ const iniciales = (nombre) => nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).j
 export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmin = false }) {
   let actual = roster, texto = '', tipo = 'todas', filtro = 'activas', grupo = 'todos'
   let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false
+  const miniaturas = new Map()
+  const urlsMiniaturas = new Set()
   const ajustes = () => ({ ...AJUSTES, ...(actual.preferenciasPersonas ?? {}) })
   const todas = () => [...actual.participantes.map((p) => ({ ...p, tipo: 'participante' })), ...actual.voluntarios.map((p) => ({ ...p, tipo: 'voluntario' }))]
   async function guardar(siguiente, descripcion, mudanzas = []) { actual = siguiente; await almacen.guardarRoster(actual, descripcion); await alCambiar(actual, mudanzas); dibujar() }
@@ -37,10 +39,27 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     chip(chips, 'Sin foto', 'sin-foto', filtro, (v) => { filtro = filtro === v ? 'activas' : v }); chip(chips, 'Nuevas', 'nuevas', filtro, (v) => { filtro = filtro === v ? 'activas' : v }); chip(chips, 'Archivadas', 'archivadas', filtro, (v) => { filtro = v })
     caja.appendChild(chips); return caja
   }
+  function cargarMiniatura(persona, avatar) {
+    if (!persona.foto || !ajustes().fotos) return
+    if (!miniaturas.has(persona.foto)) miniaturas.set(persona.foto, almacen.leerFoto(persona.foto))
+    miniaturas.get(persona.foto).then((blob) => {
+      if (!blob || !avatar.isConnected) return
+      const imagen = document.createElement('img')
+      imagen.className = 'persona-miniatura'
+      imagen.alt = ''
+      imagen.addEventListener('load', () => imagen.classList.add('lista'), { once: true })
+      const url = URL.createObjectURL(blob)
+      urlsMiniaturas.add(url)
+      imagen.src = url
+      avatar.appendChild(imagen)
+    }).catch(() => {})
+  }
   function tarjeta(p) {
     const fila = elemento('article', ['persona-tarjeta']); fila.dataset.id = p.id
     const abrir = boton('', () => { editando = p.id; agregando = false; dibujar() }); abrir.className = 'persona-abrir'; abrir.setAttribute('aria-label', `Editar a ${p.nombre}`)
-    abrir.appendChild(elemento('span', ['persona-avatar', ...(p.foto && ajustes().fotos ? ['con-foto'] : [])], iniciales(p.nombre)))
+    const avatar = elemento('span', ['persona-avatar', ...(p.foto && ajustes().fotos ? ['con-foto'] : [])], iniciales(p.nombre))
+    abrir.appendChild(avatar)
+    cargarMiniatura(p, avatar)
     const detalle = [p.tipo === 'participante' ? `Grupo ${p.grupo}` : 'Voluntario']
     if (ajustes().estado && p.nuevo) detalle.push('Nuevo'); if (ajustes().fotos) detalle.push(p.foto ? 'Foto' : 'Sin foto')
     const textoTarjeta = elemento('span', ['persona-texto']); textoTarjeta.append(elemento('strong', [], p.nombre), elemento('span', ['persona-detalle'], detalle.join(' · ')))
@@ -66,5 +85,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
   function masivas() { const caja = elemento('div', ['personas-masivas'], `${seleccion.size} seleccionadas`); const aplicar = async (cambios, texto, soloParticipantes = false) => { let siguiente = actual; const mudanzas = []; seleccion.forEach((id) => { const p = todas().find((x) => x.id === id); if (!p || (soloParticipantes && p.tipo !== 'participante')) return; siguiente = editarPersona(siguiente, id, cambios); if (cambios.grupo && p.grupo !== cambios.grupo) mudanzas.push({ id, grupo: cambios.grupo }) }); seleccion = new Set(); await guardar(siguiente, texto, mudanzas) }; caja.append(boton('Grupo 1', () => aplicar({ grupo: 1 }, 'Mover personas al grupo 1', true)), boton('Grupo 2', () => aplicar({ grupo: 2 }, 'Mover personas al grupo 2', true)), boton('Marcar nuevas', () => aplicar({ nuevo: true }, 'Marcar personas como nuevas')), boton('Archivar', async () => { deshacer = [...seleccion]; let siguiente = actual; seleccion.forEach((id) => { siguiente = desactivarPersona(siguiente, id) }); seleccion = new Set(); await guardar(siguiente, 'Archivar personas seleccionadas') }), boton('Cancelar', () => { seleccionando = false; seleccion = new Set(); dibujar() })); return caja }
   function personalizar() { const caja = elemento('section', ['personas-personalizacion']); caja.appendChild(elemento('h2', [], 'Personalizar Personas')); const borrador = ajustes(); ;[['resumen', 'Mostrar resumen de preparación'], ['fotos', 'Mostrar estado de foto'], ['estado', 'Mostrar estado Nuevo']].forEach(([clave, texto]) => { const entrada = document.createElement('input'); entrada.type = 'checkbox'; entrada.checked = borrador[clave]; entrada.addEventListener('change', () => { borrador[clave] = entrada.checked }); const etiqueta = elemento('label', ['marca-nuevo']); etiqueta.append(entrada, document.createTextNode(` ${texto}`)); caja.appendChild(etiqueta) }); const orden = document.createElement('select'); orden.innerHTML = '<option value="nombre">Ordenar por nombre</option><option value="tipo">Agrupar por tipo</option>'; orden.value = borrador.orden; orden.addEventListener('change', () => { borrador.orden = orden.value }); caja.append(orden, boton('Guardar personalización', async () => { personalizando = false; await guardar({ ...actual, preferenciasPersonas: borrador }, 'Personalizar Personas') }), boton('Cancelar', () => { personalizando = false; dibujar() })); return caja }
   function dibujar() { vaciar(raiz); const cabecera = elemento('section', ['personas-cabecera']); cabecera.append(elemento('h2', [], 'Personas'), boton('Agregar persona', () => { agregando = true; editando = null; dibujar() }), boton(seleccionando ? 'Cancelar selección' : 'Seleccionar', () => { seleccionando = !seleccionando; seleccion = new Set(); dibujar() })); if (esAdmin) cabecera.appendChild(boton('Personalizar', () => { personalizando = true; dibujar() })); raiz.appendChild(cabecera); if (ajustes().resumen) { const a = activos(actual.participantes), v = activos(actual.voluntarios), sinFoto = [...a, ...v].filter((p) => !p.foto).length; raiz.appendChild(elemento('p', ['personas-resumen'], `${a.length} participantes, ${v.length} voluntarios, ${sinFoto} sin foto`)) } raiz.appendChild(filtros()); if (deshacer.length) { const aviso = elemento('div', ['personas-deshacer'], `${deshacer.length} archivada${deshacer.length === 1 ? '' : 's'}. `); aviso.appendChild(boton('Deshacer', async () => { let siguiente = actual; deshacer.forEach((id) => { siguiente = reactivarPersona(siguiente, id) }); deshacer = []; await guardar(siguiente, 'Deshacer archivado') })); raiz.appendChild(aviso) } if (seleccionando) raiz.appendChild(masivas()); const lista = elemento('section', ['personas-directorio']); const gente = visibles(); lista.appendChild(elemento('h3', [], `${gente.length} persona${gente.length === 1 ? '' : 's'}`)); if (!gente.length) lista.appendChild(elemento('p', ['ayuda-ajustes'], 'No hay personas con estos filtros.')); gente.forEach((p) => lista.appendChild(tarjeta(p))); raiz.appendChild(lista); const persona = editando && todas().find((p) => p.id === editando); if (persona || agregando) raiz.appendChild(editor(persona)); if (personalizando && esAdmin) raiz.appendChild(personalizar()) }
-  dibujar(); return { roster: () => actual, redibujar: dibujar }
+  dibujar(); return {
+    roster: () => actual, redibujar: dibujar,
+    destruir: () => urlsMiniaturas.forEach((url) => URL.revokeObjectURL(url)),
+  }
 }

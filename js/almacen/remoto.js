@@ -8,6 +8,7 @@ const rutaAsistencias = (mes) => `asistencias/${mes}.json`
 
 export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
   const shas = new Map()
+  const fotos = new Map()
   let verificado = null
 
   // Guarda la PROMESA, no un booleano, para que dos lecturas simultaneas al
@@ -101,11 +102,23 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
     },
 
     async leerFoto(clave) {
+      if (fotos.has(clave)) return fotos.get(clave)
+      const lectura = (async () => {
       await asegurarAcceso()
       const datos = await cliente.leerBytes(rutaFoto(clave))
       if (!datos) return null
       shas.set(rutaFoto(clave), datos.sha)
       return new Blob([datos.bytes], { type: 'image/jpeg' })
+      })()
+      fotos.set(clave, lectura)
+      try {
+        const foto = await lectura
+        if (!foto) fotos.delete(clave)
+        return foto
+      } catch (error) {
+        fotos.delete(clave)
+        throw error
+      }
     },
 
     async guardarFoto(clave, blob, dueño = clave) {
@@ -118,6 +131,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
           ruta, bytes, shas.get(ruta) ?? null, `Cargar la foto de ${dueño} · ${autor}`,
         )
         shas.set(ruta, resultado.sha)
+        fotos.set(clave, Promise.resolve(blob))
       } catch (error) {
         if (error instanceof ConflictoError) {
           const actual = await cliente.leerBytes(ruta)
@@ -139,6 +153,7 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       }
       await cliente.borrar(ruta, shas.get(ruta), `Quitar la foto de ${dueño} · ${autor}`)
       shas.delete(ruta)
+      fotos.delete(clave)
     },
   }
 }

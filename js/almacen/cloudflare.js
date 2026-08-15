@@ -3,6 +3,10 @@ export class ConflictoCloudflareError extends Error {}
 export function crearAlmacenCloudflare({ fetchFn } = {}) {
   const pedir = fetchFn ?? fetch
   const revisiones = new Map()
+  // Las fotos se reutilizan entre Personas y Vista previa mientras dura esta
+  // sesion. No van a Cache Storage: dejar fotos de niños en disco despues de
+  // cerrar sesion seria peor que volver a pedirlas al entrar de nuevo.
+  const fotos = new Map()
   const rutaLista = (fecha) => `listas/${fecha}.json`
   const rutaAsistencias = (mes) => `asistencias/${mes}.json`
 
@@ -42,20 +46,34 @@ export function crearAlmacenCloudflare({ fetchFn } = {}) {
     leerSeguimientos: () => leerJson('seguimientos.json'),
     guardarSeguimientos: (datos) => guardarJson('seguimientos.json', datos),
     async leerFoto(clave) {
+      if (fotos.has(clave)) return fotos.get(clave)
+      const lectura = (async () => {
       const respuesta = await pedir(`/api/foto?clave=${encodeURIComponent(clave)}`)
       if (respuesta.status === 404) return null
       if (!respuesta.ok) throw new Error('No se pudo leer la foto.')
       return respuesta.blob()
+      })()
+      fotos.set(clave, lectura)
+      try {
+        const foto = await lectura
+        if (!foto) fotos.delete(clave)
+        return foto
+      } catch (error) {
+        fotos.delete(clave)
+        throw error
+      }
     },
     async guardarFoto(clave, blob) {
       const respuesta = await pedir(`/api/foto?clave=${encodeURIComponent(clave)}`, {
         method: 'PUT', headers: { 'content-type': blob.type || 'image/jpeg' }, body: blob,
       })
       if (!respuesta.ok) throw new Error('No se pudo guardar la foto.')
+      fotos.set(clave, Promise.resolve(blob))
     },
     async borrarFoto(clave) {
       const respuesta = await pedir(`/api/foto?clave=${encodeURIComponent(clave)}`, { method: 'DELETE' })
       if (!respuesta.ok) throw new Error('No se pudo borrar la foto.')
+      fotos.delete(clave)
     },
   }
 }
