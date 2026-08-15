@@ -21,6 +21,9 @@ import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
 import { cerrarSesionCloudflare, ingresarCloudflare, leerSesionCloudflare } from './acceso/cloudflare.js'
 import { sello, vigilarVersion } from './ui/aviso-version.js'
 import { registrarTrabajador } from './ui/trabajador.js'
+import {
+  guardarUltimaPantalla, leerUltimaPantalla, olvidarUltimaPantalla, pantallaPermitida,
+} from './ui/ultima-pantalla.js'
 import { VERSION } from './version.js'
 
 const RUTA_USUARIOS = 'usuarios.json'
@@ -47,6 +50,15 @@ let vista = null
 let alertas = []
 let ocultarEstadoGuardado = null
 let intentoGuardado = 0
+
+function abrirPantalla(destino) {
+  if (!pantallaPermitida(destino, {
+    admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare',
+  })) return
+  pantalla = destino
+  guardarUltimaPantalla(pantalla)
+  dibujar()
+}
 
 function cambiarEstadoGuardado(estado, mensaje, alReintentar = null) {
   const indicador = contenedor.querySelector('[data-estado-guardado]')
@@ -116,7 +128,7 @@ async function guardarArchivoUsuarios(archivo, descripcion = 'Cambiar los acceso
 function navegacion() {
   const caja = elemento('div', ['navegacion-contenedor'])
   const ir = (destino, etiqueta) => {
-    const b = boton(etiqueta, () => { pantalla = destino; dibujar() })
+    const b = boton(etiqueta, () => abrirPantalla(destino))
     b.dataset.pantalla = destino
     if (pantalla === destino) {
       b.classList.add('activa')
@@ -265,7 +277,7 @@ function dibujar() {
       franja: crearFranjaAlerta({
         alertas,
         alSilenciar: anotarSeguimiento,
-        alVerElMes: () => { pantalla = 'reporte'; dibujar() },
+        alVerElMes: () => abrirPantalla('reporte'),
       }),
       alCambiar: async (siguiente, descripcion, confirmacion) => {
         await guardarListaConEstado(siguiente, descripcion, confirmacion)
@@ -300,13 +312,13 @@ function dibujar() {
       // Arranca en el mes de la planilla abierta, que es de lo que se viene
       // hablando: pedir el mes antes de mostrar nada seria un paso de mas.
       mes: lista.fecha.slice(0, 7),
-      alIrALista: () => { pantalla = 'lista'; dibujar() },
+      alIrALista: () => abrirPantalla('lista'),
     })
   } else if (pantalla === 'asistencias') {
     vista = crearPantallaAsistencias(cuerpo, {
       roster,
       almacen: deposito,
-      alIrALista: () => { pantalla = 'lista'; dibujar() },
+      alIrALista: () => abrirPantalla('lista'),
     })
   } else if (pantalla === 'registro' && esAdmin(sesion)) {
     // Se lee del repositorio privado, asi que sin sesion de GitHub no hay nada
@@ -384,7 +396,10 @@ async function abrirAplicacion() {
     roster = await deposito.leerRoster()
     const sabado = proximoSabado()
     lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
-    pantalla = 'lista'
+    const restaurada = leerUltimaPantalla()
+    pantalla = pantallaPermitida(restaurada, {
+      admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare',
+    }) ? restaurada : 'lista'
     dibujar()
     // Despues de dibujar y sin await en el camino critico: la planilla tiene que
     // aparecer ya, y el aviso se suma cuando este listo.
@@ -429,6 +444,7 @@ async function entrarCloudflare({ usuario, contrasena }) {
 }
 
 async function cerrarSesion() {
+  olvidarUltimaPantalla()
   if (sesion?.origen === 'cloudflare') {
     await cerrarSesionCloudflare()
     sesion = null
