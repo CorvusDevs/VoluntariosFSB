@@ -347,6 +347,7 @@ function dibujar() {
     vista = crearPantallaPersonas(cuerpo, {
       roster,
       almacen: deposito,
+      esAdmin: esAdmin(sesion),
       alCambiar: async (siguiente, mudanza) => {
         roster = siguiente
         lista = sincronizarConRoster(lista, roster)
@@ -354,16 +355,12 @@ function dibujar() {
         // a proposito: la coordinacion a veces mueve a alguien por un sabado
         // suelto y eso no se pisa. Cambiar el grupo desde Personas si es una
         // decision explicita, asi que la planilla del dia lo acompaña.
-        if (mudanza) {
-          try {
-            lista = moverAGrupo(lista, mudanza.id, mudanza.grupo)
-          } catch {
-            // No esta en la planilla de hoy, por ejemplo si falta o esta ausente.
-            // El roster ya quedo guardado, que es lo que se pidio.
-          }
-        }
+        const mudanzas = Array.isArray(mudanza) ? mudanza : mudanza ? [mudanza] : []
+        mudanzas.forEach(({ id, grupo }) => {
+          try { lista = moverAGrupo(lista, id, grupo) } catch {}
+        })
         await guardarListaConEstado(lista,
-          mudanza ? `Pasar de grupo a alguien en la planilla del ${lista.fecha}` : undefined)
+          mudanzas.length ? `Actualizar grupos en la planilla del ${lista.fecha}` : undefined)
       },
     })
   }

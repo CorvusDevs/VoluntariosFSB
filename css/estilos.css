@@ -489,6 +489,32 @@ input.fila-nombre:focus {
 }
 .formulario label input[type=checkbox] { width: 20px; height: 20px; }
 
+/* Directorio de Personas: un gesto abre el detalle, la lista se queda para buscar. */
+.personas-cabecera, .personas-filtros, .personas-directorio, .persona-editor, .personas-personalizacion { padding: 16px; }
+.personas-cabecera { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.personas-cabecera h2 { margin: 0 auto 0 0; }
+.personas-resumen, .personas-deshacer, .personas-masivas { margin: 0 16px 12px; padding: 10px 12px; border-radius: 10px; background: #F1EAF5; color: var(--violeta); }
+.personas-filtros input, .persona-formulario input, .persona-formulario select, .persona-formulario textarea, .personas-personalizacion select { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; }
+.personas-chips { display: flex; gap: 8px; overflow-x: auto; padding: 12px 0 2px; }
+.chip { flex: 0 0 auto; min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.chip.activa { background: var(--violeta); color: var(--fondo); }
+.personas-directorio { padding-top: 0; }
+.personas-directorio h3 { margin: 4px 0 8px; font-size: 14px; color: var(--texto-suave); }
+.persona-tarjeta { display: flex; align-items: center; border-bottom: 1px solid var(--linea); }
+.persona-abrir { display: flex; flex: 1; gap: 12px; align-items: center; min-width: 0; padding: 10px 0; color: var(--texto); background: transparent; border: 0; text-align: left; }
+.persona-avatar { display: grid; place-items: center; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: #F1EAF5; color: var(--violeta); font-size: 13px; font-weight: 700; }
+.persona-avatar.con-foto { background: var(--verde); color: white; }
+.persona-texto { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
+.persona-texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.persona-detalle { font-size: 13px; color: var(--texto-suave); }
+.persona-flecha { font-size: 24px; color: var(--texto-suave); }
+.persona-seleccionar { width: 24px; height: 24px; margin: 10px; }
+.persona-editor, .personas-personalizacion { position: fixed; z-index: 3; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow: auto; border-radius: 18px 18px 0 0; background: var(--fondo); box-shadow: 0 -12px 36px rgba(41, 23, 58, .18); }
+.persona-editor h2, .personas-personalizacion h2 { margin-top: 0; }
+.persona-formulario, .personas-personalizacion { display: flex; flex-direction: column; gap: 12px; }
+.personas-masivas { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.personas-masivas .boton { font-size: 14px; }
+
 /* Selector de formato de la imagen. */
 .campo-formato { padding: 16px 16px 0; }
 .campo-formato select {

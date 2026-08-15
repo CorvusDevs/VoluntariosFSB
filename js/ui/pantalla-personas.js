@@ -2,7 +2,9 @@ import { elemento, boton, vaciar } from './componentes.js'
 import { activos, agregarParticipante, agregarVoluntario, desactivarPersona, editarPersona } from '../modelo/roster.js'
 import { crearEditorDeFoto } from './editor-foto.js'
 
-export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar }) {
+export { crearPantallaPersonas } from './pantalla-personas-directorio.js'
+
+function crearPantallaPersonasLegado(raiz, { roster, almacen, alCambiar }) {
   let actual = roster
 
   // `mudanza` avisa que alguien cambio de grupo. Va aparte del roster porque la

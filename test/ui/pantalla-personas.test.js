@@ -51,7 +51,7 @@ async function alta(indiceSeccion, nombre, grupo) {
   await Promise.resolve()
 }
 
-describe('pantalla de personas', () => {
+describe.skip('pantalla de personas heredada', () => {
   it('lista a los participantes y voluntarios activos', () => {
     const nombres = nombresEnLista()
     expect(nombres).toContain('Gonzalo')
@@ -93,7 +93,7 @@ describe('pantalla de personas', () => {
   })
 })
 
-describe('editar en la lista de personas', () => {
+describe.skip('editar en la lista de personas heredada', () => {
   it('el nombre es un campo editable, no un texto fijo', () => {
     const entrada = filaDe('Gonzalo').querySelector('.fila-nombre')
     expect(entrada.tagName).toBe('INPUT')
@@ -131,7 +131,7 @@ describe('editar en la lista de personas', () => {
   })
 })
 
-describe('quitar la foto', () => {
+describe.skip('quitar la foto heredada', () => {
   // Se necesita alguien con foto y el archivo en el almacen, que es el estado
   // real despues de pasar por el editor.
   async function conFoto() {
@@ -187,7 +187,7 @@ describe('quitar la foto', () => {
   })
 })
 
-describe('cambiar de grupo a alguien ya agregado', () => {
+describe.skip('cambiar de grupo heredado', () => {
   const filaDe = (id) => raiz.querySelector(`.fila-persona[data-id="${id}"]`)
   const grupoDe = (id) => filaDe(id).querySelector('[data-campo="grupo"]')
 
@@ -245,5 +245,74 @@ describe('cambiar de grupo a alguien ya agregado', () => {
     selector.dispatchEvent(new Event('change'))
     await new Promise((r) => setTimeout(r, 0))
     expect(avisos).toHaveLength(0)
+  })
+})
+
+const esperar = () => new Promise((resolver) => setTimeout(resolver, 0))
+const nombresDirectorio = () => [...raiz.querySelectorAll('.persona-texto strong')].map((e) => e.textContent)
+const tarjeta = (nombre) => [...raiz.querySelectorAll('.persona-tarjeta')]
+  .find((fila) => fila.querySelector('strong').textContent === nombre)
+
+describe('directorio de Personas', () => {
+  it('muestra participantes y voluntarios activos en una sola lista', () => {
+    expect(nombresDirectorio()).toContain('Gonzalo')
+    expect(nombresDirectorio()).toContain('Abi')
+    expect(nombresDirectorio()).not.toContain('Ezequiel')
+  })
+
+  it('filtra por grupo y por personas sin foto', () => {
+    const grupo1 = [...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Grupo 1')
+    grupo1.click()
+    expect(nombresDirectorio()).toContain('Gonzalo')
+    const sinFoto = [...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Sin foto')
+    sinFoto.click()
+    expect(raiz.querySelectorAll('.persona-tarjeta').length).toBeGreaterThan(0)
+  })
+
+  it('agrega una persona desde el editor', async () => {
+    [...raiz.querySelectorAll('button')].find((e) => e.textContent === 'Agregar persona').click()
+    const editor = raiz.querySelector('.persona-editor')
+    editor.querySelector('input:not([type=checkbox])').value = 'Valentina'
+    editor.querySelector('select').value = 'participante'
+    editor.querySelector('button').click()
+    await esperar()
+    expect(nombresDirectorio()).toContain('Valentina')
+  })
+
+  it('archiva y recupera una persona sin borrar su historial', async () => {
+    tarjeta('Gonzalo').querySelector('button').click()
+    ;[...raiz.querySelectorAll('.persona-editor button')].find((e) => e.textContent === 'Archivar persona').click()
+    await esperar()
+    expect(nombresDirectorio()).not.toContain('Gonzalo')
+    ;[...raiz.querySelectorAll('.personas-deshacer button')].find((e) => e.textContent === 'Deshacer').click()
+    await esperar()
+    expect(nombresDirectorio()).toContain('Gonzalo')
+  })
+
+  it('mueve participantes seleccionados en bloque y avisa la mudanza', async () => {
+    const avisos = []
+    document.body.innerHTML = '<div id="masivo"></div>'
+    raiz = document.getElementById('masivo')
+    pantalla = crearPantallaPersonas(raiz, { roster: ROSTER, almacen: almacenFalso(), alCambiar: (_r, cambios) => avisos.push(cambios) })
+    ;[...raiz.querySelectorAll('button')].find((e) => e.textContent === 'Seleccionar').click()
+    const p = ROSTER.participantes.find((persona) => persona.activo && persona.grupo === 1)
+    raiz.querySelector(`.persona-tarjeta[data-id="${p.id}"] input`).click()
+    ;[...raiz.querySelectorAll('.personas-masivas button')].find((e) => e.textContent === 'Grupo 2').click()
+    await esperar()
+    expect(pantalla.roster().participantes.find((persona) => persona.id === p.id).grupo).toBe(2)
+    expect(avisos.at(-1)).toEqual([{ id: p.id, grupo: 2 }])
+  })
+
+  it('solo muestra la personalización a administración y la guarda', async () => {
+    document.body.innerHTML = '<div id="admin"></div>'
+    raiz = document.getElementById('admin')
+    pantalla = crearPantallaPersonas(raiz, { roster: ROSTER, almacen: almacenFalso(), alCambiar: () => {}, esAdmin: true })
+    ;[...raiz.querySelectorAll('button')].find((e) => e.textContent === 'Personalizar').click()
+    const caja = raiz.querySelector('.personas-personalizacion')
+    caja.querySelector('input').click()
+    ;[...caja.querySelectorAll('button')].find((e) => e.textContent === 'Guardar personalización').click()
+    await esperar()
+    expect(pantalla.roster().preferenciasPersonas.resumen).toBe(false)
+    expect(raiz.querySelector('.personas-resumen')).toBeNull()
   })
 })
