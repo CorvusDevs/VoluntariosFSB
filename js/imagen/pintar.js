@@ -102,6 +102,29 @@ const ICONOS = {
     ctx.fillStyle = ctx.strokeStyle
     ctx.fill()
   },
+  pelota(ctx, x, y, lado) {
+    const r = lado / 2; const cx = x + r; const cy = y + r
+    ctx.beginPath(); ctx.arc(cx, cy, r * 0.9, 0, Math.PI * 2); ctx.stroke()
+    const puntos = Array.from({ length: 5 }, (_, i) => {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / 5
+      return [cx + Math.cos(a) * r * 0.32, cy + Math.sin(a) * r * 0.32]
+    })
+    ctx.beginPath(); ctx.moveTo(...puntos[0]); puntos.slice(1).forEach((p) => ctx.lineTo(...p)); ctx.closePath(); ctx.stroke()
+    puntos.forEach(([px, py], i) => {
+      const a = -Math.PI / 2 + i * Math.PI * 2 / 5
+      ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(cx + Math.cos(a) * r * 0.82, cy + Math.sin(a) * r * 0.82); ctx.stroke()
+    })
+  },
+  silbato(ctx, x, y, lado) {
+    const r = lado * 0.16
+    ctx.beginPath(); ctx.roundRect(x + lado * 0.08, y + lado * 0.3, lado * 0.62, lado * 0.4, r); ctx.stroke()
+    ctx.beginPath(); ctx.arc(x + lado * 0.76, y + lado * 0.5, lado * 0.19, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(x + lado * 0.24, y + lado * 0.3); ctx.lineTo(x + lado * 0.12, y + lado * 0.1); ctx.lineTo(x + lado * 0.02, y + lado * 0.18); ctx.stroke()
+  },
+  candado(ctx, x, y, lado) {
+    ctx.beginPath(); ctx.roundRect(x + lado * 0.17, y + lado * 0.43, lado * 0.66, lado * 0.45, lado * 0.1); ctx.stroke()
+    ctx.beginPath(); ctx.arc(x + lado / 2, y + lado * 0.43, lado * 0.2, Math.PI, 0); ctx.stroke()
+  },
 }
 
 function icono(ctx, o) {

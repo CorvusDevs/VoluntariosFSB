@@ -21,8 +21,10 @@ describe('maquetar', () => {
   })
 
   it('escribe el titulo del programa y la fecha en español', () => {
-    const t = textos(maquetar(LISTA, ROSTER, opciones))
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const t = textos(plano)
     expect(t).toContain('Fútbol sin Barreras')
+    expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'icono', nombre: 'pelota' }))
     expect(t.some((x) => x.includes('Sábado 8 de agosto'))).toBe(true)
     expect(t.some((x) => x.includes('11:00'))).toBe(true)
     expect(t.some((x) => x.includes('Tres Cruces'))).toBe(true)
@@ -37,9 +39,11 @@ describe('maquetar', () => {
   })
 
   it('escribe cada participante y su voluntario', () => {
-    const t = textos(maquetar(LISTA, ROSTER, opciones))
+    const plano = maquetar(LISTA, ROSTER, opciones)
+    const t = textos(plano)
     expect(t).toContain('Gonzalo')
     expect(t).toContain('Abi')
+    expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'icono', nombre: 'silbato', fila: 'p1' }))
   })
 
   it('un participante sin voluntario se dibuja sin separador', () => {
@@ -301,14 +305,16 @@ describe('formato de dos columnas', () => {
     expect(grande / chica).toBeGreaterThan(1.8)
   })
 
-  it('el voluntario va debajo del nombre, no al lado', () => {
+  it('el voluntario va debajo del nombre, con silbato a la izquierda', () => {
     const plano = enColumnas()
     const deGonzalo = plano.ordenes.filter((o) => o.fila === 'p1' && o.tipo === 'texto')
     const nombre = deGonzalo.find((o) => o.texto === 'Gonzalo')
     const voluntario = deGonzalo.find((o) => o.texto === 'Abi')
+    const silbato = plano.ordenes.find((o) => o.fila === 'p1' && o.tipo === 'icono' && o.nombre === 'silbato')
     expect(voluntario).toBeTruthy()
     expect(voluntario.y).toBeGreaterThan(nombre.y)
-    expect(voluntario.x).toBe(nombre.x)
+    expect(silbato).toBeTruthy()
+    expect(silbato.x).toBeLessThan(voluntario.x)
   })
 
   it('un participante sin voluntario centra el nombre y no dibuja segunda linea', () => {

@@ -66,7 +66,7 @@ export function maquetar(lista, roster, opciones = {}) {
   const ordenes = []
   let y = 0
 
-  y = bandaSuperior(ordenes, lista, m, y)
+  y = bandaSuperior(ordenes, lista, m, y, medirTexto)
 
   if (lista.opcionesImagen?.saludo && saludo.trim()) {
     y = parrafo(ordenes, saludo, m, y, medirTexto)
@@ -104,6 +104,7 @@ export function maquetar(lista, roster, opciones = {}) {
       return Math.max(maximo, inicio + ancho)
     }
     if (o.tipo === 'rect' || o.tipo === 'imagen') return Math.max(maximo, o.x + o.ancho)
+    if (o.tipo === 'icono') return Math.max(maximo, o.x + o.lado)
     if (o.tipo === 'circulo') return Math.max(maximo, o.x + o.radio)
     if (o.tipo === 'linea') return Math.max(maximo, Math.max(o.x1, o.x2))
     return maximo
@@ -131,17 +132,21 @@ function buscar(porId, id) {
 }
 
 // Convencion: cada ayudante agrega su propio espacio superior y devuelve el borde inferior ocupado. Quien llama nunca agrega relleno.
-function bandaSuperior(ordenes, lista, m, y) {
+function bandaSuperior(ordenes, lista, m, y, medirTexto) {
   const alto = m.altoBandaSuperior
+  const titulo = 'Fútbol sin Barreras'
+  const fuenteTitulo = FUENTES.titulo(m.pxTitular)
   ordenes.push({ tipo: 'rect', x: 0, y, ancho: m.ancho, alto, color: COLORES.violeta })
   ordenes.push({
     tipo: 'imagen', clave: 'logo', x: m.ancho - m.margen - m.logoAncho, y: y + m.logoY,
     ancho: m.logoAncho, alto: m.logoAlto, circular: false,
   })
   ordenes.push({
-    tipo: 'texto', texto: 'Fútbol sin Barreras', x: m.margen, y: y + alto - m.yTituloDesdeAbajo,
-    fuente: FUENTES.titulo(m.pxTitular), color: COLORES.blanco, lineaBase: 'top',
+    tipo: 'texto', texto: titulo, x: m.margen, y: y + alto - m.yTituloDesdeAbajo,
+    fuente: fuenteTitulo, color: COLORES.blanco, lineaBase: 'top',
   })
+  const ladoPelota = Math.round(m.pxTitular * 0.54)
+  ordenes.push({ tipo: 'icono', nombre: 'pelota', x: m.margen + medirTexto(titulo, fuenteTitulo) + 18, y: y + alto - m.yTituloDesdeAbajo + 12, lado: ladoPelota, color: COLORES.blanco })
   const sub = `${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`
   ordenes.push({
     tipo: 'texto', texto: sub, x: m.margen, y: y + alto - m.ySubtituloDesdeAbajo,
@@ -297,6 +302,9 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 
   if (voluntarios.length > 0) {
     x = escribirSeparador(ordenes, '-', x, centro, m, clave, medirTexto)
+    const lado = Math.round(m.pxVoluntario * 0.92)
+    ordenes.push({ tipo: 'icono', nombre: 'silbato', x, y: centro - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
+    x += lado + 10
     x = escribirNombres(ordenes, voluntarios, x, centro, m,
       FUENTES.normal(m.pxVoluntario), COLORES.magentaTexto, clave, medirTexto, true)
   }
@@ -360,8 +368,13 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
 
     if (!tramo.compartido) {
       primera.lineasVoluntario.forEach((linea, n) => {
+        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario * 0.9) : 0
+        const aire = lado ? 8 : 0
+        const anchoEtiqueta = medirTexto(linea, fuente) + lado + aire
+        const centroEtiqueta = primera.x + ancho / 2
+        if (lado) ordenes.push({ tipo: 'icono', nombre: 'silbato', x: centroEtiqueta - anchoEtiqueta / 2, y: primera.yVoluntario + n * GRILLA.pxVoluntario, lado, color: COLORES.magentaTexto, fila: clave })
         ordenes.push({
-          tipo: 'texto', texto: linea, x: primera.x + ancho / 2,
+          tipo: 'texto', texto: linea, x: centroEtiqueta + (lado + aire) / 2,
           y: primera.yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
           fuente, color: COLORES.magentaTexto,
           alineacion: 'center', lineaBase: 'middle', fila: clave,
@@ -377,7 +390,10 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     // le quede por debajo cuando los nombres no ocupan lo mismo.
     const yLinea = Math.max(...abarcadas.map((c) => c.yVoluntario)) + GRILLA.aireLlave
     const texto = primera.lineasVoluntario.join(' ')
-    const hueco = medirTexto(texto, fuente) / 2 + 12
+    const lado = Math.round(GRILLA.pxVoluntario * 0.9)
+    const aire = 8
+    const anchoEtiqueta = medirTexto(texto, fuente) + lado + aire
+    const hueco = anchoEtiqueta / 2 + 12
     const medio = (izquierda + derecha) / 2
 
     const trazo = (x1, y1, x2, y2) => ordenes.push({
@@ -391,8 +407,10 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     trazo(izquierda, yLinea, medio - hueco, yLinea)
     trazo(medio + hueco, yLinea, derecha, yLinea)
 
+    ordenes.push({ tipo: 'icono', nombre: 'silbato', x: medio - anchoEtiqueta / 2, y: yLinea - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
+
     ordenes.push({
-      tipo: 'texto', texto, x: medio, y: yLinea,
+      tipo: 'texto', texto, x: medio + (lado + aire) / 2, y: yLinea,
       fuente, color: COLORES.magentaTexto,
       alineacion: 'center', lineaBase: 'middle', fila: clave,
     })
@@ -782,8 +800,10 @@ function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medir
   })
   if (hayVoluntarios) {
     const nombres = voluntarios.map((v) => v.nombre + (v.nuevo ? ' (nuevo)' : '')).join(' / ')
+    const lado = Math.round(COLUMNAS.pxVoluntario * 0.92)
+    ordenes.push({ tipo: 'icono', nombre: 'silbato', x: textoX, y: centro + 20 - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
     ordenes.push({
-      tipo: 'texto', texto: nombres, x: textoX, y: centro + 20,
+      tipo: 'texto', texto: nombres, x: textoX + lado + 10, y: centro + 20,
       fuente: FUENTES.normal(COLUMNAS.pxVoluntario), color: COLORES.magentaTexto,
       lineaBase: 'middle', fila: clave,
     })
