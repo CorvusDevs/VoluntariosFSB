@@ -35,6 +35,7 @@ export function agregarParticipante(roster, datos) {
     foto: datos.foto ?? null,
     activo: true,
     notas: datos.notas ?? '',
+    perfil: datos.perfil ?? {},
   }
   return { ...roster, participantes: [...roster.participantes, participante] }
 }
@@ -47,6 +48,7 @@ export function agregarVoluntario(roster, datos) {
     foto: datos.foto ?? null,
     activo: true,
     notas: datos.notas ?? '',
+    perfil: datos.perfil ?? {},
   }
   return { ...roster, voluntarios: [...roster.voluntarios, voluntario] }
 }

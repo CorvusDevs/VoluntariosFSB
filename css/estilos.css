@@ -522,6 +522,11 @@ input.fila-nombre:focus {
 .persona-editor, .personas-personalizacion { position: fixed; z-index: 3; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow: auto; border-radius: 18px 18px 0 0; background: var(--fondo); box-shadow: 0 -12px 36px rgba(41, 23, 58, .18); }
 .persona-editor h2, .personas-personalizacion h2 { margin-top: 0; }
 .persona-formulario, .personas-personalizacion { display: flex; flex-direction: column; gap: 12px; }
+.persona-bio { display: grid; gap: 12px; margin: 4px 0 0; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; background: #FAF8FB; }
+.persona-bio legend { padding: 0 6px; color: var(--violeta); font-weight: 700; }
+.persona-edad { margin: -4px 0 0; color: var(--violeta); font-size: 14px; font-weight: 700; }
+.persona-bio .campo { display: grid; gap: 6px; }
+.persona-bio input, .persona-bio textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; background: var(--fondo); }
 .persona-estado { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; padding: 10px 12px; border: 1px solid var(--linea); border-radius: 10px; cursor: pointer; }
 .persona-estado-texto { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--texto-suave); }
 .persona-estado-texto strong { color: var(--texto); font-size: 15px; }

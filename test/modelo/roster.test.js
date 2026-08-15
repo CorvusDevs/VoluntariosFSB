@@ -3,6 +3,7 @@ import {
   rosterVacio, agregarParticipante, agregarVoluntario,
   editarPersona, desactivarPersona, activos, buscarPersonas,
 } from '../../js/modelo/roster.js'
+import { edadDesdeAnio, perfilDe } from '../../js/modelo/perfil.js'
 
 describe('rosterVacio', () => {
   it('trae las dos colecciones y la version', () => {
@@ -112,5 +113,18 @@ describe('participantes nuevos', () => {
   it('la marca se puede cambiar despues', () => {
     const r = agregarParticipante(rosterVacio(), { nombre: 'Lautaro', grupo: 2, nuevo: true })
     expect(editarPersona(r, r.participantes[0].id, { nuevo: false }).participantes[0].nuevo).toBe(false)
+  })
+})
+
+describe('perfil personal', () => {
+  it('conserva el perfil al crear y editar una persona', () => {
+    const r = agregarParticipante(rosterVacio(), { nombre: 'Gonzalo', grupo: 1, perfil: { anioNacimiento: '2014', leGusta: 'Pelota' } })
+    expect(perfilDe(r.participantes[0]).leGusta).toBe('Pelota')
+    expect(editarPersona(r, r.participantes[0].id, { perfil: { desde: '2023' } }).participantes[0].perfil.desde).toBe('2023')
+  })
+
+  it('calcula edad desde el año de nacimiento', () => {
+    expect(edadDesdeAnio('2014', 2026)).toBe(12)
+    expect(edadDesdeAnio('', 2026)).toBeNull()
   })
 })
