@@ -172,6 +172,12 @@ body {
 .lienzo-vista-previa {
   display: block; width: calc(100% - 32px); height: auto; margin: 0 16px 24px;
   border: 1px solid var(--linea); border-radius: 12px;
+  transition: opacity 220ms ease-out;
+}
+.lienzo-vista-previa.fotos-nuevas { opacity: 0.35; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lienzo-vista-previa { transition: none; }
 }
 
 /* Pantalla de ingreso. Una sola columna angosta: el telefono es el aparato

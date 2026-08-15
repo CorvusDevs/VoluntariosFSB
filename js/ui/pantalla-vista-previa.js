@@ -360,8 +360,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     return caja
   }
 
-  function redibujar() {
+  function redibujar({ fotosNuevas = false } = {}) {
     if (!vivo) return
+    if (fotosNuevas) lienzo.classList.add('fotos-nuevas')
     vaciar(raiz)
     calcular()
     raiz.appendChild(panelDeFormato())
@@ -376,7 +377,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
     // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.
     if (ocupado) controles().forEach((c) => { c.disabled = true })
-    dibujar()
+    dibujar().then(() => {
+      if (fotosNuevas && vivo) requestAnimationFrame(() => lienzo.classList.remove('fotos-nuevas'))
+    })
   }
 
   // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
@@ -406,14 +409,14 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
         lote.forEach(([clave, imagen]) => { if (imagen) imagenes[clave] = imagen })
         cargadas += lote.length
         mensaje = cargadas === pendientes.length ? '' : `Cargando fotos: ${cargadas} de ${pendientes.length}`
-        redibujar()
+        redibujar({ fotosNuevas: true })
       })
     }
     const logo = await logoPendiente
     if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
     mensaje = ''
-    redibujar()
+    redibujar({ fotosNuevas: Boolean(logo) })
   }
 
   // La llama app.js al cambiar de pantalla. Los mapas de bits decodificados
