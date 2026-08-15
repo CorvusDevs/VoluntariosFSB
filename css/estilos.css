@@ -504,13 +504,19 @@ input.fila-nombre:focus {
 .persona-tarjeta { display: flex; align-items: center; border-bottom: 1px solid var(--linea); }
 .persona-abrir { display: flex; flex: 1; gap: 12px; align-items: center; min-width: 0; padding: 10px 0; color: var(--texto); background: transparent; border: 0; text-align: left; }
 .persona-avatar { position: relative; display: grid; place-items: center; overflow: hidden; flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; background: #F1EAF5; color: var(--violeta); font-size: 13px; font-weight: 700; }
+.persona-avatar.participante { flex-basis: 64px; width: 64px; height: 64px; font-size: 15px; }
 .persona-avatar.con-foto { background: var(--verde); color: white; }
+.persona-tarjeta[data-grupo="1"] .persona-avatar { box-shadow: 0 0 0 3px #0F766E; }
+.persona-tarjeta[data-grupo="2"] .persona-avatar { box-shadow: 0 0 0 3px #C21870; }
 .persona-miniatura { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 220ms ease-out; }
 .persona-miniatura.lista { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .persona-miniatura { transition: none; } }
 .persona-texto { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 2px; }
 .persona-texto strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .persona-detalle { font-size: 13px; color: var(--texto-suave); }
+.persona-grupo { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+.persona-grupo-1 { background: #DDF4F1; color: #0F766E; }
+.persona-grupo-2 { background: #FBE3EF; color: #C21870; }
 .persona-flecha { font-size: 24px; color: var(--texto-suave); }
 .persona-seleccionar { width: 24px; height: 24px; margin: 10px; }
 .persona-editor, .personas-personalizacion { position: fixed; z-index: 3; right: 0; bottom: 0; left: 0; max-height: 82vh; overflow: auto; border-radius: 18px 18px 0 0; background: var(--fondo); box-shadow: 0 -12px 36px rgba(41, 23, 58, .18); }

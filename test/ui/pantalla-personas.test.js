@@ -254,10 +254,18 @@ const tarjeta = (nombre) => [...raiz.querySelectorAll('.persona-tarjeta')]
   .find((fila) => fila.querySelector('strong').textContent === nombre)
 
 describe('directorio de Personas', () => {
-  it('muestra participantes y voluntarios activos en una sola lista', () => {
+  it('arranca mostrando participantes activos', () => {
     expect(nombresDirectorio()).toContain('Gonzalo')
-    expect(nombresDirectorio()).toContain('Abi')
+    expect(nombresDirectorio()).not.toContain('Abi')
     expect(nombresDirectorio()).not.toContain('Ezequiel')
+    expect([...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Participantes').getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('da a cada participante una foto grande y una etiqueta de grupo con color', () => {
+    const participante = tarjeta('Gonzalo')
+    expect(participante.dataset.grupo).toBe('1')
+    expect(participante.querySelector('.persona-avatar.participante')).not.toBeNull()
+    expect(participante.querySelector('.persona-grupo-1').textContent).toBe('Grupo 1')
   })
 
   it('filtra por grupo y por personas sin foto', () => {

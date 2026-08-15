@@ -8,7 +8,7 @@ const tipoDe = (p) => p.id.startsWith('v_') ? 'voluntario' : 'participante'
 const iniciales = (nombre) => nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
 
 export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmin = false }) {
-  let actual = roster, texto = '', tipo = 'todas', filtro = 'activas', grupo = 'todos'
+  let actual = roster, texto = '', tipo = 'participante', filtro = 'activas', grupo = 'todos'
   let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false
   const miniaturas = new Map()
   const urlsMiniaturas = new Set()
@@ -55,14 +55,16 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     }).catch(() => {})
   }
   function tarjeta(p) {
-    const fila = elemento('article', ['persona-tarjeta']); fila.dataset.id = p.id
+    const fila = elemento('article', ['persona-tarjeta']); fila.dataset.id = p.id; if (p.tipo === 'participante') fila.dataset.grupo = p.grupo
     const abrir = boton('', () => { editando = p.id; agregando = false; dibujar() }); abrir.className = 'persona-abrir'; abrir.setAttribute('aria-label', `Editar a ${p.nombre}`)
-    const avatar = elemento('span', ['persona-avatar', ...(p.foto && ajustes().fotos ? ['con-foto'] : [])], iniciales(p.nombre))
+    const avatar = elemento('span', ['persona-avatar', ...(p.tipo === 'participante' ? ['participante'] : []), ...(p.foto && ajustes().fotos ? ['con-foto'] : [])], iniciales(p.nombre))
     abrir.appendChild(avatar)
     cargarMiniatura(p, avatar)
-    const detalle = [p.tipo === 'participante' ? `Grupo ${p.grupo}` : 'Voluntario']
-    if (ajustes().estado && p.nuevo) detalle.push('Nuevo'); if (ajustes().fotos) detalle.push(p.foto ? 'Foto' : 'Sin foto')
-    const textoTarjeta = elemento('span', ['persona-texto']); textoTarjeta.append(elemento('strong', [], p.nombre), elemento('span', ['persona-detalle'], detalle.join(' · ')))
+    const detalle = elemento('span', ['persona-detalle'])
+    if (p.tipo === 'participante') detalle.appendChild(elemento('span', ['persona-grupo', `persona-grupo-${p.grupo}`], `Grupo ${p.grupo}`))
+    else detalle.appendChild(document.createTextNode('Voluntario'))
+    if (ajustes().estado && p.nuevo) detalle.appendChild(document.createTextNode(' · Nuevo')); if (ajustes().fotos) detalle.appendChild(document.createTextNode(` · ${p.foto ? 'Foto' : 'Sin foto'}`))
+    const textoTarjeta = elemento('span', ['persona-texto']); textoTarjeta.append(elemento('strong', [], p.nombre), detalle)
     abrir.append(textoTarjeta, elemento('span', ['persona-flecha'], '›')); fila.appendChild(abrir)
     if (seleccionando && p.activo) { const marcar = document.createElement('input'); marcar.type = 'checkbox'; marcar.checked = seleccion.has(p.id); marcar.className = 'persona-seleccionar'; marcar.addEventListener('change', () => { marcar.checked ? seleccion.add(p.id) : seleccion.delete(p.id); dibujar() }); fila.appendChild(marcar) }
     return fila
