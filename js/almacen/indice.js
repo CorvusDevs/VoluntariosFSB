@@ -1,6 +1,7 @@
 import { crearAlmacenLocal } from './local.js'
 import { crearAlmacenRemoto } from './remoto.js'
 import { crearClienteGitHub } from './github.js'
+import { crearAlmacenCloudflare } from './cloudflare.js'
 import { CONFIG } from '../config.js'
 
 let instancia = null
@@ -25,6 +26,8 @@ export async function almacen() {
       rama: CONFIG.rama,
     })
     instancia = crearAlmacenRemoto({ cliente, autor: configuracion.autor ?? 'la aplicacion' })
+  } else if (configuracion.modo === 'cloudflare') {
+    instancia = crearAlmacenCloudflare()
   } else {
     instancia = await crearAlmacenLocal()
   }

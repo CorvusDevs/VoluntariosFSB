@@ -34,6 +34,11 @@ describe('modo', () => {
     indice.configurar({ modo: 'github', token: 'x' })
     expect(indice.modoActual()).toBe('github')
   })
+
+  it('configurar lo pasa a cloudflare', () => {
+    indice.configurar({ modo: 'cloudflare' })
+    expect(indice.modoActual()).toBe('cloudflare')
+  })
 })
 
 describe('construccion del almacen', () => {
@@ -74,6 +79,19 @@ describe('construccion del almacen', () => {
     const almacen = await indice.almacen()
     await almacen.leerRoster()
     expect(visitadas).toEqual([])
+  })
+
+  it('en cloudflare pide la API propia y no GitHub', async () => {
+    const visitadas = []
+    vi.stubGlobal('fetch', (url) => {
+      visitadas.push(String(url))
+      return Promise.reject(new Error('red cortada a proposito'))
+    })
+    indice.configurar({ modo: 'cloudflare' })
+    const remoto = await indice.almacen()
+    await expect(remoto.leerRoster()).rejects.toThrow(/red cortada/)
+    expect(visitadas[0]).toContain('/api/documento')
+    expect(visitadas[0]).not.toContain('github.com')
   })
 })
 

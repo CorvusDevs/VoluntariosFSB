@@ -7,12 +7,15 @@
 assets/**
 css/**
 docs/**
+functions/**
 herramientas/**
 index.html
 js/**
+migrations/**
 package-lock.json
 package.json
 sw.js
 test/**
 version.json
 vitest.config.js
+wrangler.jsonc

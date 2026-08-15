@@ -4,7 +4,9 @@ import { crearPantallaLista } from './ui/pantalla-lista.js'
 import { crearPantallaPersonas } from './ui/pantalla-personas.js'
 import { crearPantallaVistaPrevia } from './ui/pantalla-vista-previa.js'
 import { crearPantallaIngreso } from './ui/pantalla-ingreso.js'
+import { crearPantallaIngresoCloudflare } from './ui/pantalla-ingreso-cloudflare.js'
 import { crearPantallaAjustes } from './ui/pantalla-ajustes.js'
+import { crearPantallaAccesosCloudflare } from './ui/pantalla-accesos-cloudflare.js'
 import { crearPantallaRegistro } from './ui/pantalla-registro.js'
 import { crearPantallaReporte } from './ui/pantalla-reporte.js'
 import { crearPantallaAsistencias } from './ui/pantalla-asistencias.js'
@@ -16,6 +18,7 @@ import { boton, vaciar, elemento } from './ui/componentes.js'
 import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
 import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
+import { cerrarSesionCloudflare, ingresarCloudflare, leerSesionCloudflare } from './acceso/cloudflare.js'
 import { sello, vigilarVersion } from './ui/aviso-version.js'
 import { registrarTrabajador } from './ui/trabajador.js'
 import { VERSION } from './version.js'
@@ -130,10 +133,8 @@ function navegacion() {
   escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
-  if (esAdmin(sesion)) {
-    escritorio.appendChild(ir('registro', 'Registro'))
-    escritorio.appendChild(ir('ajustes', 'Ajustes'))
-  }
+  if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') escritorio.appendChild(ir('registro', 'Registro'))
+  if (esAdmin(sesion)) escritorio.appendChild(ir('ajustes', 'Ajustes'))
 
   if (sesion) {
     // Tambien para quien coordina, que no tiene pantalla de ajustes donde
@@ -141,7 +142,7 @@ function navegacion() {
     const salir = boton('Cerrar sesión', cerrarSesion)
     salir.dataset.accion = 'cerrar-sesion'
     escritorio.appendChild(salir)
-  } else {
+  } else if (!sesion) {
     const entrar = boton('Ingresar', mostrarIngreso)
     entrar.dataset.accion = 'ingresar'
     escritorio.appendChild(entrar)
@@ -166,12 +167,13 @@ function navegacion() {
   mas.appendChild(resumen)
   const menu = elemento('div', ['menu-navegacion'])
   menu.append(ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'))
-  if (esAdmin(sesion)) menu.append(ir('registro', 'Registro'), ir('ajustes', 'Ajustes'))
+  if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') menu.appendChild(ir('registro', 'Registro'))
+  if (esAdmin(sesion)) menu.appendChild(ir('ajustes', 'Ajustes'))
   if (sesion) {
     const salir = boton('Cerrar sesión', cerrarSesion)
     salir.dataset.accion = 'cerrar-sesion-movil'
     menu.appendChild(salir)
-  } else {
+  } else if (!sesion) {
     const entrar = boton('Ingresar', mostrarIngreso)
     entrar.dataset.accion = 'ingresar-movil'
     menu.appendChild(entrar)
@@ -326,6 +328,8 @@ function dibujar() {
         rama: CONFIG.rama,
       }),
     })
+  } else if (pantalla === 'ajustes' && esAdmin(sesion) && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaAccesosCloudflare(cuerpo, { sesion })
   } else if (pantalla === 'ajustes' && esAdmin(sesion)) {
     vista = crearPantallaAjustes(cuerpo, {
       sesion,
@@ -408,6 +412,11 @@ function mostrarIngreso() {
   })
 }
 
+function mostrarIngresoCloudflare() {
+  olvidarVista()
+  vista = crearPantallaIngresoCloudflare(contenedor, { alEntrar: entrarCloudflare })
+}
+
 async function entrar({ token, nombre, usuario, rol, recordar: recordarme }) {
   if (recordarme) await recordar(token, nombre, { usuario, rol })
   sesion = { token, nombre, usuario, rol }
@@ -415,7 +424,22 @@ async function entrar({ token, nombre, usuario, rol, recordar: recordarme }) {
   await abrirAplicacion()
 }
 
+async function entrarCloudflare({ usuario, contrasena }) {
+  const acceso = await ingresarCloudflare({ usuario, contrasena })
+  sesion = { ...acceso, usuario: acceso.usuario, origen: 'cloudflare' }
+  configurar({ modo: 'cloudflare', autor: acceso.nombre })
+  await abrirAplicacion()
+}
+
 async function cerrarSesion() {
+  if (sesion?.origen === 'cloudflare') {
+    await cerrarSesionCloudflare()
+    sesion = null
+    configurar({ modo: 'local', token: null, autor: null })
+    deposito = null
+    mostrarIngresoCloudflare()
+    return
+  }
   await olvidar()
   sesion = null
   // Explicito, no por omision: configurar mezcla con lo anterior y sin esto el
@@ -435,5 +459,17 @@ vigilarVersion(contenedor)
 registrarTrabajador()
 
 const recordada = await recuperarRecordado()
-if (recordada) await entrar({ ...recordada, recordar: false })
+const esCloudflare = location.hostname.endsWith('.pages.dev')
+if (esCloudflare) {
+  try {
+    const acceso = await leerSesionCloudflare()
+    if (acceso) {
+      sesion = { ...acceso, usuario: acceso.usuario ?? acceso.correo, origen: 'cloudflare' }
+      configurar({ modo: 'cloudflare', autor: acceso.nombre })
+      await abrirAplicacion()
+    } else mostrarIngresoCloudflare()
+  } catch (fallo) {
+    mostrarFalla(fallo.message)
+  }
+} else if (recordada) await entrar({ ...recordada, recordar: false })
 else mostrarIngreso()

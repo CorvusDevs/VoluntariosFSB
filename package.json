@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Armado de asignaciones semanales de Futbol sin Barreras (Aletea)",
   "scripts": {
+    "construir:cloudflare": "node herramientas/preparar-cloudflare.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "servir": "python3 -m http.server 8765"

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "voluntarios-fsb",
+  "compatibility_date": "2026-08-15",
+  "pages_build_output_dir": "dist",
+  "d1_databases": [
+    {
+      "binding": "BASE",
+      "database_name": "voluntarios-fsb",
+      "database_id": "6cf85846-b176-4796-a43c-0078b19332ec"
+    }
+  ],
+  "vars": {
+    "ENTORNO": "produccion"
+  }
+}

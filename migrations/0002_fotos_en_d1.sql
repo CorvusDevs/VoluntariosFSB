@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS fotos (
+  clave TEXT PRIMARY KEY,
+  datos BLOB NOT NULL,
+  tipo TEXT NOT NULL DEFAULT 'image/jpeg',
+  revision INTEGER NOT NULL DEFAULT 1,
+  actualizado_por TEXT NOT NULL,
+  actualizado_en TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
