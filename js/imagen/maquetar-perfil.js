@@ -1,5 +1,5 @@
 import { COLORES, FUENTES } from './tema.js'
-import { edadDesdeAnio, perfilDe } from '../modelo/perfil.js'
+import { edadDesdeAnio, fechaPerfil, perfilDe } from '../modelo/perfil.js'
 
 const ANCHO = 1080
 const MARGEN = 64
@@ -35,7 +35,7 @@ export function maquetarPerfil(persona, { medirTexto, anioActual = new Date().ge
   const etiqueta = persona.grupo ? `Grupo ${persona.grupo}` : 'Voluntariado'
   ordenes.push({ tipo: 'rect', x: 320, y: y + 94, ancho: 170, alto: 42, color: color.tenue, radio: 21 })
   ordenes.push({ tipo: 'texto', texto: etiqueta, x: 405, y: y + 122, fuente: FUENTES.titulo(22), color: color.fuerte, alineacion: 'center' })
-  const datos = [edad === null ? null : `${edad} años`, perfil.desde ? `En la organización desde ${perfil.desde}` : null].filter(Boolean).join(' · ')
+  const datos = [edad === null ? null : `${edad} años`, perfil.desde ? `En la organización desde ${fechaPerfil(perfil.desde)}` : null].filter(Boolean).join(' · ')
   if (datos) ordenes.push({ tipo: 'texto', texto: datos, x: 320, y: y + 178, fuente: FUENTES.normal(27), color: COLORES.textoSuave })
   y += 280
   const bloques = [['Le gusta', perfil.leGusta], ['Prefiere evitar', perfil.noLeGusta], ['Necesidades y apoyos', perfil.necesidades]]

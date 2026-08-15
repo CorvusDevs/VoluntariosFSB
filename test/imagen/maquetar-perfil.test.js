@@ -5,9 +5,9 @@ const medir = (texto) => texto.length * 14
 
 describe('maquetarPerfil', () => {
   it('incluye edad, historia y apoyos de la persona', () => {
-    const plano = maquetarPerfil({ nombre: 'Gonzalo', grupo: 1, perfil: { anioNacimiento: '2014', desde: '2023', leGusta: 'Pelota', necesidades: 'Pausa tranquila' } }, { medirTexto: medir, anioActual: 2026 })
+    const plano = maquetarPerfil({ nombre: 'Gonzalo', grupo: 1, perfil: { anioNacimiento: '2014-02-10', desde: '2023-03-15', leGusta: 'Pelota', necesidades: 'Pausa tranquila' } }, { medirTexto: medir, anioActual: 2026 })
     const textos = plano.ordenes.filter((o) => o.tipo === 'texto').map((o) => o.texto)
-    expect(textos).toContain('12 años · En la organización desde 2023')
+    expect(textos.some((texto) => texto.includes('12 años · En la organización desde') && texto.includes('2023'))).toBe(true)
     expect(textos).toContain('Necesidades y apoyos')
     expect(textos).toContain('Pausa tranquila')
   })

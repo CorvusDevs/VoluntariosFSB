@@ -319,16 +319,17 @@ describe('directorio de Personas', () => {
   it('guarda el perfil personal y ofrece descargar una tarjeta', async () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')
-    editor.querySelector('[data-perfil="anioNacimiento"]').value = '2014'
+    editor.querySelector('[data-perfil="anioNacimiento"]').value = '2014-02-10'
     editor.querySelector('[data-perfil="anioNacimiento"]').dispatchEvent(new Event('input'))
     editor.querySelector('[data-perfil="necesidades"]').value = 'Pausa tranquila'
     expect(editor.querySelector('.persona-edad').textContent).toBe(`Edad: ${new Date().getFullYear() - 2014} años`)
     ;[...editor.querySelectorAll('button')].find((e) => e.textContent === 'Guardar cambios').click()
     await esperar()
     const persona = pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo')
-    expect(persona.perfil).toMatchObject({ anioNacimiento: '2014', necesidades: 'Pausa tranquila' })
+    expect(persona.perfil).toMatchObject({ anioNacimiento: '2014-02-10', necesidades: 'Pausa tranquila' })
     tarjeta('Gonzalo').querySelector('button').click()
-    expect([...raiz.querySelectorAll('.persona-acciones button')].some((e) => e.textContent === 'Descargar tarjeta')).toBe(true)
+    expect([...raiz.querySelectorAll('.persona-acciones button')].some((e) => e.textContent === 'Descargar tarjeta PNG')).toBe(true)
+    expect(raiz.querySelector('.vista-tarjeta-personal')).not.toBeNull()
   })
 
   it('mueve participantes seleccionados en bloque y avisa la mudanza', async () => {

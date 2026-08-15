@@ -3,7 +3,7 @@ import {
   rosterVacio, agregarParticipante, agregarVoluntario,
   editarPersona, desactivarPersona, activos, buscarPersonas,
 } from '../../js/modelo/roster.js'
-import { edadDesdeAnio, perfilDe } from '../../js/modelo/perfil.js'
+import { edadDesdeAnio, fechaPerfil, perfilDe } from '../../js/modelo/perfil.js'
 
 describe('rosterVacio', () => {
   it('trae las dos colecciones y la version', () => {
@@ -123,8 +123,10 @@ describe('perfil personal', () => {
     expect(editarPersona(r, r.participantes[0].id, { perfil: { desde: '2023' } }).participantes[0].perfil.desde).toBe('2023')
   })
 
-  it('calcula edad desde el año de nacimiento', () => {
-    expect(edadDesdeAnio('2014', 2026)).toBe(12)
-    expect(edadDesdeAnio('', 2026)).toBeNull()
+  it('calcula edad desde fecha de nacimiento y conserva años antiguos', () => {
+    expect(edadDesdeAnio('2014-09-01', new Date('2026-08-15'))).toBe(11)
+    expect(edadDesdeAnio('2014', new Date('2026-08-15'))).toBe(12)
+    expect(edadDesdeAnio('', new Date('2026-08-15'))).toBeNull()
+    expect(fechaPerfil('2023-03-15')).toContain('2023')
   })
 })
