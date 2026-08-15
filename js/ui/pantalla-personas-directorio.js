@@ -4,7 +4,7 @@ import { coincide } from '../util/nombres.js'
 import { crearEditorDeFoto } from './editor-foto.js'
 import { edadDesdeAnio, perfilDe } from '../modelo/perfil.js'
 import { maquetarPerfil } from '../imagen/maquetar-perfil.js'
-import { descargar, esperarFuentes, medidorDesde } from '../imagen/exportar.js'
+import { cargarImagen, descargar, esperarFuentes, medidorDesde } from '../imagen/exportar.js'
 import { pintar } from '../imagen/pintar.js'
 import { crearSelectorFecha } from './selector-fecha.js'
 
@@ -14,12 +14,13 @@ const iniciales = (nombre) => nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).j
 
 export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmin = false }) {
   let actual = roster, texto = '', tipo = 'participante', filtro = 'activas', grupo = 'todos'
-  let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false, viendoTarjetas = false, tarjetaElegida = null
+  let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false, viendoTarjetas = false, tarjetaElegida = null, confirmacionPerfil = ''
   const miniaturas = new Map()
   const urlsMiniaturas = new Set()
+  let logoAleteaPendiente = null
   const ajustes = () => ({ ...AJUSTES, ...(actual.preferenciasPersonas ?? {}) })
   const todas = () => [...actual.participantes.map((p) => ({ ...p, tipo: 'participante' })), ...actual.voluntarios.map((p) => ({ ...p, tipo: 'voluntario' }))]
-  async function guardar(siguiente, descripcion, mudanzas = []) { actual = siguiente; await almacen.guardarRoster(actual, descripcion); await alCambiar(actual, mudanzas); dibujar() }
+  async function guardar(siguiente, descripcion, mudanzas = [], confirmacion = '') { actual = siguiente; await almacen.guardarRoster(actual, descripcion); await alCambiar(actual, mudanzas); confirmacionPerfil = confirmacion; dibujar() }
   function visibles() {
     return todas().filter((p) => {
       if (filtro === 'activas' && !p.activo) return false
@@ -77,13 +78,18 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
   async function foto(p, archivo) { const mapa = await createImageBitmap(archivo); crearEditorDeFoto({ mapa, persona: p, tipo: tipoDe(p), acompanante: null, alGuardar: async (blob) => { const clave = `${p.id}.jpg`; await almacen.guardarFoto(clave, blob, p.nombre); await guardar(editarPersona(actual, p.id, { foto: clave }), `Cambiar la foto de ${p.nombre}`) }, alCancelar: () => {} }) }
   async function lienzoDeTarjeta(p) {
     await esperarFuentes(); const lienzo = document.createElement('canvas'); const ctx = lienzo.getContext('2d'); const plano = maquetarPerfil(p, { medirTexto: medidorDesde(ctx) }); const imagenes = {}
+    if (!logoAleteaPendiente) logoAleteaPendiente = cargarImagen('assets/logo-aletea.png')
+    const logoAletea = await logoAleteaPendiente
+    if (logoAletea) imagenes.logo = logoAletea
     if (p.foto) { const blob = await almacen.leerFoto(p.foto); if (blob) imagenes[p.foto] = await createImageBitmap(blob) }
     pintar(ctx, plano, imagenes, 2); return lienzo
   }
   async function descargarTarjeta(p) { await descargar(await lienzoDeTarjeta(p), `perfil-${p.nombre.toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.png`) }
   function editor(p) {
     const nueva = !p, datos = p ?? { nombre: '', tipo: 'participante', grupo: 1, nuevo: false, notas: '', perfil: {} }, perfil = perfilDe(datos), caja = elemento('section', ['persona-editor'])
-    caja.appendChild(elemento('h2', [], nueva ? 'Agregar persona' : `Perfil de ${datos.nombre}`)); const form = elemento('form', ['persona-formulario']); const nombre = document.createElement('input'); nombre.required = true; nombre.value = datos.nombre; nombre.placeholder = 'Nombre completo'; nombre.setAttribute('aria-label', 'Nombre completo'); form.appendChild(nombre)
+    caja.appendChild(elemento('h2', [], nueva ? 'Agregar persona' : `Perfil de ${datos.nombre}`))
+    if (!nueva && confirmacionPerfil) { const confirmacion = elemento('p', ['persona-confirmacion'], confirmacionPerfil); confirmacion.setAttribute('role', 'status'); caja.appendChild(confirmacion) }
+    const form = elemento('form', ['persona-formulario']); const nombre = document.createElement('input'); nombre.required = true; nombre.value = datos.nombre; nombre.placeholder = 'Nombre completo'; nombre.setAttribute('aria-label', 'Nombre completo'); form.appendChild(nombre)
     const clase = document.createElement('select'); clase.innerHTML = '<option value="participante">Participante</option><option value="voluntario">Voluntario</option>'; clase.value = datos.tipo; clase.disabled = !nueva; form.appendChild(clase)
     const selectorGrupo = document.createElement('select'); selectorGrupo.innerHTML = '<option value="1">Grupo 1</option><option value="2">Grupo 2</option>'; selectorGrupo.value = String(datos.grupo ?? 1); selectorGrupo.hidden = clase.value !== 'participante'; clase.addEventListener('change', () => { selectorGrupo.hidden = clase.value !== 'participante' }); form.appendChild(selectorGrupo)
     const marca = document.createElement('input'); marca.type = 'checkbox'; marca.checked = Boolean(datos.nuevo); marca.id = `persona-nuevo-${datos.id ?? 'nueva'}`; marca.setAttribute('role', 'switch'); const etiqueta = elemento('label', ['persona-estado']); etiqueta.htmlFor = marca.id; const textoEstado = elemento('span', ['persona-estado-texto']); textoEstado.append(elemento('strong', [], 'Estado'), elemento('span', [], 'Marcar como nuevo')); etiqueta.append(textoEstado, marca); form.appendChild(etiqueta)
@@ -107,7 +113,7 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     form.appendChild(bio)
     const perfilActual = () => Object.fromEntries([...bio.querySelectorAll('[data-perfil]')].map((e) => [e.dataset.perfil, e.value.trim()]))
     const personaBorrador = () => ({ ...datos, nombre: nombre.value.trim() || datos.nombre, grupo: Number(selectorGrupo.value), perfil: perfilActual() })
-    form.appendChild(boton(nueva ? 'Agregar persona' : 'Guardar cambios', async () => { const limpio = nombre.value.trim(); if (!limpio) return; const perfilNuevo = perfilActual(); if (nueva) { const siguiente = clase.value === 'participante' ? agregarParticipante(actual, { nombre: limpio, grupo: Number(selectorGrupo.value), nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }) : agregarVoluntario(actual, { nombre: limpio, nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }); agregando = false; await guardar(siguiente, `Agregar a ${limpio}`) } else { const cambios = { nombre: limpio, nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }, mudanzas = []; if (datos.tipo === 'participante' && Number(selectorGrupo.value) !== datos.grupo) { cambios.grupo = Number(selectorGrupo.value); mudanzas.push({ id: datos.id, grupo: cambios.grupo }) } await guardar(editarPersona(actual, datos.id, cambios), `Actualizar a ${datos.nombre}`, mudanzas) } }))
+    form.appendChild(boton(nueva ? 'Agregar persona' : 'Guardar cambios', async () => { const limpio = nombre.value.trim(); if (!limpio) return; const perfilNuevo = perfilActual(); if (nueva) { const siguiente = clase.value === 'participante' ? agregarParticipante(actual, { nombre: limpio, grupo: Number(selectorGrupo.value), nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }) : agregarVoluntario(actual, { nombre: limpio, nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }); agregando = false; await guardar(siguiente, `Agregar a ${limpio}`, [], 'Persona agregada correctamente') } else { const cambios = { nombre: limpio, nuevo: marca.checked, notas: notas.value, perfil: perfilNuevo }, mudanzas = []; if (datos.tipo === 'participante' && Number(selectorGrupo.value) !== datos.grupo) { cambios.grupo = Number(selectorGrupo.value); mudanzas.push({ id: datos.id, grupo: cambios.grupo }) } await guardar(editarPersona(actual, datos.id, cambios), `Actualizar a ${datos.nombre}`, mudanzas, `Perfil de ${limpio} guardado correctamente`) } }))
     form.addEventListener('submit', (e) => e.preventDefault()); caja.appendChild(form)
     if (!nueva) { const vista = elemento('section', ['vista-tarjeta-personal']); vista.appendChild(elemento('h3', [], 'Vista previa de tarjeta')); const textoVista = elemento('p', ['ayuda-ajustes'], 'La tarjeta se actualiza mientras editás.'); const lienzos = elemento('div', ['contenedor-lienzo-tarjeta']); vista.append(textoVista, lienzos); let revisionVista = 0; const actualizarVista = () => { const revision = ++revisionVista; lienzoDeTarjeta(personaBorrador()).then((lienzo) => { if (!vista.isConnected || revision !== revisionVista) return; lienzo.className = 'lienzo-tarjeta-personal'; lienzos.replaceChildren(lienzo) }).catch(() => { if (revision === revisionVista) textoVista.textContent = 'No se pudo preparar la vista previa.' }) }; form.querySelectorAll('input, textarea, select').forEach((entrada) => entrada.addEventListener('input', actualizarVista)); form.querySelectorAll('select').forEach((entrada) => entrada.addEventListener('change', actualizarVista)); actualizarVista(); caja.appendChild(vista) }
     const acciones = elemento('div', ['persona-acciones'])

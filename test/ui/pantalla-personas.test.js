@@ -337,6 +337,7 @@ describe('directorio de Personas', () => {
     expect(editor.querySelector('.persona-edad').textContent).toBe(`Edad: ${new Date().getFullYear() - 2014} años`)
     ;[...editor.querySelectorAll('button')].find((e) => e.textContent === 'Guardar cambios').click()
     await esperar()
+    expect(raiz.querySelector('.persona-confirmacion').textContent).toContain('guardado correctamente')
     const persona = pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo')
     expect(persona.perfil).toMatchObject({ anioNacimiento: '2014-02-10', necesidades: 'Pausa tranquila' })
     tarjeta('Gonzalo').querySelector('button').click()

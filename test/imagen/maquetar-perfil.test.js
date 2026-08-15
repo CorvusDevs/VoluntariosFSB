@@ -10,5 +10,6 @@ describe('maquetarPerfil', () => {
     expect(textos.some((texto) => texto.includes('12 años · En la organización desde') && texto.includes('2023'))).toBe(true)
     expect(textos).toContain('Necesidades y apoyos')
     expect(textos).toContain('Pausa tranquila')
+    expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'imagen', clave: 'logo', x: 816, y: 68, ancho: 200, alto: 75 }))
   })
 })

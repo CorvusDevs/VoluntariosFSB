@@ -26,6 +26,8 @@ export function maquetarPerfil(persona, { medirTexto, anioActual = new Date().ge
   const edad = edadDesdeAnio(perfil.anioNacimiento, anioActual)
   let y = 0
   ordenes.push({ tipo: 'rect', x: 0, y: 0, ancho: ANCHO, alto: 210, color: COLORES.violeta })
+  // Mantiene la misma marca, escala y esquina que la cabecera de la planilla.
+  ordenes.push({ tipo: 'imagen', clave: 'logo', x: ANCHO - MARGEN - 200, y: 68, ancho: 200, alto: 75, circular: false })
   ordenes.push({ tipo: 'texto', texto: 'Fútbol sin Barreras', x: MARGEN, y: 76, fuente: FUENTES.normal(28), color: COLORES.blanco })
   ordenes.push({ tipo: 'texto', texto: 'Perfil personal · Uso interno', x: MARGEN, y: 130, fuente: FUENTES.titulo(42), color: COLORES.blanco })
   y = 258

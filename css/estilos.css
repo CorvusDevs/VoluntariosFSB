@@ -524,6 +524,7 @@ input.fila-nombre:focus {
 .persona-formulario, .personas-personalizacion { display: flex; flex-direction: column; gap: 12px; }
 .persona-bio { display: grid; gap: 12px; margin: 4px 0 0; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; background: #FAF8FB; }
 .persona-bio legend { padding: 0 6px; color: var(--violeta); font-weight: 700; }
+.persona-confirmacion { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #A7DED8; border-radius: 10px; color: var(--turquesa-texto); background: #F1FAF8; font-weight: 700; }
 .persona-edad { margin: -4px 0 0; color: var(--violeta); font-size: 14px; font-weight: 700; }
 .persona-bio .campo { display: grid; gap: 6px; }
 .persona-bio input, .persona-bio textarea { box-sizing: border-box; width: 100%; min-height: 44px; padding: 9px 12px; font: inherit; border: 1px solid var(--linea); border-radius: 10px; background: var(--fondo); }
