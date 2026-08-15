@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { crearPantallaVistaPrevia, DENSIDAD } from '../../js/ui/pantalla-vista-previa.js'
+import { cargarEnLotes, crearPantallaVistaPrevia, DENSIDAD, FOTOS_POR_LOTE } from '../../js/ui/pantalla-vista-previa.js'
 import {
   crearLista, asignarVoluntario, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO,
   TAMANO_VOLUNTARIO_POR_DEFECTO, ASOMO_VOLUNTARIO_POR_DEFECTO,
@@ -41,6 +41,21 @@ beforeEach(() => {
 })
 
 describe('pantalla de vista previa', () => {
+  it('carga fotos en grupos chicos para no esperar una por una', async () => {
+    const iniciadas = []
+    const liberar = []
+    const tarea = cargarEnLotes(['a', 'b', 'c', 'd', 'e'], (clave) => new Promise((resolver) => {
+      iniciadas.push(clave)
+      liberar.push(() => resolver({ clave }))
+    }), async () => {})
+    expect(iniciadas).toEqual(['a', 'b', 'c', 'd'])
+    liberar.splice(0, FOTOS_POR_LOTE).forEach((resolver) => resolver())
+    await new Promise((resolver) => setTimeout(resolver, 0))
+    expect(iniciadas).toEqual(['a', 'b', 'c', 'd', 'e'])
+    liberar.at(-1)()
+    await tarea
+  })
+
   it('dibuja los cuatro interruptores en español', () => {
     const etiquetas = [...raiz.querySelectorAll('label')].map((e) => e.textContent)
     expect(etiquetas.some((t) => t.includes('Saludo'))).toBe(true)

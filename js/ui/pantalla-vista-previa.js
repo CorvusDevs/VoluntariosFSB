@@ -13,6 +13,17 @@ import {
 // El lienzo se pinta al doble de tamaño para que se vea nitido en el telefono.
 // El archivo que se descarga mide, entonces, el doble que el plano.
 export const DENSIDAD = 2
+export const FOTOS_POR_LOTE = 4
+
+// Cuatro descargas a la vez recortan la espera de una red móvil sin decodificar
+// las 25 fotos juntas, que haría subir de golpe la memoria del navegador.
+export async function cargarEnLotes(claves, cargar, alTerminarLote) {
+  for (let inicio = 0; inicio < claves.length; inicio += FOTOS_POR_LOTE) {
+    const lote = claves.slice(inicio, inicio + FOTOS_POR_LOTE)
+    const imagenes = await Promise.all(lote.map(async (clave) => [clave, await cargar(clave)]))
+    await alTerminarLote(imagenes)
+  }
+}
 
 const OPCIONES = [
   ['saludo', 'Saludo'],
@@ -373,9 +384,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   const cerrar = (i) => { if (i && typeof i.close === 'function') i.close() }
 
   async function precargarFotos() {
-    const logo = await (opciones.cargarLogo ?? cargarLogoReal)()
-    if (!vivo) return cerrar(logo)
-    if (logo) imagenes.logo = logo
+    const logoPendiente = (opciones.cargarLogo ?? cargarLogoReal)()
     if (cargarFoto) {
       // Los voluntarios tambien, no solo los participantes. Cuando se escribio
       // esto ningun formato dibujaba la cara del voluntario; Retratos si, y sin
@@ -383,12 +392,27 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       const claves = new Set()
       const gente = [...roster.participantes, ...roster.voluntarios]
       gente.forEach((p) => { if (p.foto) claves.add(p.foto) })
-      for (const clave of claves) {
-        const imagen = await cargarFoto(clave)
-        if (!vivo) return cerrar(imagen)
-        if (imagen) imagenes[clave] = imagen
+      const pendientes = [...claves]
+      let cargadas = 0
+      if (pendientes.length) {
+        mensaje = `Cargando fotos: 0 de ${pendientes.length}`
+        redibujar()
       }
+      await cargarEnLotes(pendientes, cargarFoto, async (lote) => {
+        if (!vivo) {
+          lote.forEach(([, imagen]) => cerrar(imagen))
+          return
+        }
+        lote.forEach(([clave, imagen]) => { if (imagen) imagenes[clave] = imagen })
+        cargadas += lote.length
+        mensaje = cargadas === pendientes.length ? '' : `Cargando fotos: ${cargadas} de ${pendientes.length}`
+        redibujar()
+      })
     }
+    const logo = await logoPendiente
+    if (!vivo) return cerrar(logo)
+    if (logo) imagenes.logo = logo
+    mensaje = ''
     redibujar()
   }
 
