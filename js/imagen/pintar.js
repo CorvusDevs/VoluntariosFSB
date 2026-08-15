@@ -10,7 +10,7 @@ export const TIPOS = Object.freeze(['rect', 'circulo', 'linea', 'texto', 'imagen
 // era el unico paso sin verificar entre "el plano esta bien", que se probo, y
 // "el bosquejo se ve mal". Pintar derecho lo saca del medio y ademas evita
 // construir un lienzo grande por cada opcion.
-export function pintar(ctx, plano, imagenes = {}, densidad = 1, recorte = null) {
+export function pintar(ctx, plano, imagenes = {}, densidad = 1, recorte = null, opacidadesImagenes = {}) {
   const marco = recorte ?? { x: 0, y: 0, ancho: plano.ancho, alto: plano.alto }
   ctx.canvas.width = Math.round(marco.ancho * densidad)
   ctx.canvas.height = Math.round(marco.alto * densidad)
@@ -26,7 +26,7 @@ export function pintar(ctx, plano, imagenes = {}, densidad = 1, recorte = null) 
       case 'circulo': return circulo(ctx, orden)
       case 'linea': return linea(ctx, orden)
       case 'texto': return texto(ctx, orden)
-      case 'imagen': return imagen(ctx, orden, imagenes)
+      case 'imagen': return imagen(ctx, orden, imagenes, opacidadesImagenes[orden.clave])
       case 'icono': return icono(ctx, orden)
       default: throw new Error(`Orden de dibujo desconocida: ${orden.tipo}`)
     }
@@ -116,11 +116,12 @@ function icono(ctx, o) {
   ctx.restore()
 }
 
-function imagen(ctx, o, imagenes) {
+function imagen(ctx, o, imagenes, opacidad = 1) {
   const fuente = imagenes[o.clave]
-  if (!fuente) return
+  if (!fuente || opacidad <= 0) return
   ctx.save()
   try {
+    ctx.globalAlpha = Math.min(1, opacidad)
     // El recorte lo hace SIEMPRE un clip, y la imagen se dibuja entera y
     // agrandada hasta tapar el hueco. Antes se recortaba con el rectangulo de
     // origen de drawImage, su forma de nueve argumentos: en Safari esa forma no
@@ -155,4 +156,3 @@ function imagen(ctx, o, imagenes) {
     ctx.restore()
   }
 }
-

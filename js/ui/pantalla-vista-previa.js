@@ -14,6 +14,7 @@ import {
 // El archivo que se descarga mide, entonces, el doble que el plano.
 export const DENSIDAD = 2
 export const FOTOS_POR_LOTE = 4
+export const DURACION_FUNDIDO_FOTOS_MS = 220
 
 // Cuatro descargas a la vez recortan la espera de una red móvil sin decodificar
 // las 25 fotos juntas, que haría subir de golpe la memoria del navegador.
@@ -49,7 +50,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   lienzo.className = 'lienzo-vista-previa'
   const ctx = crearContexto ? crearContexto(lienzo) : lienzo.getContext('2d')
   const imagenes = {}
+  const fotosApareciendo = new Map()
   let plano = null
+  let animacionFotos = null
   // vivo pasa a false al salir de la pantalla: sin esto la precarga de fotos
   // sigue armando DOM huerfano y repintando un lienzo que ya nadie ve.
   let vivo = true
@@ -81,7 +84,39 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     await esperarFuentes()
     if (!vivo) return
     calcular()
-    pintar(ctx, plano, imagenes, DENSIDAD)
+    pintar(ctx, plano, imagenes, DENSIDAD, null, opacidadesDeFotos())
+    continuarFundidoDeFotos()
+  }
+
+  const ahora = () => globalThis.performance?.now?.() ?? Date.now()
+  const reduceMovimiento = () => globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+
+  function opacidadesDeFotos() {
+    const opacidades = {}
+    const momento = ahora()
+    fotosApareciendo.forEach((inicio, clave) => {
+      const progreso = Math.min(1, (momento - inicio) / DURACION_FUNDIDO_FOTOS_MS)
+      if (progreso === 1) fotosApareciendo.delete(clave)
+      else opacidades[clave] = progreso
+    })
+    return opacidades
+  }
+
+  function continuarFundidoDeFotos() {
+    if (!vivo || animacionFotos !== null || fotosApareciendo.size === 0) return
+    animacionFotos = requestAnimationFrame(() => {
+      animacionFotos = null
+      dibujar()
+    })
+  }
+
+  function guardarFotos(lote) {
+    const inicio = ahora()
+    lote.forEach(([clave, imagen]) => {
+      if (!imagen) return
+      imagenes[clave] = imagen
+      if (!reduceMovimiento()) fotosApareciendo.set(clave, inicio)
+    })
   }
 
   // Dos formatos conviven a proposito: el apilado sirve los sabados sin fotos
@@ -360,9 +395,8 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     return caja
   }
 
-  function redibujar({ fotosNuevas = false } = {}) {
+  function redibujar() {
     if (!vivo) return
-    if (fotosNuevas) lienzo.classList.add('fotos-nuevas')
     vaciar(raiz)
     calcular()
     raiz.appendChild(panelDeFormato())
@@ -377,9 +411,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
     // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.
     if (ocupado) controles().forEach((c) => { c.disabled = true })
-    dibujar().then(() => {
-      if (fotosNuevas && vivo) requestAnimationFrame(() => lienzo.classList.remove('fotos-nuevas'))
-    })
+    dibujar()
   }
 
   // El logo va en toda imagen, asi que no depende de que nos pasen cargarFoto:
@@ -406,23 +438,24 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
           lote.forEach(([, imagen]) => cerrar(imagen))
           return
         }
-        lote.forEach(([clave, imagen]) => { if (imagen) imagenes[clave] = imagen })
+        guardarFotos(lote)
         cargadas += lote.length
         mensaje = cargadas === pendientes.length ? '' : `Cargando fotos: ${cargadas} de ${pendientes.length}`
-        redibujar({ fotosNuevas: true })
+        redibujar()
       })
     }
     const logo = await logoPendiente
     if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
     mensaje = ''
-    redibujar({ fotosNuevas: Boolean(logo) })
+    redibujar()
   }
 
   // La llama app.js al cambiar de pantalla. Los mapas de bits decodificados
   // ocupan memoria hasta que se los cierra a mano.
   function destruir() {
     vivo = false
+    if (animacionFotos !== null) cancelAnimationFrame(animacionFotos)
     Object.values(imagenes).forEach(cerrar)
   }
 

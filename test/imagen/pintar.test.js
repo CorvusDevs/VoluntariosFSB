@@ -36,6 +36,7 @@ function contextoFalso() {
     set textAlign(v) { llamadas.push({ nombre: 'textAlign', args: [v] }) },
     set textBaseline(v) { llamadas.push({ nombre: 'textBaseline', args: [v] }) },
     set lineWidth(v) { llamadas.push({ nombre: 'lineWidth', args: [v] }) },
+    set globalAlpha(v) { llamadas.push({ nombre: 'globalAlpha', args: [v] }) },
   }
 }
 
@@ -83,6 +84,16 @@ describe('pintar', () => {
     ]), { 'f.jpg': img }, 1)
     expect(ctx.llamadas.some((l) => l.nombre === 'clip')).toBe(true)
     expect(ctx.llamadas.some((l) => l.nombre === 'drawImage')).toBe(true)
+  })
+
+  it('puede fundir una foto sin afectar el resto del plano', () => {
+    const ctx = contextoFalso()
+    pintar(ctx, plano([
+      { tipo: 'texto', texto: 'Fútbol sin Barreras', x: 5, y: 6, fuente: '10px X', color: '#000' },
+      { tipo: 'imagen', clave: 'f.jpg', x: 0, y: 0, ancho: 10, alto: 10 },
+    ]), { 'f.jpg': { width: 10, height: 10 } }, 1, null, { 'f.jpg': 0.4 })
+    expect(ctx.llamadas).toContainEqual({ nombre: 'globalAlpha', args: [0.4] })
+    expect(ctx.llamadas.some((l) => l.nombre === 'fillText')).toBe(true)
   })
 
   it('recorta en rectangulo redondeado cuando la orden trae radio', () => {
