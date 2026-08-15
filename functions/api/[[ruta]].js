@@ -52,6 +52,15 @@ function cookieSesion(valor, maxAge = DURACION_SESION) {
   return `vfsb_sesion=${valor}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`
 }
 
+export function bytesFoto(datos) {
+  // El ArrayBuffer que entrega D1 queda vacío si se pasa directo al Response de
+  // Pages. Copiarlo a un Uint8Array propio conserva los bytes hasta que la
+  // respuesta termina de enviarse.
+  if (datos instanceof ArrayBuffer) return new Uint8Array(datos).slice()
+  if (ArrayBuffer.isView(datos)) return new Uint8Array(datos.buffer, datos.byteOffset, datos.byteLength).slice()
+  return Uint8Array.from(datos)
+}
+
 function aleatorio(longitud) {
   const bytes = crypto.getRandomValues(new Uint8Array(longitud))
   return base64url(bytes).slice(0, longitud)
@@ -241,7 +250,7 @@ async function foto(contexto, sesion) {
       'SELECT datos, tipo, revision FROM fotos WHERE clave = ?1',
     ).bind(clave).first()
     if (!guardada) return error('No se encontró la foto.', 404)
-    return new Response(guardada.datos, {
+    return new Response(bytesFoto(guardada.datos), {
       headers: { 'content-type': guardada.tipo, etag: `"${guardada.revision}"` },
     })
   }
