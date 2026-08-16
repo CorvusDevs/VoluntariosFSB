@@ -419,6 +419,16 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
   })
 }
 
+// Cuando todo el grupo entra en un solo renglón, repartirlo de borde a borde
+// aprovecha el ancho de la planilla sin agrandar ni recortar las fotos. Con una
+// sola persona, centrarla evita que el grupo parezca incompleto o desalineado.
+function xDeCeldaEnGrupo(indice, cantidad, columnas, anchoCelda, separacion, margen, anchoLienzo) {
+  if (cantidad >= columnas) return margen + (indice % columnas) * (anchoCelda + separacion)
+  if (cantidad === 1) return Math.round((anchoLienzo - anchoCelda) / 2)
+  const espacio = (anchoLienzo - margen * 2 - anchoCelda * cantidad) / (cantidad - 1)
+  return Math.round(margen + indice * (anchoCelda + espacio))
+}
+
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const columnas = m.columnasGrilla ?? GRILLA.porFila
   const ancho = anchoDeCeldaGrilla(m.margen)
@@ -450,7 +460,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   let cursor = y
   celdas.forEach((celda, i) => {
     const columna = i % columnas
-    const x = m.margen + columna * (ancho + GRILLA.separacion)
+    const x = xDeCeldaEnGrupo(i, celdas.length, columnas, ancho, GRILLA.separacion, m.margen, m.ancho)
     const arriba = cursor
     const clave = celda.fila.participantes[0]
     let textoY = arriba
@@ -572,7 +582,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   let cursor = y
   grupo.filas.forEach((fila, i) => {
     const columna = i % columnas
-    const x = m.margen + columna * (ancho + separacion)
+    const x = xDeCeldaEnGrupo(i, grupo.filas.length, columnas, ancho, separacion, m.margen, m.ancho)
     const asomaFila = asomaEn(i)
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
@@ -710,7 +720,7 @@ function cuerpoEnRetratosConNombre(ordenes, grupo, porId, m, y, conFotos, medirT
   celdas.forEach((celda, i) => {
     const columna = i % columnas
     const renglon = Math.floor(i / columnas)
-    const x = m.margen + columna * (ancho + separacion)
+    const x = xDeCeldaEnGrupo(i, celdas.length, columnas, ancho, separacion, m.margen, m.ancho)
     const clave = celda.fila.participantes[0]
 
     dibujarRetrato(ordenes, {

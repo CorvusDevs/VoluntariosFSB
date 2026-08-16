@@ -465,6 +465,23 @@ describe('formato de grilla', () => {
     expect(marcos[1].y).toBe(marcos[2].y)
   })
 
+  it('reparte un grupo chico en todo el ancho sin agrandar sus fotos', () => {
+    const lista = structuredClone(LISTA)
+    lista.opcionesImagen.formato = 'grilla'
+    lista.grupos[0].filas = [
+      { participantes: ['p1'], voluntarios: [] },
+      { participantes: ['p3'], voluntarios: [] },
+    ]
+    const plano = maquetar(lista, ROSTER, opciones)
+    const fotos = plano.ordenes
+      .filter((o) => o.tipo === 'rect' && o.radio === GRILLA.radioFoto && ['p1', 'p3'].includes(o.fila))
+      .sort((a, b) => a.x - b.x)
+    expect(fotos).toHaveLength(2)
+    expect(fotos[0].x).toBe(medidas(false).margen)
+    expect(fotos[1].x + fotos[1].ancho).toBe(plano.ancho - medidas(false).margen)
+    expect(fotos[0].ancho).toBe(anchoDeCeldaGrilla(medidas(false).margen))
+  })
+
   it('nada se sale del lienzo ni invade el margen', () => {
     const plano = enGrilla()
     expect(plano.desborde).toBe(false)
