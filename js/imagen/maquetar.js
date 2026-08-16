@@ -368,13 +368,12 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
 
     if (!tramo.compartido) {
       primera.lineasVoluntario.forEach((linea, n) => {
-        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario * 0.9) : 0
+        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario * 1.2) : 0
         const aire = lado ? 8 : 0
-        const anchoEtiqueta = medirTexto(linea, fuente) + lado + aire
         const centroEtiqueta = primera.x + ancho / 2
-        if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: centroEtiqueta - anchoEtiqueta / 2, y: primera.yVoluntario + n * GRILLA.pxVoluntario, ancho: lado, alto: lado, fila: clave })
+        if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: centroEtiqueta - medirTexto(linea, fuente) / 2 - lado - aire, y: primera.yVoluntario + n * GRILLA.pxVoluntario - (lado - GRILLA.pxVoluntario) / 2, ancho: lado, alto: lado, fila: clave })
         ordenes.push({
-          tipo: 'texto', texto: linea, x: centroEtiqueta + (lado + aire) / 2,
+          tipo: 'texto', texto: linea, x: centroEtiqueta,
           y: primera.yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
           fuente, color: COLORES.magentaTexto,
           alineacion: 'center', lineaBase: 'middle', fila: clave,
@@ -390,10 +389,10 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     // le quede por debajo cuando los nombres no ocupan lo mismo.
     const yLinea = Math.max(...abarcadas.map((c) => c.yVoluntario)) + GRILLA.aireLlave
     const texto = primera.lineasVoluntario.join(' ')
-    const lado = Math.round(GRILLA.pxVoluntario * 0.9)
+    const lado = Math.round(GRILLA.pxVoluntario * 1.2)
     const aire = 8
-    const anchoEtiqueta = medirTexto(texto, fuente) + lado + aire
-    const hueco = anchoEtiqueta / 2 + 12
+    const anchoTexto = medirTexto(texto, fuente)
+    const hueco = anchoTexto / 2 + lado + aire + 12
     const medio = (izquierda + derecha) / 2
 
     const trazo = (x1, y1, x2, y2) => ordenes.push({
@@ -407,10 +406,10 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     trazo(izquierda, yLinea, medio - hueco, yLinea)
     trazo(medio + hueco, yLinea, derecha, yLinea)
 
-    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: medio - anchoEtiqueta / 2, y: yLinea - lado / 2, ancho: lado, alto: lado, fila: clave })
+    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: medio - anchoTexto / 2 - lado - aire, y: yLinea - lado / 2, ancho: lado, alto: lado, fila: clave })
 
     ordenes.push({
-      tipo: 'texto', texto, x: medio + (lado + aire) / 2, y: yLinea,
+      tipo: 'texto', texto, x: medio, y: yLinea,
       fuente, color: COLORES.magentaTexto,
       alineacion: 'center', lineaBase: 'middle', fila: clave,
     })

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { maquetar, agruparPorVoluntario } from '../../js/imagen/maquetar.js'
 import { FORMATO_POR_DEFECTO } from '../../js/modelo/lista.js'
 import {
-  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, esSuperpuesto,
+  ANCHO, COLORES, COLUMNAS, GRILLA, RETRATOS, ESQUINAS, esSuperpuesto, medidas, anchoDeCeldaGrilla,
   TAMANOS_VOLUNTARIO, ASOMOS_VOLUNTARIO, medidasRetratos, anchoDeCeldaRetratos,
 } from '../../js/imagen/tema.js'
 import { ROSTER, LISTA, SALUDO, DESPEDIDA, medirFalso } from '../ayudas/datos.js'
@@ -44,6 +44,17 @@ describe('maquetar', () => {
     expect(t).toContain('Gonzalo')
     expect(t).toContain('Abi')
     expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'imagen', clave: 'icono-voluntario', fila: 'p1' }))
+  })
+
+  it('mantiene centrado el nombre del voluntario aunque tenga icono', () => {
+    const listaGrilla = { ...LISTA, opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla' } }
+    const plano = maquetar(listaGrilla, ROSTER, opciones)
+    const voluntario = plano.ordenes.find((o) => o.tipo === 'texto' && o.fila === 'p1' && o.texto === 'Abi')
+    const icono = plano.ordenes.find((o) => o.tipo === 'imagen' && o.fila === 'p1' && o.clave === 'icono-voluntario')
+    const base = medidas(false)
+    expect(voluntario.alineacion).toBe('center')
+    expect(voluntario.x).toBe(base.margen + anchoDeCeldaGrilla(base.margen) / 2)
+    expect(icono.x + icono.ancho).toBeLessThan(voluntario.x)
   })
 
   it('un participante sin voluntario se dibuja sin separador', () => {
