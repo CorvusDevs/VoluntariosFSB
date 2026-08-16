@@ -23,6 +23,7 @@ function almacenFalso() {
 let raiz, almacen, pantalla
 
 beforeEach(() => {
+  sessionStorage.clear()
   document.body.innerHTML = '<div id="raiz"></div>'
   raiz = document.getElementById('raiz')
   almacen = almacenFalso()

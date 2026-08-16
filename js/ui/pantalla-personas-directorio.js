@@ -9,16 +9,23 @@ import { pintar } from '../imagen/pintar.js'
 import { crearSelectorFecha } from './selector-fecha.js'
 
 const AJUSTES = { resumen: true, fotos: true, estado: true, orden: 'nombre' }
+const CLAVE_FILTROS = 'voluntarios-fsb:filtros-personas'
 const tipoDe = (p) => p.id.startsWith('v_') ? 'voluntario' : 'participante'
 const iniciales = (nombre) => nombre.split(/\s+/).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
 
-export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmin = false }) {
-  let actual = roster, texto = '', tipo = 'participante', filtro = 'activas', grupo = 'todos'
+function leerFiltros() {
+  try { return JSON.parse(sessionStorage.getItem(CLAVE_FILTROS) ?? '{}') } catch { return {} }
+}
+
+export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmin = false, busquedaInicial = '' }) {
+  const guardados = leerFiltros()
+  let actual = roster, texto = busquedaInicial || guardados.texto || '', tipo = busquedaInicial ? 'todas' : guardados.tipo || 'participante', filtro = guardados.filtro || 'activas', grupo = guardados.grupo || 'todos'
   let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false, viendoTarjetas = false, tarjetaElegida = null, confirmacionPerfil = ''
   const miniaturas = new Map()
   const urlsMiniaturas = new Set()
   let logoAleteaPendiente = null, iconoPelotaPendiente = null
   const ajustes = () => ({ ...AJUSTES, ...(actual.preferenciasPersonas ?? {}) })
+  const recordarFiltros = () => { try { sessionStorage.setItem(CLAVE_FILTROS, JSON.stringify({ texto, tipo, filtro, grupo })) } catch {} }
   const todas = () => [...actual.participantes.map((p) => ({ ...p, tipo: 'participante' })), ...actual.voluntarios.map((p) => ({ ...p, tipo: 'voluntario' }))]
   async function guardar(siguiente, descripcion, mudanzas = [], confirmacion = '') {
     await almacen.guardarRoster(siguiente, descripcion)
@@ -39,12 +46,12 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     }).sort((a, b) => ajustes().orden === 'tipo' && a.tipo !== b.tipo ? a.tipo.localeCompare(b.tipo) : a.nombre.localeCompare(b.nombre, 'es'))
   }
   function chip(caja, etiqueta, valor, actualValor, cambiar) {
-    const control = boton(etiqueta, () => { cambiar(valor); dibujar() })
+    const control = boton(etiqueta, () => { cambiar(valor); recordarFiltros(); dibujar() })
     control.classList.add('chip'); control.classList.toggle('activa', actualValor === valor); control.setAttribute('aria-pressed', String(actualValor === valor)); caja.appendChild(control)
   }
   function filtros() {
     const caja = elemento('section', ['personas-filtros']); const buscar = document.createElement('input')
-    buscar.type = 'search'; buscar.placeholder = 'Buscar persona'; buscar.value = texto; buscar.setAttribute('aria-label', 'Buscar persona'); buscar.addEventListener('input', () => { texto = buscar.value; dibujar() }); caja.appendChild(buscar)
+    buscar.type = 'search'; buscar.placeholder = 'Buscar persona'; buscar.value = texto; buscar.setAttribute('aria-label', 'Buscar persona'); buscar.addEventListener('input', () => { texto = buscar.value; recordarFiltros(); dibujar() }); caja.appendChild(buscar)
     const chips = elemento('div', ['personas-chips'])
     chip(chips, 'Todas', 'todas', tipo, (v) => { tipo = v }); chip(chips, 'Participantes', 'participante', tipo, (v) => { tipo = v }); chip(chips, 'Voluntarios', 'voluntario', tipo, (v) => { tipo = v })
     chip(chips, 'Grupo 1', '1', grupo, (v) => { grupo = grupo === v ? 'todos' : v }); chip(chips, 'Grupo 2', '2', grupo, (v) => { grupo = grupo === v ? 'todos' : v })

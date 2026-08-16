@@ -11,6 +11,7 @@ import { crearPantallaRegistro } from './ui/pantalla-registro.js'
 import { crearPantallaReporte } from './ui/pantalla-reporte.js'
 import { crearPantallaAsistencias } from './ui/pantalla-asistencias.js'
 import { crearPantallaAgenda } from './ui/pantalla-agenda.js'
+import { crearPantallaInicio } from './ui/pantalla-inicio.js'
 import { crearFranjaAlerta } from './ui/franja-alerta.js'
 import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
 import { crearLista, sincronizarConRoster, moverAGrupo } from './modelo/lista.js'
@@ -43,6 +44,7 @@ let deposito = null
 let roster = null
 let lista = null
 let pantalla = 'lista'
+let contextoPantalla = {}
 // La pantalla que se esta mostrando. Algunas tienen trabajo en curso (fotos que
 // se decodifican, un lienzo que se repinta) y hay que avisarles que se van.
 let vista = null
@@ -52,11 +54,12 @@ let alertas = []
 let ocultarEstadoGuardado = null
 let intentoGuardado = 0
 
-function abrirPantalla(destino) {
+function abrirPantalla(destino, contexto = {}) {
   if (!pantallaPermitida(destino, {
     admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare',
   })) return
   pantalla = destino
+  contextoPantalla = contexto
   guardarUltimaPantalla(pantalla)
   dibujar()
 }
@@ -140,7 +143,7 @@ function navegacion() {
 
   const escritorio = elemento('nav', ['navegacion', 'navegacion-escritorio'])
   escritorio.setAttribute('aria-label', 'Secciones')
-  escritorio.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
+  escritorio.append(ir('inicio', 'Inicio'), ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
   // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
   // y la foto de cada chico, asi que la asistencia no agrega exposicion.
   escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'), ir('agenda', 'Agenda'))
@@ -172,14 +175,14 @@ function navegacion() {
   mas.className = 'navegacion-mas'
   const resumen = elemento('summary', ['boton-navegacion'], 'Más')
   resumen.setAttribute('aria-label', 'Más secciones')
-  const destinosSecundarios = ['vista-previa', 'reporte', 'agenda', 'registro', 'ajustes']
+  const destinosSecundarios = ['inicio', 'vista-previa', 'reporte', 'agenda', 'registro', 'ajustes']
   if (destinosSecundarios.includes(pantalla)) {
     resumen.classList.add('activa')
     resumen.setAttribute('aria-current', 'page')
   }
   mas.appendChild(resumen)
   const menu = elemento('div', ['menu-navegacion'])
-  menu.append(ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'), ir('agenda', 'Agenda'))
+  menu.append(ir('inicio', 'Inicio'), ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'), ir('agenda', 'Agenda'))
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') menu.appendChild(ir('registro', 'Registro'))
   if (esAdmin(sesion)) menu.appendChild(ir('ajustes', 'Ajustes'))
   if (sesion) {
@@ -271,7 +274,9 @@ function dibujar() {
   contenedor.appendChild(cuerpo)
   contenedor.appendChild(sello())
 
-  if (pantalla === 'lista') {
+  if (pantalla === 'inicio') {
+    vista = crearPantallaInicio(cuerpo, { roster, alertas, alIrA: abrirPantalla })
+  } else if (pantalla === 'lista') {
     vista = crearPantallaLista(cuerpo, {
       lista,
       roster,
@@ -371,6 +376,7 @@ function dibujar() {
       roster,
       almacen: deposito,
       esAdmin: esAdmin(sesion),
+      busquedaInicial: contextoPantalla.busqueda,
       alCambiar: async (siguiente, mudanza) => {
         roster = siguiente
         lista = sincronizarConRoster(lista, roster)

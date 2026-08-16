@@ -28,6 +28,8 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
   // Armar lista, asi que escribir "Grupo 1" a mano haria que el reporte y la
   // planilla se contradigan.
   let titulos = {}
+  let mesesDisponibles = []
+  let mesAEliminar = mesInicial
   // Voluntarios al costado en vez de abajo. Viene activado porque el reporte se
   // lee de un vistazo en un telefono, y apilarlo todo obliga a seguir con la
   // mirada una columna larguisima.
@@ -45,6 +47,8 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
     dibujar()
     try {
       const claves = (await almacen.listarListas()).map((l) => l.fecha)
+      mesesDisponibles = [...new Set(claves.map((fecha) => fecha.slice(0, 7)))].sort().reverse()
+      if (!mesesDisponibles.includes(mesAEliminar)) mesAEliminar = pedido
       const fechas = delMes(claves, pedido)
       const listas = (await Promise.all(fechas.map((f) => almacen.leerLista(f)))).filter(Boolean)
       const archivo = await almacen.leerAsistencias(pedido)
@@ -154,20 +158,38 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
       descargarCSV(aCSV(historia, titulos), `asistencia-${mes}.csv`)
     })
     csv.dataset.accion = 'descargar-csv'
+    const selectorBorrado = document.createElement('select')
+    selectorBorrado.dataset.campo = 'mes-a-eliminar'
+    mesesDisponibles.forEach((mesDisponible) => {
+      const opcion = document.createElement('option')
+      opcion.value = mesDisponible
+      opcion.textContent = mesDisponible
+      selectorBorrado.appendChild(opcion)
+    })
+    selectorBorrado.value = mesAEliminar
+    selectorBorrado.addEventListener('change', () => { mesAEliminar = selectorBorrado.value })
+    const rotuloBorrado = elemento('label', ['eliminar-mes-control'])
+    rotuloBorrado.append(elemento('span', [], 'Mes a eliminar'), selectorBorrado)
+
     const borrar = boton('Eliminar mes', async () => {
-      if (!window.confirm(`Se eliminarán todas las planillas y correcciones de asistencia de ${mes}. Esta acción no se puede deshacer.`)) return
+      if (!mesAEliminar) return
+      if (!window.confirm(`Se eliminarán todas las planillas y correcciones de asistencia de ${mesAEliminar}. Esta acción no se puede deshacer.`)) return
       borrar.disabled = true
+      selectorBorrado.disabled = true
       try {
-        await almacen.borrarMes(mes)
+        await almacen.borrarMes(mesAEliminar)
         historia = null
         await cargar()
       } catch (fallo) {
         error = `No se pudo eliminar el mes: ${fallo.message}`
         dibujar()
-      } finally { borrar.disabled = false }
+      } finally {
+        borrar.disabled = false
+        selectorBorrado.disabled = false
+      }
     }, ['boton-peligro'])
     borrar.dataset.accion = 'eliminar-mes'
-    caja.append(png, csv, borrar)
+    caja.append(png, csv, rotuloBorrado, borrar)
     return caja
   }
 

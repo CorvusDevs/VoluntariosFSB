@@ -21,7 +21,7 @@ export function crearPantallaAgenda(raiz, { roster, almacen, alCambiar }) {
     const adelante = boton('›', () => { mes.setMonth(mes.getMonth() + 1); dibujar() }); adelante.setAttribute('aria-label', 'Mes siguiente')
     const titulo = elemento('strong', ['agenda-mes'], new Intl.DateTimeFormat('es-UY', { month: 'long', year: 'numeric' }).format(mes))
     controles.append(atras, titulo, adelante); seccion.appendChild(controles)
-    const eventos = eventosDe(actual)
+    const eventos = eventosDe(actual, new Date(mes.getFullYear(), mes.getMonth(), 1))
     const dias = elemento('div', ['agenda-dias'])
     ;['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'].forEach((dia) => dias.appendChild(elemento('span', ['agenda-dia-semana'], dia)))
     const primero = (mes.getDay() + 6) % 7
@@ -30,15 +30,16 @@ export function crearPantallaAgenda(raiz, { roster, almacen, alCambiar }) {
     for (let dia = 1; dia <= fin; dia += 1) {
       const fecha = `${mes.getFullYear()}-${String(mes.getMonth() + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
       const celda = elemento('div', ['agenda-dia']); celda.appendChild(elemento('span', ['agenda-numero'], String(dia)))
-      eventos.filter((evento) => evento.fecha === fecha).slice(0, 2).forEach((evento) => celda.appendChild(elemento('span', ['agenda-marca', evento.tipo === 'cumpleanos' ? 'cumpleanos' : 'evento'], evento.tipo === 'cumpleanos' ? `Cumple ${evento.persona.nombre}` : evento.titulo)))
+      eventos.filter((evento) => evento.fecha === fecha).slice(0, 2).forEach((evento) => celda.appendChild(elemento('span', ['agenda-marca', evento.tipo === 'cumpleanos' ? 'cumpleanos' : evento.tipo === 'efemeride' ? 'efemeride' : 'evento'], evento.tipo === 'cumpleanos' ? `Cumple ${evento.persona.nombre}` : evento.titulo)))
       dias.appendChild(celda)
     }
     seccion.appendChild(dias)
     const proximos = elemento('section', ['agenda-proximos']); proximos.appendChild(elemento('h3', [], 'Próximas alertas'))
     eventos.filter((evento) => evento.fecha >= new Date().toISOString().slice(0, 10)).slice(0, 8).forEach((evento) => {
       const fila = elemento('div', ['agenda-evento'])
-      fila.append(elemento('strong', [], fechaLocal(evento.fecha)), elemento('span', [], evento.tipo === 'cumpleanos' ? `Cumpleaños de ${evento.persona.nombre}` : evento.titulo))
-      if (evento.tipo !== 'cumpleanos') fila.appendChild(boton('Quitar', async () => { try { await guardar(quitarEvento(actual, evento.id), `Quitar evento: ${evento.titulo}`); error = ''; dibujar() } catch (fallo) { error = fallo.message; dibujar() } }))
+      fila.append(elemento('strong', [], fechaLocal(evento.fecha)), elemento('span', [], evento.tipo === 'cumpleanos' ? `Cumpleaños de ${evento.persona.nombre}, ${evento.rol}` : evento.titulo))
+      if (evento.detalle) fila.appendChild(elemento('span', ['agenda-detalle'], evento.detalle))
+      if (evento.tipo === 'manual') fila.appendChild(boton('Quitar', async () => { try { await guardar(quitarEvento(actual, evento.id), `Quitar evento: ${evento.titulo}`); error = ''; dibujar() } catch (fallo) { error = fallo.message; dibujar() } }))
       proximos.appendChild(fila)
     })
     if (!proximos.querySelector('.agenda-evento')) proximos.appendChild(elemento('p', ['ayuda'], 'Todavía no hay cumpleaños con fecha completa ni eventos próximos.'))

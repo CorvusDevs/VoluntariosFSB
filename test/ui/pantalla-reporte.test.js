@@ -118,6 +118,21 @@ describe('pantalla de reporte', () => {
     expect(raiz.querySelector('[data-accion="descargar-csv"]')).not.toBeNull()
   })
 
+  it('permite elegir el mes que se eliminará antes de confirmar', async () => {
+    deposito.listarListas = vi.fn(async () => [{ fecha: '2026-07-25' }, { fecha: '2026-08-01' }])
+    deposito.borrarMes = vi.fn(async () => {})
+    vi.stubGlobal('confirm', vi.fn(() => true))
+    await abrir()
+    const selector = raiz.querySelector('[data-campo="mes-a-eliminar"]')
+    expect([...selector.options].map((opcion) => opcion.value)).toEqual(['2026-08', '2026-07'])
+    selector.value = '2026-07'
+    selector.dispatchEvent(new Event('change'))
+    raiz.querySelector('[data-accion="eliminar-mes"]').click()
+    await esperar()
+    expect(deposito.borrarMes).toHaveBeenCalledWith('2026-07')
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2026-07'))
+  })
+
   it('cambiar de mes vuelve a leer', async () => {
     await abrir()
     const selector = raiz.querySelector('[data-campo="mes"]')
