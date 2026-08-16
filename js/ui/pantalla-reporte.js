@@ -8,6 +8,7 @@ import { hoyISO } from '../util/fechas.js'
 
 const MARCA = { [VINO]: '✓', [FALTO]: '✗' }
 const diaDe = (fecha) => String(Number(fecha.slice(8, 10)))
+const fechaLocal = (fecha) => new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${fecha}T00:00:00`))
 
 // Las listas se guardan una por fecha, asi que el mes es un prefijo de la clave:
 // no hay indice que consultar ni fecha que parsear.
@@ -30,6 +31,8 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
   let titulos = {}
   let mesesDisponibles = []
   let mesAEliminar = mesInicial
+  let diaAEliminar = ''
+  let confirmacionBorrado = null
   // Voluntarios al costado en vez de abajo. Viene activado porque el reporte se
   // lee de un vistazo en un telefono, y apilarlo todo obliga a seguir con la
   // mirada una columna larguisima.
@@ -50,6 +53,7 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
       mesesDisponibles = [...new Set(claves.map((fecha) => fecha.slice(0, 7)))].sort().reverse()
       if (!mesesDisponibles.includes(mesAEliminar)) mesAEliminar = pedido
       const fechas = delMes(claves, pedido)
+      if (!fechas.includes(diaAEliminar)) diaAEliminar = fechas.at(-1) ?? ''
       const listas = (await Promise.all(fechas.map((f) => almacen.leerLista(f)))).filter(Boolean)
       const archivo = await almacen.leerAsistencias(pedido)
       if (!vivo || mia !== carga) return
@@ -170,26 +174,63 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
     selectorBorrado.addEventListener('change', () => { mesAEliminar = selectorBorrado.value })
     const rotuloBorrado = elemento('label', ['eliminar-mes-control'])
     rotuloBorrado.append(elemento('span', [], 'Mes a eliminar'), selectorBorrado)
+    const selectorDia = document.createElement('select')
+    selectorDia.dataset.campo = 'dia-a-eliminar'
+    historia.fechas.forEach((fecha) => {
+      const opcion = document.createElement('option')
+      opcion.value = fecha
+      opcion.textContent = fechaLocal(fecha)
+      selectorDia.appendChild(opcion)
+    })
+    selectorDia.value = diaAEliminar
+    selectorDia.addEventListener('change', () => { diaAEliminar = selectorDia.value })
+    const rotuloDia = elemento('label', ['eliminar-mes-control'])
+    rotuloDia.append(elemento('span', [], 'Día a eliminar'), selectorDia)
 
-    const borrar = boton('Eliminar mes', async () => {
-      if (!mesAEliminar) return
-      if (!window.confirm(`Se eliminarán todas las planillas y correcciones de asistencia de ${mesAEliminar}. Esta acción no se puede deshacer.`)) return
-      borrar.disabled = true
-      selectorBorrado.disabled = true
+    const pedirBorrado = (tipo, valor) => {
+      if (!valor) return
+      confirmacionBorrado = { tipo, valor, paso: 1 }
+      dibujar()
+    }
+    const borrar = boton('Eliminar mes', () => pedirBorrado('mes', mesAEliminar), ['boton-peligro'])
+    borrar.dataset.accion = 'eliminar-mes'
+    const borrarDia = boton('Eliminar día', () => pedirBorrado('dia', diaAEliminar), ['boton-peligro'])
+    borrarDia.dataset.accion = 'eliminar-dia'
+    caja.append(png, csv, rotuloDia, borrarDia, rotuloBorrado, borrar)
+    return caja
+  }
+
+  function confirmacionDeBorrado() {
+    if (!confirmacionBorrado) return null
+    const { tipo, valor, paso } = confirmacionBorrado
+    const unidad = tipo === 'mes' ? `el mes ${valor} y todas sus planillas` : `la planilla del ${fechaLocal(valor)}`
+    const caja = elemento('section', ['confirmacion-borrado'])
+    caja.dataset.paso = String(paso)
+    caja.appendChild(elemento('strong', [], paso === 1 ? `Primera confirmación: vas a eliminar ${unidad}.` : `Segunda confirmación: ${unidad} se borrará de forma definitiva.`))
+    caja.appendChild(elemento('p', [], paso === 1 ? 'Revisá la selección. Todavía no se borró ningún dato.' : 'Este es el último paso. No se puede deshacer después de confirmar.'))
+    const cancelar = boton('Cancelar', () => { confirmacionBorrado = null; dibujar() })
+    if (paso === 1) {
+      const continuar = boton('Continuar', () => { confirmacionBorrado = { ...confirmacionBorrado, paso: 2 }; dibujar() }, ['boton-peligro'])
+      continuar.dataset.accion = 'continuar-eliminacion'
+      caja.append(cancelar, continuar)
+      return caja
+    }
+    const definitivo = boton('Eliminar definitivamente', async () => {
+      definitivo.disabled = true
+      cancelar.disabled = true
       try {
-        await almacen.borrarMes(mesAEliminar)
+        if (tipo === 'mes') await almacen.borrarMes(valor)
+        else await almacen.borrarDia(valor)
+        confirmacionBorrado = null
         historia = null
         await cargar()
       } catch (fallo) {
-        error = `No se pudo eliminar el mes: ${fallo.message}`
+        error = `No se pudo eliminar ${tipo === 'mes' ? 'el mes' : 'el día'}: ${fallo.message}`
         dibujar()
-      } finally {
-        borrar.disabled = false
-        selectorBorrado.disabled = false
       }
     }, ['boton-peligro'])
-    borrar.dataset.accion = 'eliminar-mes'
-    caja.append(png, csv, rotuloBorrado, borrar)
+    definitivo.dataset.accion = 'confirmar-eliminacion-definitiva'
+    caja.append(cancelar, definitivo)
     return caja
   }
 
@@ -244,6 +285,8 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
       seccion.appendChild(elemento('p', ['ayuda'],
         `${cuantos} ${cuantos === 1 ? 'sábado' : 'sábados'} con planilla. La casilla vacía es "todavía no estaba".`))
       seccion.appendChild(acciones())
+      const confirmacion = confirmacionDeBorrado()
+      if (confirmacion) seccion.appendChild(confirmacion)
     }
     raiz.appendChild(seccion)
   }

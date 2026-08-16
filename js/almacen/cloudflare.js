@@ -58,6 +58,21 @@ export function crearAlmacenCloudflare({ fetchFn } = {}) {
       const asistencias = await leerJson(rutaAsistencias(mes))
       if (asistencias) await borrarJson(rutaAsistencias(mes))
     },
+    async borrarDia(fecha) {
+      const listas = await this.listarListas()
+      const lista = listas.find((registro) => registro.fecha === fecha)
+      if (lista) {
+        revisiones.set(rutaLista(fecha), String(lista.revision))
+        await borrarJson(rutaLista(fecha))
+      }
+      const mes = fecha.slice(0, 7)
+      const asistencias = await leerJson(rutaAsistencias(mes))
+      if (!asistencias) return
+      await guardarJson(rutaAsistencias(mes), {
+        ...asistencias,
+        correcciones: (asistencias.correcciones ?? []).filter((correccion) => correccion.fecha !== fecha),
+      })
+    },
     leerAsistencias: (mes) => leerJson(rutaAsistencias(mes)),
     guardarAsistencias: (mes, datos) => guardarJson(rutaAsistencias(mes), datos),
     leerSeguimientos: () => leerJson('seguimientos.json'),

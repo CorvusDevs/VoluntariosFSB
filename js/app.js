@@ -54,6 +54,7 @@ let alertas = []
 let tendencia = null
 let ocultarEstadoGuardado = null
 let intentoGuardado = 0
+let estadoGuardadoActual = null
 
 function abrirPantalla(destino, contexto = {}) {
   if (!pantallaPermitida(destino, {
@@ -66,20 +67,30 @@ function abrirPantalla(destino, contexto = {}) {
 }
 
 function cambiarEstadoGuardado(estado, mensaje, alReintentar = null) {
+  estadoGuardadoActual = { estado, mensaje, alReintentar }
   const indicador = contenedor.querySelector('[data-estado-guardado]')
-  if (!indicador) return
   if (ocultarEstadoGuardado) clearTimeout(ocultarEstadoGuardado)
+  if (indicador) pintarEstadoGuardado(indicador)
+  if (estado === 'guardado') {
+    ocultarEstadoGuardado = setTimeout(() => {
+      estadoGuardadoActual = null
+      const actual = contenedor.querySelector('[data-estado-guardado]')
+      if (actual) actual.hidden = true
+    }, 1800)
+  }
+}
+
+function pintarEstadoGuardado(indicador) {
+  const actual = estadoGuardadoActual
+  if (!actual) { indicador.hidden = true; return }
   vaciar(indicador)
   indicador.hidden = false
-  indicador.dataset.estado = estado
-  indicador.appendChild(elemento('span', ['estado-guardado-texto'], mensaje))
-  if (alReintentar) {
-    const reintentar = boton('Reintentar', alReintentar, ['boton-reintentar'])
+  indicador.dataset.estado = actual.estado
+  indicador.appendChild(elemento('span', ['estado-guardado-texto'], actual.mensaje))
+  if (actual.alReintentar) {
+    const reintentar = boton('Reintentar', actual.alReintentar, ['boton-reintentar'])
     reintentar.dataset.accion = 'reintentar-guardado'
     indicador.appendChild(reintentar)
-  }
-  if (estado === 'guardado') {
-    ocultarEstadoGuardado = setTimeout(() => { indicador.hidden = true }, 1800)
   }
 }
 
@@ -101,6 +112,19 @@ async function guardarListaConEstado(siguiente, descripcion, confirmacion = null
       })
     }
     return false
+  }
+}
+
+async function guardarRosterConEstado(siguiente, descripcion) {
+  cambiarEstadoGuardado('guardando', 'Guardando cambios de personas…')
+  try {
+    await deposito.guardarRoster(siguiente, descripcion)
+    cambiarEstadoGuardado('guardado', 'Cambios guardados')
+  } catch (fallo) {
+    cambiarEstadoGuardado('error', `No se pudieron guardar los cambios: ${fallo.message}`, () => {
+      guardarRosterConEstado(siguiente, descripcion).catch(() => {})
+    })
+    throw fallo
   }
 }
 
@@ -285,6 +309,7 @@ function dibujar() {
   estadoGuardado.setAttribute('aria-live', 'polite')
   estadoGuardado.hidden = true
   contenedor.appendChild(estadoGuardado)
+  pintarEstadoGuardado(estadoGuardado)
   const cuerpo = elemento('div', ['cuerpo'])
   contenedor.appendChild(cuerpo)
   contenedor.appendChild(sello())
@@ -355,6 +380,7 @@ function dibujar() {
     vista = crearPantallaAgenda(cuerpo, {
       roster,
       almacen: deposito,
+      alGuardar: guardarRosterConEstado,
       alCambiar: async (siguiente) => {
         roster = siguiente
         lista = sincronizarConRoster(lista, roster)
@@ -402,6 +428,7 @@ function dibujar() {
       almacen: deposito,
       esAdmin: esAdmin(sesion),
       busquedaInicial: contextoPantalla.busqueda,
+      alGuardar: guardarRosterConEstado,
       alCambiar: async (siguiente, mudanza) => {
         roster = siguiente
         lista = sincronizarConRoster(lista, roster)

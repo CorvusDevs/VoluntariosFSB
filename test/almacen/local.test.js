@@ -77,6 +77,21 @@ describe('almacen local', () => {
 })
 
 describe('asistencias y seguimientos', () => {
+  it('borra un día y sus correcciones sin tocar los otros días del mes', async () => {
+    await almacen.guardarLista({ ...LISTA, fecha: '2026-08-08' })
+    await almacen.guardarLista({ ...LISTA, fecha: '2026-08-15' })
+    await almacen.guardarAsistencias('2026-08', { version: 1, correcciones: [
+      { fecha: '2026-08-08', persona: 'p1', vino: false },
+      { fecha: '2026-08-15', persona: 'p1', vino: true },
+    ] })
+    await almacen.borrarDia('2026-08-08')
+    expect(await almacen.leerLista('2026-08-08')).toBeNull()
+    expect(await almacen.leerLista('2026-08-15')).not.toBeNull()
+    expect((await almacen.leerAsistencias('2026-08')).correcciones).toEqual([
+      { fecha: '2026-08-15', persona: 'p1', vino: true },
+    ])
+  })
+
   it('guarda y lee las correcciones de un mes', async () => {
     await almacen.guardarAsistencias('2026-08', {
       version: 1,

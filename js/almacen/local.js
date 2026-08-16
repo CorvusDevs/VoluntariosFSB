@@ -82,6 +82,18 @@ export async function crearAlmacenLocal() {
       await operar(db, DEPOSITOS.asistencias, 'readwrite', (d) => d.delete(mes))
     },
 
+    // Un día tiene su propia planilla, pero sus correcciones viven dentro del
+    // archivo mensual. Al borrarlo se limpian ambas cosas para que nunca quede
+    // una corrección huérfana que pudiera reaparecer si se vuelve a crear fecha.
+    async borrarDia(fecha) {
+      await operar(db, DEPOSITOS.listas, 'readwrite', (d) => d.delete(fecha))
+      const mes = String(fecha).slice(0, 7)
+      const asistencias = await operar(db, DEPOSITOS.asistencias, 'readonly', (d) => d.get(mes))
+      if (!asistencias) return
+      const correcciones = (asistencias.correcciones ?? []).filter((correccion) => correccion.fecha !== fecha)
+      await operar(db, DEPOSITOS.asistencias, 'readwrite', (d) => d.put({ ...asistencias, correcciones }, mes))
+    },
+
     // Las correcciones de asistencia van por mes, con la misma clave que usa el
     // almacen remoto para el nombre del archivo.
     async leerAsistencias(mes) {

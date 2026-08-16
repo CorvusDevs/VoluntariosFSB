@@ -59,4 +59,19 @@ describe('almacén Cloudflare', () => {
     ]))
     expect(borrados.map(({ opciones }) => opciones.headers['if-match'])).toEqual(expect.arrayContaining(['7', '9']))
   })
+
+  it('elimina un día y solo sus correcciones', async () => {
+    const llamadas = []
+    const almacen = crearAlmacenCloudflare({ fetchFn: async (url, opciones = {}) => {
+      llamadas.push({ url, opciones })
+      if (url === '/api/listas') return json([{ fecha: '2026-08-15', revision: 7 }])
+      if (url.includes('asistencias%2F2026-08.json') && !opciones.method) return json({ version: 1, correcciones: [{ fecha: '2026-08-15', persona: 'p1', vino: false }] }, 200, { etag: '"9"' })
+      if (opciones.method === 'PUT') return json({ revision: 10 })
+      return new Response(null, { status: 204 })
+    } })
+    await almacen.borrarDia('2026-08-15')
+    expect(llamadas.some(({ url, opciones }) => url.includes('listas%2F2026-08-15.json') && opciones.method === 'DELETE')).toBe(true)
+    const guardado = llamadas.find(({ url, opciones }) => url.includes('asistencias%2F2026-08.json') && opciones.method === 'PUT')
+    expect(JSON.parse(guardado.opciones.body).correcciones).toEqual([])
+  })
 })

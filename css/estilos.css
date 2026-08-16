@@ -71,6 +71,7 @@ body {
 .boton-con-icono svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .boton:disabled { opacity: 0.4; cursor: default; }
 .boton-peligro { border-color: #A51E1A; color: #A51E1A; }
+button, input, select, textarea { font: inherit; }
 
 .encabezado-lista {
   display: flex;
@@ -133,6 +134,15 @@ body {
 .inicio-resultados { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .inicio-resultado { font-size: 14px; }
 .inicio-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.inicio-leyenda { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 8px 0 18px; color: var(--texto-suave); font-size: 13px; }
+.inicio-leyenda strong { color: var(--texto); margin-right: 2px; }
+.leyenda-grupo, .leyenda-voluntario, .leyenda-alerta { display: inline-flex; align-items: center; min-height: 28px; padding: 4px 9px; border-radius: 14px; font-weight: 500; }
+.leyenda-grupo.grupo-1 { background: #E6F7F4; color: var(--turquesa-texto); }
+.leyenda-grupo.grupo-2 { background: #FBEAF0; color: var(--magenta-texto); }
+.leyenda-voluntario { background: #F3EAF7; color: var(--violeta); }
+.leyenda-alerta { background: #FFF5DE; color: #805800; }
+.inicio-vacio { width: 100%; padding: 12px; text-align: left; }
+.inicio-vacio p { margin-top: 0; }
 .inicio-proximos { padding: 16px; border-left: 4px solid var(--turquesa); border-radius: 4px 12px 12px 4px; background: #F1FAF8; }
 .inicio-proximos h3 { margin: 0 0 8px; color: var(--turquesa-texto); }
 .inicio-fecha { margin: 8px 0; font-size: 14px; }
@@ -142,6 +152,9 @@ body {
 .inicio-estado { display: grid; gap: 4px; background: #FAFAFC; font-size: 14px; }
 .inicio-estado strong { color: var(--turquesa-texto); }
 .inicio-tendencia { color: var(--violeta); font-weight: 500; }
+.inicio-semanal { margin-top: 8px; padding-top: 10px; border-top: 1px solid var(--linea); }
+.inicio-semanal h3, .inicio-semanal p { margin: 0 0 5px; }
+.inicio-semanal h3 { color: var(--violeta); font-size: 14px; }
 .seccion { padding: 16px; }
 .seccion h2 { font-size: 18px; font-weight: 500; }
 .formulario { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
@@ -993,6 +1006,20 @@ html, body { max-width: 100%; overflow-x: hidden; }
   font: inherit;
   font-size: 15px;
 }
+.confirmacion-borrado {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid #EAB0C9;
+  border-left: 4px solid #A51E1A;
+  border-radius: 12px;
+  background: #FDF5F7;
+}
+.confirmacion-borrado strong, .confirmacion-borrado p { flex: 1 1 100%; margin: 0; }
+.confirmacion-borrado p { color: var(--texto-suave); font-size: 14px; }
 
 /* Corrección de asistencia. Filas anchas y tocables: se usan de a muchas
    seguidas y con el telefono en la mano. */
@@ -1128,6 +1155,15 @@ select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid rgba(102, 45, 125, .32);
   outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @media (max-width: 899px) {

@@ -118,10 +118,9 @@ describe('pantalla de reporte', () => {
     expect(raiz.querySelector('[data-accion="descargar-csv"]')).not.toBeNull()
   })
 
-  it('permite elegir el mes que se eliminará antes de confirmar', async () => {
+  it('permite elegir el mes y exige dos confirmaciones antes de eliminarlo', async () => {
     deposito.listarListas = vi.fn(async () => [{ fecha: '2026-07-25' }, { fecha: '2026-08-01' }])
     deposito.borrarMes = vi.fn(async () => {})
-    vi.stubGlobal('confirm', vi.fn(() => true))
     await abrir()
     const selector = raiz.querySelector('[data-campo="mes-a-eliminar"]')
     expect([...selector.options].map((opcion) => opcion.value)).toEqual(['2026-08', '2026-07'])
@@ -129,8 +128,26 @@ describe('pantalla de reporte', () => {
     selector.dispatchEvent(new Event('change'))
     raiz.querySelector('[data-accion="eliminar-mes"]').click()
     await esperar()
+    expect(raiz.querySelector('[data-paso="1"]')).not.toBeNull()
+    expect(deposito.borrarMes).not.toHaveBeenCalled()
+    raiz.querySelector('[data-accion="continuar-eliminacion"]').click()
+    raiz.querySelector('[data-accion="confirmar-eliminacion-definitiva"]').click()
+    await esperar()
     expect(deposito.borrarMes).toHaveBeenCalledWith('2026-07')
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2026-07'))
+  })
+
+  it('permite elegir un día y exige dos confirmaciones antes de eliminarlo', async () => {
+    deposito.borrarDia = vi.fn(async () => {})
+    await abrir()
+    const selector = raiz.querySelector('[data-campo="dia-a-eliminar"]')
+    selector.value = '2026-08-01'
+    selector.dispatchEvent(new Event('change'))
+    raiz.querySelector('[data-accion="eliminar-dia"]').click()
+    expect(raiz.querySelector('[data-paso="1"]')).not.toBeNull()
+    raiz.querySelector('[data-accion="continuar-eliminacion"]').click()
+    raiz.querySelector('[data-accion="confirmar-eliminacion-definitiva"]').click()
+    await esperar()
+    expect(deposito.borrarDia).toHaveBeenCalledWith('2026-08-01')
   })
 
   it('cambiar de mes vuelve a leer', async () => {

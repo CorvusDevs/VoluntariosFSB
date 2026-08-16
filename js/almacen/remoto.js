@@ -89,6 +89,27 @@ export function crearAlmacenRemoto({ cliente, autor = 'la aplicación' }) {
       if (asistencia) await cliente.borrar(rutaAsistencias(mes), asistencia.sha, `Borrar asistencias de ${mes} · ${autor}`)
     },
 
+    async borrarDia(fecha) {
+      await asegurarAcceso()
+      const ruta = rutaLista(fecha)
+      let sha = shas.get(ruta)
+      if (!sha) {
+        const actual = await cliente.leerTexto(ruta)
+        if (!actual) return
+        sha = actual.sha
+        shas.set(ruta, sha)
+      }
+      await cliente.borrar(ruta, sha, `Borrar planilla de ${fecha} · ${autor}`)
+      shas.delete(ruta)
+      const mes = fecha.slice(0, 7)
+      const asistencia = await leerJson(rutaAsistencias(mes))
+      if (!asistencia) return
+      await escribirJson(rutaAsistencias(mes), {
+        ...asistencia,
+        correcciones: (asistencia.correcciones ?? []).filter((correccion) => correccion.fecha !== fecha),
+      }, `Quitar correcciones del ${fecha} · ${autor}`)
+    },
+
     // Correcciones de asistencia, un archivo por mes. Guarda solo las
     // diferencias contra lo que dice la planilla, asi que el archivo que no
     // existe significa "la planilla tenia razon", que es el caso normal.

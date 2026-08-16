@@ -3,12 +3,13 @@ import { agendaDe, eventosDe, agregarEvento, quitarEvento, PLANTILLAS_DE_EVENTO,
 
 const fechaLocal = (fecha) => new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long' }).format(new Date(`${fecha}T00:00:00`))
 
-export function crearPantallaAgenda(raiz, { roster, almacen, alCambiar }) {
+export function crearPantallaAgenda(raiz, { roster, almacen, alCambiar, alGuardar = null }) {
   let actual = roster
   let mes = new Date(); mes.setDate(1)
   let error = ''
   async function guardar(siguiente, descripcion) {
-    await almacen.guardarRoster(siguiente, descripcion)
+    if (alGuardar) await alGuardar(siguiente, descripcion)
+    else await almacen.guardarRoster(siguiente, descripcion)
     actual = siguiente
     await alCambiar(actual)
   }

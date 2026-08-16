@@ -10,10 +10,28 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
     caja.replaceChildren()
     const consulta = texto.trim()
     if (!consulta) return
+    const destinos = [
+      ['Armar lista', 'lista', 'Preparar la jornada'],
+      ['Tomar asistencia', 'asistencias', 'Corregir asistencias'],
+      ['Agenda', 'agenda', 'Fechas y alertas'],
+      ['Personas', 'personas', 'Perfiles y fotos'],
+      ['Reporte', 'reporte', 'Ver asistencia mensual'],
+      ['Vista previa', 'vista-previa', 'Revisar o descargar la planilla'],
+    ].filter(([etiqueta, , detalle]) => coincide(`${etiqueta} ${detalle}`, consulta))
+    destinos.forEach(([etiqueta, destino, detalle]) => {
+      const resultado = boton(`${etiqueta}: ${detalle}`, () => alIrA(destino))
+      resultado.classList.add('inicio-resultado', 'inicio-resultado-destino')
+      caja.appendChild(resultado)
+    })
     const personas = [...roster.participantes, ...roster.voluntarios]
       .filter((persona) => persona.activo !== false && coincide(persona.nombre, consulta)).slice(0, 6)
-    if (!personas.length) {
-      caja.appendChild(elemento('p', ['ayuda'], 'No encontramos personas con ese nombre.'))
+    if (!personas.length && !destinos.length) {
+      const vacio = elemento('div', ['estado-vacio', 'inicio-vacio'])
+      vacio.append(
+        elemento('p', [], 'No encontramos una persona, sección ni fecha con ese nombre.'),
+        boton('Ver Personas', () => alIrA('personas')),
+      )
+      caja.appendChild(vacio)
       return
     }
     personas.forEach((persona) => {
@@ -38,7 +56,7 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
   seccion.appendChild(resumen)
 
   const buscar = document.createElement('input')
-  buscar.type = 'search'; buscar.className = 'inicio-buscar'; buscar.placeholder = 'Buscar persona, grupo o voluntario'; buscar.setAttribute('aria-label', 'Buscar persona en toda la organización')
+  buscar.type = 'search'; buscar.className = 'inicio-buscar'; buscar.placeholder = 'Buscar persona, sección o próxima fecha'; buscar.setAttribute('aria-label', 'Buscar en toda la organización')
   const resultados = elemento('div', ['inicio-resultados'])
   buscar.addEventListener('input', () => dibujarResultados(resultados, buscar.value))
   seccion.append(buscar, resultados)
@@ -51,6 +69,16 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
     boton('Personas', () => alIrA('personas')),
   )
   seccion.appendChild(acciones)
+
+  const leyenda = elemento('section', ['inicio-leyenda'])
+  leyenda.append(
+    elemento('strong', [], 'Guía rápida'),
+    elemento('span', ['leyenda-grupo', 'grupo-1'], 'Grupo 1'),
+    elemento('span', ['leyenda-grupo', 'grupo-2'], 'Grupo 2'),
+    elemento('span', ['leyenda-voluntario'], 'Voluntariado'),
+    elemento('span', ['leyenda-alerta'], 'Alerta o fecha importante'),
+  )
+  seccion.appendChild(leyenda)
 
   const trabajo = elemento('section', ['inicio-trabajo'])
   trabajo.appendChild(elemento('h3', [], 'Atención de coordinación'))
@@ -66,8 +94,12 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
 
   const estado = elemento('section', ['inicio-estado'])
   const enLinea = typeof navigator === 'undefined' || navigator.onLine !== false
-  estado.append(elemento('strong', [], enLinea ? 'Conexión disponible' : 'Sin conexión'), elemento('span', [], enLinea ? 'Los cambios se guardan de forma segura al confirmar.' : 'Revisá la conexión antes de guardar cambios.'))
-  if (tendencia?.texto) estado.appendChild(elemento('span', ['inicio-tendencia'], tendencia.texto))
+  estado.append(elemento('strong', [], enLinea ? 'Listo para guardar' : 'Sin conexión'), elemento('span', [], enLinea ? 'Los cambios confirman su estado arriba de la pantalla.' : 'Los cambios no se guardarán hasta recuperar la conexión.'))
+  const resumenSemanal = elemento('section', ['inicio-semanal'])
+  resumenSemanal.appendChild(elemento('h3', [], 'Resumen de la semana'))
+  resumenSemanal.appendChild(elemento('p', [], tendencia?.texto ?? 'Todavía no hay jornadas registradas para calcular asistencia.'))
+  resumenSemanal.appendChild(elemento('p', [], alertas.length ? `${alertas.length} alerta${alertas.length === 1 ? '' : 's'} a revisar antes de la próxima jornada.` : 'No hay alertas de asistencia pendientes.'))
+  estado.appendChild(resumenSemanal)
   seccion.appendChild(estado)
 
   const proximos = elemento('section', ['inicio-proximos'])
