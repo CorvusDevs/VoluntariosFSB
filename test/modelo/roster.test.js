@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   rosterVacio, agregarParticipante, agregarVoluntario,
-  editarPersona, desactivarPersona, activos, buscarPersonas,
+  editarPersona, desactivarPersona, activos, buscarPersonas, posiblesDuplicados, perfilesIncompletos,
 } from '../../js/modelo/roster.js'
 import { edadDesdeAnio, fechaPerfil, perfilDe } from '../../js/modelo/perfil.js'
 
@@ -128,5 +128,18 @@ describe('perfil personal', () => {
     expect(edadDesdeAnio('2014', new Date('2026-08-15'))).toBe(12)
     expect(edadDesdeAnio('', new Date('2026-08-15'))).toBeNull()
     expect(fechaPerfil('2023-03-15')).toContain('2023')
+  })
+})
+
+describe('control operativo de datos', () => {
+  it('encuentra duplicados ignorando tildes y espacios', () => {
+    let roster = agregarParticipante(rosterVacio(), { nombre: 'María Pérez', grupo: 1 })
+    roster = agregarVoluntario(roster, { nombre: 'Maria  Perez' })
+    expect(posiblesDuplicados(roster)).toHaveLength(1)
+  })
+
+  it('señala perfiles sin fecha de nacimiento o de ingreso', () => {
+    const roster = agregarParticipante(rosterVacio(), { nombre: 'Ana', grupo: 1, perfil: { anioNacimiento: '2015-06-01' } })
+    expect(perfilesIncompletos(roster).map((persona) => persona.nombre)).toEqual(['Ana'])
   })
 })

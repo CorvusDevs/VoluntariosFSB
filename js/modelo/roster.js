@@ -90,3 +90,28 @@ export function activos(gente) {
 export function buscarPersonas(gente, busqueda) {
   return ordenarPorNombre(gente.filter((p) => coincide(p.nombre, busqueda)))
 }
+
+const claveNombre = (nombre) => String(nombre ?? '').normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase()
+
+export function posiblesDuplicados(roster) {
+  const porNombre = new Map()
+  ;[...(roster.participantes ?? []), ...(roster.voluntarios ?? [])]
+    .filter((persona) => persona.activo !== false)
+    .forEach((persona) => {
+      const clave = claveNombre(persona.nombre)
+      if (!clave) return
+      porNombre.set(clave, [...(porNombre.get(clave) ?? []), persona])
+    })
+  return [...porNombre.values()].filter((personas) => personas.length > 1)
+}
+
+export function perfilesIncompletos(roster) {
+  return [...(roster.participantes ?? []), ...(roster.voluntarios ?? [])]
+    .filter((persona) => persona.activo !== false)
+    .filter((persona) => {
+      const perfil = persona.perfil ?? {}
+      return !/^\d{4}-\d{2}-\d{2}$/.test(String(perfil.anioNacimiento ?? ''))
+        || !/^\d{4}-\d{2}-\d{2}$/.test(String(perfil.desde ?? ''))
+    })
+}

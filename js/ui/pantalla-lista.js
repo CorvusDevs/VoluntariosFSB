@@ -7,7 +7,7 @@ import {
 import { crearPila } from '../modelo/deshacer.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 
-export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFecha, franja = null }) {
+export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFecha, alRecuperarAnterior, franja = null }) {
   const pila = crearPila(lista)
   let seleccionado = null
   // Cuando se esta eligiendo el apoyo de un grupo, guarda su numero. Reusa el
@@ -155,6 +155,17 @@ export function crearPantallaLista(raiz, { lista, roster, alCambiar, alCambiarFe
     rehacer.disabled = !pila.sePuedeRehacer()
 
     barra.append(deshacer, rehacer)
+    if (alRecuperarAnterior) {
+      const recuperar = boton('Usar la jornada anterior', async () => {
+        const anterior = await alRecuperarAnterior()
+        if (!anterior) return
+        pila.registrar(anterior)
+        alCambiar(anterior, 'Recuperar asignaciones de la jornada anterior', 'Asignaciones recuperadas')
+        dibujar()
+      })
+      recuperar.dataset.accion = 'recuperar-jornada-anterior'
+      barra.appendChild(recuperar)
+    }
     return barra
   }
 

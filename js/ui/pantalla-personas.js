@@ -1,4 +1,4 @@
-import { elemento, boton, vaciar } from './componentes.js'
+import { elemento, boton, vaciar, agregarIcono } from './componentes.js'
 import { activos, agregarParticipante, agregarVoluntario, desactivarPersona, editarPersona } from '../modelo/roster.js'
 import { crearEditorDeFoto } from './editor-foto.js'
 
@@ -49,6 +49,7 @@ function crearPantallaPersonasLegado(raiz, { roster, almacen, alCambiar }) {
     enviar.type = 'submit'
     enviar.className = 'boton'
     enviar.textContent = 'Agregar'
+    agregarIcono(enviar, 'sumar')
     caja.appendChild(enviar)
 
     caja.addEventListener('submit', async (evento) => {

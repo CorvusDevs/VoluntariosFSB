@@ -60,6 +60,17 @@ export function crearLista(fecha, roster, base = {}) {
   }
 }
 
+// Recupera las decisiones de una jornada anterior sin reutilizar su fecha. Es
+// útil cuando hay una secuencia de sábados parecidos, pero no toca la lista que
+// ya estaba guardada ni inventa asistencia de una fecha nueva.
+export function duplicarListaParaFecha(origen, fecha) {
+  return {
+    ...structuredClone(origen),
+    fecha,
+    ausentes: [],
+  }
+}
+
 function ubicar(lista, participanteId) {
   for (let g = 0; g < lista.grupos.length; g += 1) {
     const f = lista.grupos[g].filas.findIndex((fila) => fila.participantes.includes(participanteId))

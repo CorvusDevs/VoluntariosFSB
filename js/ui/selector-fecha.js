@@ -32,7 +32,10 @@ export function crearSelectorFecha({ clave, rotulo, valor = '', max = '' }) {
   panel.hidden = true
   const limite = fechaDe(max) ?? new Date(2999, 11, 31)
   let vista = fechaDe(valor) ?? new Date(Math.min(new Date().getTime(), limite.getTime()))
-  const refrescarTexto = () => { const fecha = fechaDe(entrada.value); disparador.textContent = fecha ? textoFecha(fecha) : 'Elegir fecha' }
+  const refrescarTexto = () => {
+    const fecha = fechaDe(entrada.value)
+    disparador.replaceChildren(icono('agenda'), document.createTextNode(fecha ? textoFecha(fecha) : 'Elegir fecha'))
+  }
   const cerrar = () => { panel.hidden = true; disparador.setAttribute('aria-expanded', 'false') }
   const abrir = () => { panel.hidden = false; disparador.setAttribute('aria-expanded', 'true'); renderizar() }
   const renderizar = () => {
@@ -40,7 +43,7 @@ export function crearSelectorFecha({ clave, rotulo, valor = '', max = '' }) {
     const cabecera = document.createElement('div')
     cabecera.className = 'selector-fecha-cabecera'
     const anterior = document.createElement('button')
-    anterior.type = 'button'; anterior.className = 'selector-fecha-navegar'; anterior.textContent = '‹'; anterior.setAttribute('aria-label', 'Mes anterior')
+    anterior.type = 'button'; anterior.className = 'selector-fecha-navegar'; anterior.appendChild(icono('atras')); anterior.setAttribute('aria-label', 'Mes anterior')
     anterior.addEventListener('click', () => { vista = new Date(vista.getFullYear(), vista.getMonth() - 1, 1); renderizar() })
     const mes = document.createElement('select')
     mes.className = 'selector-fecha-mes'; mes.setAttribute('aria-label', 'Mes')
@@ -53,7 +56,7 @@ export function crearSelectorFecha({ clave, rotulo, valor = '', max = '' }) {
     anio.value = String(vista.getFullYear())
     anio.addEventListener('change', () => { vista = new Date(Number(anio.value), vista.getMonth(), 1); renderizar() })
     const siguiente = document.createElement('button')
-    siguiente.type = 'button'; siguiente.className = 'selector-fecha-navegar'; siguiente.textContent = '›'; siguiente.setAttribute('aria-label', 'Mes siguiente')
+    siguiente.type = 'button'; siguiente.className = 'selector-fecha-navegar'; siguiente.appendChild(icono('adelante')); siguiente.setAttribute('aria-label', 'Mes siguiente')
     siguiente.disabled = vista.getFullYear() === limite.getFullYear() && vista.getMonth() >= limite.getMonth()
     siguiente.addEventListener('click', () => { vista = new Date(vista.getFullYear(), vista.getMonth() + 1, 1); renderizar() })
     cabecera.append(anterior, mes, anio, siguiente)
@@ -83,3 +86,4 @@ export function crearSelectorFecha({ clave, rotulo, valor = '', max = '' }) {
   campo.append(titulo, entrada, disparador, panel)
   return { campo, entrada }
 }
+import { icono } from './componentes.js'

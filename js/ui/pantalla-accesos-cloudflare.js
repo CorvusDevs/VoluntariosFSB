@@ -1,6 +1,9 @@
 import { boton, elemento, vaciar } from './componentes.js'
 
 const ROLES = { admin: 'Administradora', coordinacion: 'Coordinadora' }
+const PERMISOS = [
+  ['planilla', 'Armar y ver planillas'], ['personas', 'Gestionar personas'], ['asistencias', 'Tomar asistencias'], ['reportes', 'Ver reportes'], ['agenda', 'Usar agenda'],
+]
 
 async function pedir(url, opciones = {}) {
   const respuesta = await fetch(url, {
@@ -49,11 +52,20 @@ export function crearPantallaAccesosCloudflare(raiz, { sesion }) {
       rol.appendChild(opcion)
     })
     rol.value = 'coordinacion'
+    const permisos = document.createElement('fieldset')
+    permisos.className = 'permisos-acceso'
+    permisos.appendChild(elemento('legend', [], 'Secciones permitidas'))
+    const casillas = PERMISOS.map(([valor, etiqueta]) => {
+      const entrada = document.createElement('input'); entrada.type = 'checkbox'; entrada.value = valor; entrada.checked = true
+      const rotulo = elemento('label', [], ''); rotulo.append(entrada, document.createTextNode(` ${etiqueta}`)); permisos.appendChild(rotulo)
+      return entrada
+    })
+    rol.addEventListener('change', () => { permisos.hidden = rol.value === 'admin' })
     const enviar = boton('Dar acceso', async () => {
       enviar.disabled = true
       try {
         contrasenaNueva = await pedir('/api/usuarios', {
-          method: 'POST', body: JSON.stringify({ nombre: nombre.value, usuario: usuario.value, rol: rol.value }),
+          method: 'POST', body: JSON.stringify({ nombre: nombre.value, usuario: usuario.value, rol: rol.value, permisos: casillas.filter((casilla) => casilla.checked).map((casilla) => casilla.value) }),
         })
         await cargar()
       } catch (fallo) {
@@ -64,7 +76,7 @@ export function crearPantallaAccesosCloudflare(raiz, { sesion }) {
     enviar.type = 'submit'
     const forma = document.createElement('form')
     forma.className = 'formulario-agregar'
-    forma.append(nombre, usuario, rol, enviar)
+    forma.append(nombre, usuario, rol, permisos, enviar)
     forma.addEventListener('submit', (evento) => {
       evento.preventDefault()
       enviar.click()
@@ -97,6 +109,25 @@ export function crearPantallaAccesosCloudflare(raiz, { sesion }) {
         elemento('strong', [], usuario.nombre),
         elemento('span', ['ayuda-ajustes'], `${usuario.correo} · ${ROLES[usuario.rol]}`),
       )
+      if (usuario.rol === 'coordinacion') {
+        const permisos = document.createElement('details')
+        permisos.className = 'permisos-editar'
+        permisos.appendChild(elemento('summary', [], 'Permisos'))
+        const seleccion = new Set(Array.isArray(usuario.permisos) ? usuario.permisos : PERMISOS.map(([valor]) => valor))
+        const casillas = PERMISOS.map(([valor, etiqueta]) => {
+          const entrada = document.createElement('input'); entrada.type = 'checkbox'; entrada.value = valor; entrada.checked = seleccion.has(valor)
+          const rotulo = elemento('label', [], ''); rotulo.append(entrada, document.createTextNode(` ${etiqueta}`)); permisos.appendChild(rotulo)
+          return entrada
+        })
+        const guardar = boton('Guardar permisos', async () => {
+          try {
+            await pedir('/api/usuarios', { method: 'PATCH', body: JSON.stringify({ correo: usuario.correo, permisos: casillas.filter((casilla) => casilla.checked).map((casilla) => casilla.value) }) })
+            await cargar()
+          } catch (fallo) { error = fallo.message; dibujar() }
+        })
+        permisos.appendChild(guardar)
+        fila.appendChild(permisos)
+      }
       if (usuario.correo !== sesion.correo) {
         const quitar = boton('Quitar acceso', async () => {
           try {

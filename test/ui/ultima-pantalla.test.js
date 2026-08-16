@@ -31,6 +31,15 @@ describe('ultima pantalla', () => {
     expect(pantallaPermitida('ajustes', { admin: true })).toBe(true)
   })
 
+  it('respeta los permisos operativos de cada seccion', () => {
+    const permisos = ['planilla', 'agenda']
+    expect(pantallaPermitida('lista', { permisos })).toBe(true)
+    expect(pantallaPermitida('vista-previa', { permisos })).toBe(true)
+    expect(pantallaPermitida('agenda', { permisos })).toBe(true)
+    expect(pantallaPermitida('personas', { permisos })).toBe(false)
+    expect(pantallaPermitida('asistencias', { permisos })).toBe(false)
+  })
+
   it('ignora un valor corrupto o un almacenamiento no disponible', () => {
     const falla = { getItem: () => { throw new Error('sin acceso') } }
     expect(leerUltimaPantalla(falla)).toBe('lista')

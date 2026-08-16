@@ -85,9 +85,9 @@ async function sesionDe(contexto) {
   const firmada = await leerSesionFirmada(cookies(contexto.request).vfsb_sesion, contexto.env.SESSION_SECRET)
   if (!firmada) return null
   const cuenta = await contexto.env.BASE.prepare(
-    'SELECT correo, nombre, rol, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
+    'SELECT correo, nombre, rol, permisos, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
   ).bind(firmada.usuario).first()
-  return cuenta?.version_sesion === firmada.version ? cuenta : null
+  return cuenta?.version_sesion === firmada.version ? exponerCuenta(cuenta) : null
 }
 
 async function registrar(base, sesion, accion, recurso, detalle = null) {
@@ -97,6 +97,79 @@ async function registrar(base, sesion, accion, recurso, detalle = null) {
 }
 
 const esAdmin = (sesion) => sesion.rol === 'admin'
+const PERMISOS = ['planilla', 'personas', 'asistencias', 'reportes', 'agenda']
+
+function permisosDe(cuenta) {
+  if (cuenta?.rol === 'admin' || !cuenta?.permisos) return PERMISOS
+  if (Array.isArray(cuenta.permisos)) return cuenta.permisos.filter((permiso) => PERMISOS.includes(permiso))
+  try {
+    const permisos = JSON.parse(cuenta.permisos)
+    return Array.isArray(permisos) ? permisos.filter((permiso) => PERMISOS.includes(permiso)) : PERMISOS
+  } catch { return PERMISOS }
+}
+
+function exponerCuenta(cuenta) {
+  return { ...cuenta, permisos: permisosDe(cuenta) }
+}
+
+export function tienePermiso(sesion, requisitos) {
+  const necesarios = Array.isArray(requisitos) ? requisitos : [requisitos]
+  return necesarios.some((permiso) => permisosDe(sesion).includes(permiso))
+}
+
+function permisosParaDocumento(ruta) {
+  if (ruta === 'roster.json') return ['personas', 'agenda']
+  if (/^listas\//.test(ruta)) return ['planilla']
+  if (/^asistencias\//.test(ruta) || ruta === 'seguimientos.json') return ['asistencias']
+  return []
+}
+
+function fechaValida(fecha) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(fecha ?? '')) && !Number.isNaN(new Date(`${fecha}T00:00:00`).getTime())
+}
+
+function personaPublica(persona) {
+  const { id, nombre, grupo, nuevo, foto, activo } = persona ?? {}
+  return { id, nombre, ...(grupo ? { grupo } : {}), nuevo: Boolean(nuevo), foto: foto ?? null, activo: activo !== false }
+}
+
+export function cumpleanosParaAgenda(roster, hoy = new Date(), dias = 45) {
+  const inicio = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  const personas = [
+    ...(roster?.participantes ?? []).map((persona) => ({ persona, rol: 'participante' })),
+    ...(roster?.voluntarios ?? []).map((persona) => ({ persona, rol: 'voluntario' })),
+  ]
+  return personas
+    .filter(({ persona }) => persona.activo !== false && fechaValida(persona.perfil?.anioNacimiento))
+    .map(({ persona, rol }) => {
+      const nacimiento = new Date(`${persona.perfil.anioNacimiento}T00:00:00`)
+      const fecha = new Date(inicio.getFullYear(), nacimiento.getMonth(), nacimiento.getDate())
+      if (fecha < inicio) fecha.setFullYear(fecha.getFullYear() + 1)
+      return { tipo: 'cumpleanos', id: `cumple-${persona.id}-${fecha.getFullYear()}`, fecha: fecha.toISOString().slice(0, 10), persona: personaPublica(persona), rol }
+    })
+    .filter((evento) => (new Date(`${evento.fecha}T00:00:00`) - inicio) / 86400000 <= dias)
+    .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.persona.nombre.localeCompare(b.persona.nombre, 'es'))
+}
+
+export function rosterParaSesion(roster, sesion, hoy = new Date()) {
+  if (tienePermiso(sesion, 'personas')) return roster
+  return {
+    ...roster,
+    participantes: (roster?.participantes ?? []).map(personaPublica),
+    voluntarios: (roster?.voluntarios ?? []).map(personaPublica),
+    // La agenda se puede recorrer mes a mes. Mandamos un ciclo anual de avisos,
+    // nunca las fechas de nacimiento ni el resto del perfil.
+    cumpleanosAgenda: cumpleanosParaAgenda(roster, hoy, 400),
+  }
+}
+
+export function preservarRosterParaAgenda(actual, solicitado) {
+  const agenda = solicitado?.agenda
+  return {
+    ...actual,
+    agenda: agenda && typeof agenda === 'object' && !Array.isArray(agenda) ? agenda : actual?.agenda,
+  }
+}
 
 function usuarioValido(usuario) {
   return /^[a-z0-9][a-z0-9._@-]{2,63}$/i.test(usuario)
@@ -110,7 +183,7 @@ async function ingresar(contexto) {
   const contrasena = String(datos.contrasena || '')
   if (!usuario || !contrasena) return error('Usuario o contraseña incorrectos.', 401)
   const cuenta = await contexto.env.BASE.prepare(`
-    SELECT correo, nombre, rol, sal, hash_contrasena, version_sesion
+    SELECT correo, nombre, rol, permisos, sal, hash_contrasena, version_sesion
     FROM usuarios WHERE correo = ?1 AND activo = 1
   `).bind(usuario).first()
   const correcta = cuenta?.sal && cuenta?.hash_contrasena
@@ -119,7 +192,7 @@ async function ingresar(contexto) {
   const expira = Math.floor(Date.now() / 1000) + DURACION_SESION
   const token = await firmarSesion({ usuario: cuenta.correo, version: cuenta.version_sesion, expira }, contexto.env.SESSION_SECRET)
   await registrar(contexto.env.BASE, cuenta, 'ingresar', 'sesion')
-  return responder({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol }, 200, {
+  return responder(exponerCuenta({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol, permisos: cuenta.permisos }), 200, {
     'set-cookie': cookieSesion(token),
   })
 }
@@ -133,9 +206,9 @@ async function usuarios(contexto, sesion) {
   const { request, env } = contexto
   if (request.method === 'GET') {
     const filas = await env.BASE.prepare(
-      'SELECT correo, nombre, rol FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
+      'SELECT correo, nombre, rol, permisos FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
     ).all()
-    return responder({ usuarios: filas.results })
+    return responder({ usuarios: filas.results.map(exponerCuenta) })
   }
   if (request.method === 'POST') {
     let datos
@@ -143,6 +216,7 @@ async function usuarios(contexto, sesion) {
     const correo = String(datos.usuario || '').trim().toLowerCase()
     const nombre = String(datos.nombre || '').trim()
     const rol = datos.rol
+    const permisos = Array.isArray(datos.permisos) ? datos.permisos.filter((permiso) => PERMISOS.includes(permiso)) : PERMISOS
     if (!usuarioValido(correo) || !nombre || !['admin', 'coordinacion'].includes(rol)) {
       return error('Completá nombre, usuario y un rol válido.', 400)
     }
@@ -150,12 +224,24 @@ async function usuarios(contexto, sesion) {
     const sal = crypto.getRandomValues(new Uint8Array(16))
     const hash = await derivarContrasena(contrasena, sal)
     const creada = await env.BASE.prepare(`
-      INSERT INTO usuarios (correo, nombre, rol, activo, sal, hash_contrasena, version_sesion)
-      VALUES (?1, ?2, ?3, 1, ?4, ?5, 0)
-    `).bind(correo, nombre, rol, sal, hash).run().catch(() => null)
+      INSERT INTO usuarios (correo, nombre, rol, permisos, activo, sal, hash_contrasena, version_sesion)
+      VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, 0)
+    `).bind(correo, nombre, rol, rol === 'admin' ? null : JSON.stringify(permisos), sal, hash).run().catch(() => null)
     if (!creada) return error('Ese usuario ya existe.', 409)
     await registrar(env.BASE, sesion, 'dar acceso', correo, rol)
-    return responder({ usuario: correo, correo, nombre, rol, contrasena }, 201)
+    return responder({ usuario: correo, correo, nombre, rol, permisos: rol === 'admin' ? PERMISOS : permisos, contrasena }, 201)
+  }
+  if (request.method === 'PATCH') {
+    let datos
+    try { datos = await request.json() } catch { return error('Los permisos no son válidos.', 400) }
+    const correo = String(datos.correo || '').trim().toLowerCase()
+    const permisos = Array.isArray(datos.permisos) ? datos.permisos.filter((permiso) => PERMISOS.includes(permiso)) : null
+    const objetivo = await env.BASE.prepare('SELECT rol FROM usuarios WHERE correo = ?1 AND activo = 1').bind(correo).first()
+    if (!objetivo) return error('No encontramos ese acceso.', 404)
+    if (objetivo.rol === 'admin' || !permisos) return error('Solo se ajustan permisos de coordinación.', 400)
+    await env.BASE.prepare('UPDATE usuarios SET permisos = ?1 WHERE correo = ?2').bind(JSON.stringify(permisos), correo).run()
+    await registrar(env.BASE, sesion, 'cambiar permisos', correo, permisos.join(','))
+    return responder({ actualizada: true, permisos })
   }
   if (request.method === 'DELETE') {
     const correo = String(new URL(request.url).searchParams.get('correo') || '').trim().toLowerCase()
@@ -188,13 +274,17 @@ async function documento(contexto, sesion) {
   const { request, env } = contexto
   const ruta = rutaDocumento(request.url)
   if (!rutaPermitida(ruta)) return error('La ruta de datos no es válida.', 400)
+  if (request.method !== 'GET' && !tienePermiso(sesion, permisosParaDocumento(ruta))) {
+    return error('Tu cuenta no puede modificar estos datos.', 403)
+  }
 
   if (request.method === 'GET') {
     const fila = await env.BASE.prepare(
       'SELECT contenido, revision, actualizado_por, actualizado_en FROM documentos WHERE ruta = ?1',
     ).bind(ruta).first()
     if (!fila) return error('No se encontró el documento.', 404)
-    return responder(JSON.parse(fila.contenido), 200, { etag: `"${fila.revision}"` })
+    const contenido = JSON.parse(fila.contenido)
+    return responder(ruta === 'roster.json' ? rosterParaSesion(contenido, sesion) : contenido, 200, { etag: `"${fila.revision}"` })
   }
 
   if (request.method === 'DELETE') {
@@ -222,6 +312,13 @@ async function documento(contexto, sesion) {
     return error('Los datos cambiaron antes de poder guardarlos. Recargá.', 409)
   }
 
+  if (ruta === 'roster.json' && !tienePermiso(sesion, 'personas')) {
+    const guardado = actual
+      ? JSON.parse((await env.BASE.prepare('SELECT contenido FROM documentos WHERE ruta = ?1').bind(ruta).first()).contenido)
+      : { version: 1, participantes: [], voluntarios: [] }
+    contenido = preservarRosterParaAgenda(guardado, contenido)
+  }
+
   const revision = (actual?.revision ?? 0) + 1
   await env.BASE.prepare(`
     INSERT INTO documentos (ruta, contenido, revision, actualizado_por, actualizado_en)
@@ -236,7 +333,10 @@ async function documento(contexto, sesion) {
   return responder({ revision }, 200, { etag: `"${revision}"` })
 }
 
-async function listas(contexto) {
+async function listas(contexto, sesion) {
+  if (!tienePermiso(sesion, ['planilla', 'asistencias', 'reportes'])) {
+    return error('Tu cuenta no puede ver las planillas.', 403)
+  }
   const filas = await contexto.env.BASE.prepare(`
     SELECT ruta, revision FROM documentos
     WHERE ruta LIKE 'listas/%.json'
@@ -252,6 +352,9 @@ async function foto(contexto, sesion) {
   const { request, env } = contexto
   const clave = String(new URL(request.url).searchParams.get('clave') || '').trim()
   if (!/^[a-zA-Z0-9_.-]+$/.test(clave)) return error('La clave de la foto no es válida.', 400)
+  if (request.method !== 'GET' && !tienePermiso(sesion, 'personas')) {
+    return error('Tu cuenta no puede modificar fotos.', 403)
+  }
 
   if (request.method === 'GET') {
     const guardada = await env.BASE.prepare(
@@ -299,7 +402,7 @@ export async function onRequest(contexto) {
   if (ruta === 'sesion' && contexto.request.method === 'GET') return responder(sesion)
   if (ruta === 'usuarios') return usuarios(contexto, sesion)
   if (ruta === 'documento') return documento(contexto, sesion)
-  if (ruta === 'listas' && contexto.request.method === 'GET') return listas(contexto)
+  if (ruta === 'listas' && contexto.request.method === 'GET') return listas(contexto, sesion)
   if (ruta === 'foto') return foto(contexto, sesion)
   return error('No se encontró esa operación.', 404)
 }

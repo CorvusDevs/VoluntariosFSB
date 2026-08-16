@@ -36,6 +36,15 @@ export async function leerUsuarios({ duenio, repoPublico, rama, fetchFn }) {
 }
 
 export const ROLES = ['admin', 'coordinacion']
+export const PERMISOS = ['planilla', 'personas', 'asistencias', 'reportes', 'agenda']
+
+export function tienePermiso(registro, permiso) {
+  if (!registro || registro.rol === 'admin') return true
+  if (!PERMISOS.includes(permiso)) return false
+  // Las coordinadoras existentes mantienen su acceso completo. Los permisos
+  // aparecen solo cuando administración decide acotarlos explícitamente.
+  return !Array.isArray(registro.permisos) || registro.permisos.includes(permiso)
+}
 
 export function esAdmin(registro) {
   return registro?.rol === 'admin'

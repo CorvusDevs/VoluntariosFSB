@@ -67,6 +67,8 @@ body {
   font: inherit;
   cursor: pointer;
 }
+.boton-con-icono { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.boton-con-icono svg { width: 18px; height: 18px; flex: 0 0 auto; }
 .boton:disabled { opacity: 0.4; cursor: default; }
 .boton-peligro { border-color: #A51E1A; color: #A51E1A; }
 
@@ -134,6 +136,12 @@ body {
 .inicio-proximos { padding: 16px; border-left: 4px solid var(--turquesa); border-radius: 4px 12px 12px 4px; background: #F1FAF8; }
 .inicio-proximos h3 { margin: 0 0 8px; color: var(--turquesa-texto); }
 .inicio-fecha { margin: 8px 0; font-size: 14px; }
+.inicio-trabajo, .inicio-estado { margin-top: 16px; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; }
+.inicio-trabajo h3 { margin: 0 0 10px; color: var(--violeta); }
+.inicio-tarea { display: block; width: 100%; margin-top: 8px; text-align: left; border-color: #E9D8F0; }
+.inicio-estado { display: grid; gap: 4px; background: #FAFAFC; font-size: 14px; }
+.inicio-estado strong { color: var(--turquesa-texto); }
+.inicio-tendencia { color: var(--violeta); font-weight: 500; }
 .seccion { padding: 16px; }
 .seccion h2 { font-size: 18px; font-weight: 500; }
 .formulario { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
@@ -229,6 +237,11 @@ body {
   border: 1px solid var(--linea); border-radius: 10px;
 }
 .formulario-agregar, .formulario-rotar { display: flex; flex-direction: column; gap: 12px; }
+.permisos-acceso, .permisos-editar { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 10px; border: 1px solid var(--linea); border-radius: 10px; }
+.permisos-acceso legend { color: var(--texto-suave); font-size: 13px; }
+.permisos-acceso label, .permisos-editar label { font-size: 14px; }
+.permisos-editar { flex-basis: 100%; }
+.permisos-editar summary { width: 100%; cursor: pointer; color: var(--violeta); }
 .aviso-admin {
   margin: 0; padding: 10px 12px; border-radius: 10px;
   background: #F1EAF5; color: var(--violeta); font-size: 13px; line-height: 1.5;
@@ -277,14 +290,19 @@ body {
 .agenda-marca.cumpleanos { color: var(--turquesa-texto); background: #DFF4F1; }
 .agenda-marca.evento { color: var(--magenta-texto); background: #FDE7F1; }
 .agenda-marca.efemeride { color: var(--violeta); background: #F1E7F7; }
-.agenda-proximos, .agenda-formulario { margin-top: 20px; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; }
+.agenda-proximos, .agenda-formulario, .agenda-recordatorios { margin-top: 20px; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; }
+.agenda-recordatorios { border-left: 4px solid var(--magenta); background: #FFF6FA; }
+.agenda-recordatorios h3 { margin: 0 0 8px; color: var(--magenta-texto); }
+.agenda-recordatorios p { margin: 7px 0; font-size: 14px; }
 .agenda-proximos h3, .agenda-formulario h3 { margin: 0 0 10px; color: var(--violeta); }
 .agenda-evento { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--linea); }
 .agenda-evento strong { min-width: 96px; color: var(--violeta); font-size: 13px; }
 .agenda-evento span { flex: 1; font-size: 14px; }
 .agenda-evento .agenda-detalle { flex-basis: 100%; color: var(--texto-suave); font-size: 13px; }
-.agenda-formulario { display: grid; grid-template-columns: 150px 1fr 1fr auto; gap: 8px; align-items: end; }
-.agenda-formulario input { min-height: 44px; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 10px; font: inherit; }
+.agenda-formulario { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.agenda-formulario h3 { grid-column: 1 / -1; }
+.agenda-formulario .boton { justify-self: start; }
+.agenda-formulario input, .agenda-formulario select { min-height: 44px; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 10px; background: var(--fondo); font: inherit; }
 @media (max-width: 620px) { .agenda { padding: 16px 0; } .agenda-dia { min-height: 64px; padding: 4px; } .agenda-marca { font-size: 9px; padding: 2px 3px; } .agenda-formulario { grid-template-columns: 1fr; } .agenda-evento { flex-wrap: wrap; } }
 @media (max-width: 620px) { .inicio { padding: 16px 12px 28px; } .inicio-resumen { grid-template-columns: 1fr; } .inicio-acciones .boton { flex: 1 1 calc(50% - 4px); } }
 

@@ -1,10 +1,11 @@
 import { elemento, boton, vaciar } from './componentes.js'
-import { eventosDe } from '../modelo/agenda.js'
+import { eventosDe, recordatoriosDe } from '../modelo/agenda.js'
+import { perfilesIncompletos, posiblesDuplicados } from '../modelo/roster.js'
 import { coincide } from '../util/nombres.js'
 
 const fechaLocal = (fecha) => new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long' }).format(new Date(`${fecha}T00:00:00`))
 
-export function crearPantallaInicio(raiz, { roster, alertas = [], alIrA }) {
+export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = null, alIrA }) {
   function dibujarResultados(caja, texto) {
     caja.replaceChildren()
     const consulta = texto.trim()
@@ -50,6 +51,24 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], alIrA }) {
     boton('Personas', () => alIrA('personas')),
   )
   seccion.appendChild(acciones)
+
+  const trabajo = elemento('section', ['inicio-trabajo'])
+  trabajo.appendChild(elemento('h3', [], 'Atención de coordinación'))
+  const incompletos = perfilesIncompletos(roster)
+  const duplicados = posiblesDuplicados(roster)
+  const recordatorios = recordatoriosDe(roster)
+  const fila = (texto, accion) => trabajo.appendChild(boton(texto, accion, ['inicio-tarea']))
+  if (incompletos.length) fila(`${incompletos.length} perfiles con datos básicos pendientes`, () => alIrA('personas'))
+  if (duplicados.length) fila(`${duplicados.length} posible${duplicados.length === 1 ? '' : 's'} duplicado${duplicados.length === 1 ? '' : 's'} para revisar`, () => alIrA('personas'))
+  recordatorios.forEach((evento) => fila(`${evento.faltan === 0 ? 'Hoy' : `En ${evento.faltan} días`}: ${evento.titulo}`, () => alIrA('agenda')))
+  if (!incompletos.length && !duplicados.length && !recordatorios.length) trabajo.appendChild(elemento('p', ['ayuda'], 'No hay tareas administrativas pendientes.'))
+  seccion.appendChild(trabajo)
+
+  const estado = elemento('section', ['inicio-estado'])
+  const enLinea = typeof navigator === 'undefined' || navigator.onLine !== false
+  estado.append(elemento('strong', [], enLinea ? 'Conexión disponible' : 'Sin conexión'), elemento('span', [], enLinea ? 'Los cambios se guardan de forma segura al confirmar.' : 'Revisá la conexión antes de guardar cambios.'))
+  if (tendencia?.texto) estado.appendChild(elemento('span', ['inicio-tendencia'], tendencia.texto))
+  seccion.appendChild(estado)
 
   const proximos = elemento('section', ['inicio-proximos'])
   proximos.appendChild(elemento('h3', [], 'Próximas fechas'))

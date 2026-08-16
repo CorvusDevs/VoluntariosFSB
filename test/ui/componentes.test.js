@@ -47,4 +47,11 @@ describe('boton', () => {
     expect(el.textContent).toBe('Deshacer')
     expect(veces).toBe(1)
   })
+
+  it('agrega un SVG oficial a las acciones conocidas sin cambiar su etiqueta', () => {
+    const el = boton('Armar lista', () => {})
+    expect(el.querySelector('svg')).not.toBeNull()
+    expect(el.textContent).toBe('Armar lista')
+    expect(el.classList.contains('boton-con-icono')).toBe(true)
+  })
 })

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   crearLista, asignarVoluntario, quitarVoluntario, fusionarParticipantes,
   separarParticipante, moverAGrupo, agregarApoyo, contarPendientes, filaDe,
-  sincronizarConRoster, editarGrupo, quitarDeLista, volverALaLista,
+  sincronizarConRoster, editarGrupo, quitarDeLista, volverALaLista, duplicarListaParaFecha,
 } from '../../js/modelo/lista.js'
 import { ROSTER } from '../ayudas/datos.js'
 
@@ -284,5 +284,18 @@ describe('ausencias de una jornada', () => {
 
   it('volverALaLista falla si el participante no existe', () => {
     expect(() => volverALaLista(crearLista('2026-08-08', ROSTER), 'p999', ROSTER)).toThrow(/p999/)
+  })
+})
+
+describe('duplicarListaParaFecha', () => {
+  it('conserva las asignaciones y reinicia las ausencias en una nueva fecha', () => {
+    let lista = asignarVoluntario(crearLista('2026-08-08', ROSTER), 'p1', 'v1')
+    lista = quitarDeLista(lista, 'p2')
+    const copia = duplicarListaParaFecha(lista, '2026-08-15')
+    expect(copia.fecha).toBe('2026-08-15')
+    expect(filaDe(copia, 'p1').voluntarios).toEqual(['v1'])
+    expect(copia.ausentes).toEqual([])
+    expect(lista.fecha).toBe('2026-08-08')
+    expect(lista.ausentes).toContain('p2')
   })
 })

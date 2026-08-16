@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agregarEvento, cumpleanosProximos, efemeridesUruguay, quitarEvento } from '../../js/modelo/agenda.js'
+import { agregarEvento, cumpleanosProximos, efemeridesUruguay, quitarEvento, recordatoriosDe } from '../../js/modelo/agenda.js'
 
 const ROSTER = { version: 1, participantes: [
   { id: 'p1', nombre: 'Ana', activo: true, perfil: { anioNacimiento: '2016-08-20' } },
@@ -27,9 +27,16 @@ describe('agenda', () => {
     const eventos = efemeridesUruguay([2026])
     expect(eventos).toEqual(expect.arrayContaining([
       expect.objectContaining({ fecha: '2026-04-02', titulo: 'Día Nacional de las Personas con TEA' }),
+      expect.objectContaining({ fecha: '2026-05-10', titulo: 'Día de la Madre' }),
       expect.objectContaining({ fecha: '2026-08-09', titulo: 'Día de la Niñez' }),
       expect.objectContaining({ fecha: '2026-10-12', titulo: 'Día de la Diversidad Cultural' }),
       expect.objectContaining({ fecha: '2026-12-03', titulo: 'Día Internacional de las Personas con Discapacidad' }),
     ]))
+  })
+
+  it('activa el recordatorio de un evento manual cuando entra en su plazo', () => {
+    const conEvento = agregarEvento(ROSTER, { fecha: '2026-08-22', titulo: 'Reunión', recordatorio: 7 })
+    expect(recordatoriosDe(conEvento, new Date('2026-08-16T12:00:00')))
+      .toEqual([expect.objectContaining({ titulo: 'Reunión', faltan: 6, recordatorio: 7 })])
   })
 })

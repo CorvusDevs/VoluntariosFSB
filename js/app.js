@@ -14,7 +14,7 @@ import { crearPantallaAgenda } from './ui/pantalla-agenda.js'
 import { crearPantallaInicio } from './ui/pantalla-inicio.js'
 import { crearFranjaAlerta } from './ui/franja-alerta.js'
 import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
-import { crearLista, sincronizarConRoster, moverAGrupo } from './modelo/lista.js'
+import { crearLista, sincronizarConRoster, moverAGrupo, duplicarListaParaFecha } from './modelo/lista.js'
 import { proximoSabado, hoyISO } from './util/fechas.js'
 import { boton, vaciar, elemento } from './ui/componentes.js'
 import { CONFIG } from './config.js'
@@ -51,12 +51,13 @@ let vista = null
 // Las alertas se calculan una vez por sesion: leer los ultimos sabados en cada
 // redibujado seria una llamada a GitHub por cada toque en la pantalla.
 let alertas = []
+let tendencia = null
 let ocultarEstadoGuardado = null
 let intentoGuardado = 0
 
 function abrirPantalla(destino, contexto = {}) {
   if (!pantallaPermitida(destino, {
-    admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare',
+    admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos,
   })) return
   pantalla = destino
   contextoPantalla = contexto
@@ -132,6 +133,7 @@ async function guardarArchivoUsuarios(archivo, descripcion = 'Cambiar los acceso
 function navegacion() {
   const caja = elemento('div', ['navegacion-contenedor'])
   const ir = (destino, etiqueta) => {
+    if (!pantallaPermitida(destino, { admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos })) return null
     const b = boton(etiqueta, () => abrirPantalla(destino))
     b.dataset.pantalla = destino
     if (pantalla === destino) {
@@ -143,10 +145,10 @@ function navegacion() {
 
   const escritorio = elemento('nav', ['navegacion', 'navegacion-escritorio'])
   escritorio.setAttribute('aria-label', 'Secciones')
-  escritorio.append(ir('inicio', 'Inicio'), ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
+  escritorio.append(...['inicio', 'lista', 'vista-previa', 'personas'].map((destino) => ir(destino, { inicio: 'Inicio', lista: 'Armar lista', 'vista-previa': 'Vista previa', personas: 'Personas' }[destino])).filter(Boolean))
   // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
   // y la foto de cada chico, asi que la asistencia no agrega exposicion.
-  escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'), ir('agenda', 'Agenda'))
+  escritorio.append(...['reporte', 'asistencias', 'agenda'].map((destino) => ir(destino, { reporte: 'Reporte', asistencias: 'Asistencias', agenda: 'Agenda' }[destino])).filter(Boolean))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') escritorio.appendChild(ir('registro', 'Registro'))
@@ -169,7 +171,7 @@ function navegacion() {
   // filas antes de que aparezca la planilla.
   const movil = elemento('nav', ['navegacion-movil'])
   movil.setAttribute('aria-label', 'Secciones principales')
-  movil.append(ir('lista', 'Lista'), ir('personas', 'Personas'), ir('asistencias', 'Asistencia'))
+  movil.append(...['lista', 'personas', 'asistencias'].map((destino) => ir(destino, { lista: 'Lista', personas: 'Personas', asistencias: 'Asistencia' }[destino])).filter(Boolean))
 
   const mas = document.createElement('details')
   mas.className = 'navegacion-mas'
@@ -182,7 +184,7 @@ function navegacion() {
   }
   mas.appendChild(resumen)
   const menu = elemento('div', ['menu-navegacion'])
-  menu.append(ir('inicio', 'Inicio'), ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'), ir('agenda', 'Agenda'))
+  menu.append(...['inicio', 'vista-previa', 'reporte', 'agenda'].map((destino) => ir(destino, { inicio: 'Inicio', 'vista-previa': 'Vista previa', reporte: 'Reporte', agenda: 'Agenda' }[destino])).filter(Boolean))
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') menu.appendChild(ir('registro', 'Registro'))
   if (esAdmin(sesion)) menu.appendChild(ir('ajustes', 'Ajustes'))
   if (sesion) {
@@ -235,6 +237,19 @@ async function calcularAlertas() {
   }
 }
 
+async function calcularTendencia() {
+  try {
+    const fechas = hastaHoy((await deposito.listarListas()).map((registro) => registro.fecha), hoyISO()).slice(-4)
+    if (!fechas.length) return null
+    const listas = (await Promise.all(fechas.map((fecha) => deposito.leerLista(fecha)))).filter(Boolean)
+    const presentes = listas.reduce((total, jornada) => total + (jornada.grupos ?? []).reduce((cuenta, grupo) => cuenta + (grupo.filas ?? []).reduce((fila, asignacion) => fila + (asignacion.participantes?.length ?? 0), 0), 0), 0)
+    const activos = roster.participantes.filter((persona) => persona.activo !== false).length
+    if (!activos) return null
+    const porcentaje = Math.round((presentes / (activos * listas.length)) * 100)
+    return { texto: `Asistencia planificada: ${porcentaje}% en las últimas ${listas.length} jornada${listas.length === 1 ? '' : 's'}` }
+  } catch { return null }
+}
+
 async function anotarSeguimiento(persona, nota) {
   const guardados = (await deposito.leerSeguimientos())?.seguimientos ?? []
   const seguimientos = [...guardados, {
@@ -275,7 +290,7 @@ function dibujar() {
   contenedor.appendChild(sello())
 
   if (pantalla === 'inicio') {
-    vista = crearPantallaInicio(cuerpo, { roster, alertas, alIrA: abrirPantalla })
+    vista = crearPantallaInicio(cuerpo, { roster, alertas, tendencia, alIrA: abrirPantalla })
   } else if (pantalla === 'lista') {
     vista = crearPantallaLista(cuerpo, {
       lista,
@@ -300,6 +315,16 @@ function dibujar() {
           coordinacion: lista.coordinacion,
         })
         dibujar()
+      },
+      alRecuperarAnterior: async () => {
+        const anteriores = (await deposito.listarListas()).map((registro) => registro.fecha)
+          .filter((fecha) => fecha < lista.fecha).sort().reverse()
+        if (!anteriores.length) {
+          window.alert('Todavía no hay una jornada anterior para recuperar.')
+          return null
+        }
+        const anterior = await deposito.leerLista(anteriores[0])
+        return anterior ? sincronizarConRoster(duplicarListaParaFecha(anterior, lista.fecha), roster) : null
       },
     })
   } else if (pantalla === 'vista-previa') {
@@ -415,15 +440,15 @@ async function abrirAplicacion() {
     lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
     const restaurada = leerUltimaPantalla()
     pantalla = pantallaPermitida(restaurada, {
-      admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare',
+      admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos,
     }) ? restaurada : 'lista'
     dibujar()
     // Despues de dibujar y sin await en el camino critico: la planilla tiene que
     // aparecer ya, y el aviso se suma cuando este listo.
-    calcularAlertas().then((nuevas) => {
-      if (nuevas.length === 0) return
+    Promise.all([calcularAlertas(), calcularTendencia()]).then(([nuevas, nuevaTendencia]) => {
       alertas = nuevas
-      if (pantalla === 'lista') dibujar()
+      tendencia = nuevaTendencia
+      if (pantalla === 'lista' || pantalla === 'inicio') dibujar()
     })
   } catch (fallo) {
     // Un token vencido o un repositorio mal escrito no pueden dejar la
