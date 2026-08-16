@@ -31,6 +31,14 @@ export function crearAlmacenCloudflare({ fetchFn } = {}) {
     return resultado
   }
 
+  async function borrarJson(ruta) {
+    const respuesta = await pedir(`/api/documento?ruta=${encodeURIComponent(ruta)}`, {
+      method: 'DELETE', headers: { 'if-match': revisiones.get(ruta) ?? '0' },
+    })
+    if (!respuesta.ok && respuesta.status !== 404) throw new Error((await respuesta.json()).error || 'No se pudieron borrar los datos.')
+    revisiones.delete(ruta)
+  }
+
   return {
     leerRoster: () => leerJson('roster.json', { version: 1, participantes: [], voluntarios: [] }),
     guardarRoster: (datos) => guardarJson('roster.json', datos),
@@ -40,6 +48,15 @@ export function crearAlmacenCloudflare({ fetchFn } = {}) {
       const respuesta = await pedir('/api/listas')
       if (!respuesta.ok) throw new Error((await respuesta.json()).error || 'No se pudieron listar las planillas.')
       return respuesta.json()
+    },
+    async borrarMes(mes) {
+      const listas = await this.listarListas()
+      await Promise.all(listas.filter((lista) => lista.fecha.startsWith(`${mes}-`)).map((lista) => {
+        revisiones.set(rutaLista(lista.fecha), String(lista.revision))
+        return borrarJson(rutaLista(lista.fecha))
+      }))
+      const asistencias = await leerJson(rutaAsistencias(mes))
+      if (asistencias) await borrarJson(rutaAsistencias(mes))
     },
     leerAsistencias: (mes) => leerJson(rutaAsistencias(mes)),
     guardarAsistencias: (mes, datos) => guardarJson(rutaAsistencias(mes), datos),

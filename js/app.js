@@ -10,6 +10,7 @@ import { crearPantallaAccesosCloudflare } from './ui/pantalla-accesos-cloudflare
 import { crearPantallaRegistro } from './ui/pantalla-registro.js'
 import { crearPantallaReporte } from './ui/pantalla-reporte.js'
 import { crearPantallaAsistencias } from './ui/pantalla-asistencias.js'
+import { crearPantallaAgenda } from './ui/pantalla-agenda.js'
 import { crearFranjaAlerta } from './ui/franja-alerta.js'
 import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
 import { crearLista, sincronizarConRoster, moverAGrupo } from './modelo/lista.js'
@@ -142,7 +143,7 @@ function navegacion() {
   escritorio.append(ir('lista', 'Armar lista'), ir('vista-previa', 'Vista previa'), ir('personas', 'Personas'))
   // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
   // y la foto de cada chico, asi que la asistencia no agrega exposicion.
-  escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'))
+  escritorio.append(ir('reporte', 'Reporte'), ir('asistencias', 'Asistencias'), ir('agenda', 'Agenda'))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') escritorio.appendChild(ir('registro', 'Registro'))
@@ -171,14 +172,14 @@ function navegacion() {
   mas.className = 'navegacion-mas'
   const resumen = elemento('summary', ['boton-navegacion'], 'Más')
   resumen.setAttribute('aria-label', 'Más secciones')
-  const destinosSecundarios = ['vista-previa', 'reporte', 'registro', 'ajustes']
+  const destinosSecundarios = ['vista-previa', 'reporte', 'agenda', 'registro', 'ajustes']
   if (destinosSecundarios.includes(pantalla)) {
     resumen.classList.add('activa')
     resumen.setAttribute('aria-current', 'page')
   }
   mas.appendChild(resumen)
   const menu = elemento('div', ['menu-navegacion'])
-  menu.append(ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'))
+  menu.append(ir('vista-previa', 'Vista previa'), ir('reporte', 'Reporte'), ir('agenda', 'Agenda'))
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') menu.appendChild(ir('registro', 'Registro'))
   if (esAdmin(sesion)) menu.appendChild(ir('ajustes', 'Ajustes'))
   if (sesion) {
@@ -319,6 +320,16 @@ function dibujar() {
       roster,
       almacen: deposito,
       alIrALista: () => abrirPantalla('lista'),
+    })
+  } else if (pantalla === 'agenda') {
+    vista = crearPantallaAgenda(cuerpo, {
+      roster,
+      almacen: deposito,
+      alCambiar: async (siguiente) => {
+        roster = siguiente
+        lista = sincronizarConRoster(lista, roster)
+        await guardarListaConEstado(lista)
+      },
     })
   } else if (pantalla === 'registro' && esAdmin(sesion)) {
     // Se lee del repositorio privado, asi que sin sesion de GitHub no hay nada

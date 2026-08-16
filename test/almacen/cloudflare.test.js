@@ -39,4 +39,24 @@ describe('almacén Cloudflare', () => {
     expect(lecturas).toBe(1)
     expect(segunda).toBe(primera)
   })
+
+  it('elimina las planillas y asistencias de un mes usando sus revisiones', async () => {
+    const llamadas = []
+    const almacen = crearAlmacenCloudflare({ fetchFn: async (url, opciones = {}) => {
+      llamadas.push({ url, opciones })
+      if (url === '/api/listas') return json([{ fecha: '2026-08-15', revision: 7 }, { fecha: '2026-09-01', revision: 8 }])
+      if (url.includes('asistencias%2F2026-08.json') && !opciones.method) return json({ asistencias: [] }, 200, { etag: '"9"' })
+      return new Response(null, { status: 204 })
+    } })
+
+    await almacen.borrarMes('2026-08')
+
+    const borrados = llamadas.filter(({ opciones }) => opciones.method === 'DELETE')
+    expect(borrados).toHaveLength(2)
+    expect(borrados.map(({ url }) => url)).toEqual(expect.arrayContaining([
+      expect.stringContaining('listas%2F2026-08-15.json'),
+      expect.stringContaining('asistencias%2F2026-08.json'),
+    ]))
+    expect(borrados.map(({ opciones }) => opciones.headers['if-match'])).toEqual(expect.arrayContaining(['7', '9']))
+  })
 })

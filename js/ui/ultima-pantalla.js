@@ -1,7 +1,7 @@
 const CLAVE = 'voluntarios-fsb:ultima-pantalla'
 
 export const PANTALLAS = Object.freeze([
-  'lista', 'vista-previa', 'personas', 'reporte', 'asistencias', 'registro', 'ajustes',
+  'lista', 'vista-previa', 'personas', 'reporte', 'asistencias', 'agenda', 'registro', 'ajustes',
 ])
 
 export function pantallaPermitida(pantalla, { admin = false, cloudflare = false } = {}) {

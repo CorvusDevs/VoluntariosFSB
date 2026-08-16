@@ -356,7 +356,7 @@ function tramosCompartidos(celdas, columnas) {
       firma
       && fin + 1 < celdas.length
       && firmaDeVoluntarios(celdas[fin + 1].fila) === firma
-      && Math.floor((fin + 1) / columnas) === Math.floor(inicio / columnas)
+      && posicionEnRenglon(fin + 1, celdas.length, columnas).renglon === posicionEnRenglon(inicio, celdas.length, columnas).renglon
     ) fin += 1
     tramos.push({ inicio, fin, compartido: Boolean(firma) && fin > inicio })
     inicio = fin + 1
@@ -419,14 +419,25 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
   })
 }
 
-// Cuando todo el grupo entra en un solo renglón, repartirlo de borde a borde
-// aprovecha el ancho de la planilla sin agrandar ni recortar las fotos. Con una
-// sola persona, centrarla evita que el grupo parezca incompleto o desalineado.
-function xDeCeldaEnGrupo(indice, cantidad, columnas, anchoCelda, separacion, margen, anchoLienzo) {
-  if (cantidad >= columnas) return margen + (indice % columnas) * (anchoCelda + separacion)
+// Se reparte la cantidad total entre el mínimo de renglones necesarios. Ocho
+// chicos, por ejemplo, salen 4 y 4 en vez de 6 y 2. Cada renglón se estira de
+// borde a borde sin cambiar el tamaño de la foto.
+function posicionEnRenglon(indice, cantidadTotal, columnas) {
+  const renglones = Math.ceil(cantidadTotal / columnas)
+  const base = Math.floor(cantidadTotal / renglones)
+  const extras = cantidadTotal % renglones
+  const corte = (base + 1) * extras
+  if (indice < corte) return { renglon: Math.floor(indice / (base + 1)), columna: indice % (base + 1), cantidad: base + 1 }
+  const desdeCorte = indice - corte
+  return { renglon: extras + Math.floor(desdeCorte / base), columna: desdeCorte % base, cantidad: base }
+}
+
+function xDeCeldaEnRenglon(indice, cantidadTotal, columnas, anchoCelda, separacion, margen, anchoLienzo) {
+  const { columna, cantidad } = posicionEnRenglon(indice, cantidadTotal, columnas)
+  if (cantidad === columnas) return margen + columna * (anchoCelda + separacion)
   if (cantidad === 1) return Math.round((anchoLienzo - anchoCelda) / 2)
   const espacio = (anchoLienzo - margen * 2 - anchoCelda * cantidad) / (cantidad - 1)
-  return Math.round(margen + indice * (anchoCelda + espacio))
+  return Math.round(margen + columna * (anchoCelda + espacio))
 }
 
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
@@ -459,8 +470,8 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 
   let cursor = y
   celdas.forEach((celda, i) => {
-    const columna = i % columnas
-    const x = xDeCeldaEnGrupo(i, celdas.length, columnas, ancho, GRILLA.separacion, m.margen, m.ancho)
+    const { columna, renglon } = posicionEnRenglon(i, celdas.length, columnas)
+    const x = xDeCeldaEnRenglon(i, celdas.length, columnas, ancho, GRILLA.separacion, m.margen, m.ancho)
     const arriba = cursor
     const clave = celda.fila.participantes[0]
     let textoY = arriba
@@ -500,7 +511,9 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     celda.yVoluntario = textoY + celda.lineasNombre.length * GRILLA.pxNombre
       + GRILLA.espacioBajoNombre
 
-    if (columna === columnas - 1 || i === celdas.length - 1) cursor += altoCelda
+    const ultimoDelRenglon = i === celdas.length - 1
+      || posicionEnRenglon(i + 1, celdas.length, columnas).renglon !== renglon
+    if (ultimoDelRenglon) cursor += altoCelda
   })
 
   dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto, m.mostrarIconoVoluntariado)
@@ -571,7 +584,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   // El sobresalido se reserva por renglon y solo donde de verdad hay medallones.
   // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
   // 18 chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
-  const renglonDe = (i) => Math.floor(i / columnas)
+  const renglonDe = (i) => posicionEnRenglon(i, grupo.filas.length, columnas).renglon
   const conMedallon = grupo.filas.reduce((acc, fila, i) => {
     const r = renglonDe(i)
     acc[r] = acc[r] || fila.voluntarios.length > 0
@@ -581,8 +594,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
 
   let cursor = y
   grupo.filas.forEach((fila, i) => {
-    const columna = i % columnas
-    const x = xDeCeldaEnGrupo(i, grupo.filas.length, columnas, ancho, separacion, m.margen, m.ancho)
+    const { renglon } = posicionEnRenglon(i, grupo.filas.length, columnas)
+    const x = xDeCeldaEnRenglon(i, grupo.filas.length, columnas, ancho, separacion, m.margen, m.ancho)
     const asomaFila = asomaEn(i)
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
@@ -632,7 +645,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // de cada grupo contra 20 entre renglones, que es lo que se veia como un
     // hueco muerto.
     const ultimo = i === grupo.filas.length - 1
-    if (columna === columnas - 1 || ultimo) {
+    const ultimoDelRenglon = ultimo || posicionEnRenglon(i + 1, grupo.filas.length, columnas).renglon !== renglon
+    if (ultimoDelRenglon) {
       cursor += alto + asomaFila + (ultimo ? 0 : m.espacioBajoTitulo)
     }
   })
@@ -713,14 +727,13 @@ function cuerpoEnRetratosConNombre(ordenes, grupo, porId, m, y, conFotos, medirT
   // entero: con un maximo comun, un renglon sin acompañantes quedaba con el aire
   // de otro que si los tenia.
   const maxEn = (renglon) => Math.max(0, ...celdas
-    .filter((_, i) => Math.floor(i / columnas) === renglon)
+    .filter((_, i) => posicionEnRenglon(i, celdas.length, columnas).renglon === renglon)
     .map((c) => c.lineasVoluntario.length))
 
   let cursor = y
   celdas.forEach((celda, i) => {
-    const columna = i % columnas
-    const renglon = Math.floor(i / columnas)
-    const x = xDeCeldaEnGrupo(i, celdas.length, columnas, ancho, separacion, m.margen, m.ancho)
+    const { renglon } = posicionEnRenglon(i, celdas.length, columnas)
+    const x = xDeCeldaEnRenglon(i, celdas.length, columnas, ancho, separacion, m.margen, m.ancho)
     const clave = celda.fila.participantes[0]
 
     dibujarRetrato(ordenes, {
@@ -730,10 +743,11 @@ function cuerpoEnRetratosConNombre(ordenes, grupo, porId, m, y, conFotos, medirT
     celda.x = x
     celda.yVoluntario = cursor + alto + GRILLA.espacioBajoNombre
 
-    if (columna === columnas - 1 || i === celdas.length - 1) {
+    const ultimo = i === celdas.length - 1
+    const ultimoDelRenglon = ultimo || posicionEnRenglon(i + 1, celdas.length, columnas).renglon !== renglon
+    if (ultimoDelRenglon) {
       const lineas = maxEn(renglon)
       const alturaTexto = lineas > 0 ? GRILLA.espacioBajoNombre + lineas * GRILLA.pxVoluntario : 0
-      const ultimo = i === celdas.length - 1
       cursor += alto + alturaTexto + (ultimo ? 0 : m.espacioBajoTitulo)
     }
   })

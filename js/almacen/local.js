@@ -75,6 +75,13 @@ export async function crearAlmacenLocal() {
       return [...claves].sort().reverse().map((fecha) => ({ fecha, sha: null }))
     },
 
+    async borrarMes(mes) {
+      const claves = await operar(db, DEPOSITOS.listas, 'readonly', (d) => d.getAllKeys())
+      await Promise.all(claves.filter((fecha) => String(fecha).startsWith(`${mes}-`))
+        .map((fecha) => operar(db, DEPOSITOS.listas, 'readwrite', (d) => d.delete(fecha))))
+      await operar(db, DEPOSITOS.asistencias, 'readwrite', (d) => d.delete(mes))
+    },
+
     // Las correcciones de asistencia van por mes, con la misma clave que usa el
     // almacen remoto para el nombre del archivo.
     async leerAsistencias(mes) {

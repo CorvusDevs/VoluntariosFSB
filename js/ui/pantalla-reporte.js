@@ -154,7 +154,20 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
       descargarCSV(aCSV(historia, titulos), `asistencia-${mes}.csv`)
     })
     csv.dataset.accion = 'descargar-csv'
-    caja.append(png, csv)
+    const borrar = boton('Eliminar mes', async () => {
+      if (!window.confirm(`Se eliminarán todas las planillas y correcciones de asistencia de ${mes}. Esta acción no se puede deshacer.`)) return
+      borrar.disabled = true
+      try {
+        await almacen.borrarMes(mes)
+        historia = null
+        await cargar()
+      } catch (fallo) {
+        error = `No se pudo eliminar el mes: ${fallo.message}`
+        dibujar()
+      } finally { borrar.disabled = false }
+    }, ['boton-peligro'])
+    borrar.dataset.accion = 'eliminar-mes'
+    caja.append(png, csv, borrar)
     return caja
   }
 

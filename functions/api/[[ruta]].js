@@ -197,6 +197,14 @@ async function documento(contexto, sesion) {
     return responder(JSON.parse(fila.contenido), 200, { etag: `"${fila.revision}"` })
   }
 
+  if (request.method === 'DELETE') {
+    const esperada = request.headers.get('if-match')?.replaceAll('"', '') ?? null
+    const actual = await env.BASE.prepare('SELECT revision FROM documentos WHERE ruta = ?1').bind(ruta).first()
+    if (actual && esperada && String(actual.revision) !== esperada) return error('Otra coordinadora modificó estos datos. Recargá antes de borrar.', 409)
+    await env.BASE.prepare('DELETE FROM documentos WHERE ruta = ?1').bind(ruta).run()
+    await registrar(env.BASE, sesion, 'borrar', ruta)
+    return responder({ borrada: true })
+  }
   if (request.method !== 'PUT') return error('Método no permitido.', 405)
   let contenido
   try {

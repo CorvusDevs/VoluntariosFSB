@@ -68,6 +68,7 @@ body {
   cursor: pointer;
 }
 .boton:disabled { opacity: 0.4; cursor: default; }
+.boton-peligro { border-color: #A51E1A; color: #A51E1A; }
 
 .encabezado-lista {
   display: flex;
@@ -248,6 +249,29 @@ body {
    telefono nadie descubre un boton que quedo fuera de un scroll horizontal. */
 .navegacion { flex-wrap: wrap; }
 .navegacion .boton { font-size: 14px; padding: 10px 14px; }
+
+/* Agenda: el mes es un mapa de trabajo, no una tabla de planilla. Las marcas
+   coloreadas hacen visible qué pasa ese día y la lista de abajo da el detalle. */
+.agenda { padding: 16px; }
+.agenda h2 { margin: 0 0 4px; color: var(--violeta); }
+.agenda-controles { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; }
+.agenda-mes { min-width: 190px; text-align: center; text-transform: capitalize; }
+.agenda-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.agenda-dia-semana { padding: 7px 2px; text-align: center; font-size: 12px; font-weight: 500; color: var(--texto-suave); }
+.agenda-dia { min-height: 78px; padding: 6px; border: 1px solid var(--linea); border-radius: 10px; background: #fff; }
+.agenda-dia.vacio { border-color: transparent; background: transparent; }
+.agenda-numero { display: block; margin-bottom: 4px; font-size: 12px; color: var(--texto-suave); }
+.agenda-marca { display: block; overflow: hidden; padding: 3px 5px; border-radius: 6px; font-size: 10px; white-space: nowrap; text-overflow: ellipsis; }
+.agenda-marca.cumpleanos { color: var(--turquesa-texto); background: #DFF4F1; }
+.agenda-marca.evento { color: var(--magenta-texto); background: #FDE7F1; }
+.agenda-proximos, .agenda-formulario { margin-top: 20px; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; }
+.agenda-proximos h3, .agenda-formulario h3 { margin: 0 0 10px; color: var(--violeta); }
+.agenda-evento { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--linea); }
+.agenda-evento strong { min-width: 96px; color: var(--violeta); font-size: 13px; }
+.agenda-evento span { flex: 1; font-size: 14px; }
+.agenda-formulario { display: grid; grid-template-columns: 150px 1fr 1fr auto; gap: 8px; align-items: end; }
+.agenda-formulario input { min-height: 44px; padding: 8px 12px; border: 1px solid var(--linea); border-radius: 10px; font: inherit; }
+@media (max-width: 620px) { .agenda { padding: 16px 0; } .agenda-dia { min-height: 64px; padding: 4px; } .agenda-marca { font-size: 9px; padding: 2px 3px; } .agenda-formulario { grid-template-columns: 1fr; } .agenda-evento { flex-wrap: wrap; } }
 
 /* ---------------------------------------------------------------------------
    Pantalla ancha.

@@ -482,6 +482,27 @@ describe('formato de grilla', () => {
     expect(fotos[0].ancho).toBe(anchoDeCeldaGrilla(medidas(false).margen))
   })
 
+  it('equilibra ocho participantes en dos filas de cuatro', () => {
+    const roster = structuredClone(ROSTER)
+    const ids = Array.from({ length: 8 }, (_, i) => `extra-${i}`)
+    roster.participantes.push(...ids.map((id) => ({ id, nombre: id, grupo: 1, foto: null, activo: true, notas: '' })))
+    const lista = structuredClone(LISTA)
+    lista.opcionesImagen.formato = 'grilla'
+    lista.grupos[0].filas = ids.map((id) => ({ participantes: [id], voluntarios: [] }))
+    const plano = maquetar(lista, roster, opciones)
+    const fotos = plano.ordenes
+      .filter((o) => o.tipo === 'rect' && o.radio === GRILLA.radioFoto && ids.includes(o.fila))
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+    const renglones = [...new Map(fotos.map((foto) => [foto.y, fotos.filter((otra) => otra.y === foto.y)])).values()]
+    expect(renglones).toHaveLength(2)
+    renglones.forEach((renglon) => {
+      expect(renglon).toHaveLength(4)
+      expect(renglon.every((foto) => foto.ancho === anchoDeCeldaGrilla(medidas(false).margen))).toBe(true)
+      expect(renglon[0].x).toBe(medidas(false).margen)
+      expect(renglon.at(-1).x + renglon.at(-1).ancho).toBe(plano.ancho - medidas(false).margen)
+    })
+  })
+
   it('nada se sale del lienzo ni invade el margen', () => {
     const plano = enGrilla()
     expect(plano.desborde).toBe(false)
