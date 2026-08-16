@@ -20,7 +20,13 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
   let logoAleteaPendiente = null, iconoPelotaPendiente = null
   const ajustes = () => ({ ...AJUSTES, ...(actual.preferenciasPersonas ?? {}) })
   const todas = () => [...actual.participantes.map((p) => ({ ...p, tipo: 'participante' })), ...actual.voluntarios.map((p) => ({ ...p, tipo: 'voluntario' }))]
-  async function guardar(siguiente, descripcion, mudanzas = [], confirmacion = '') { actual = siguiente; await almacen.guardarRoster(actual, descripcion); await alCambiar(actual, mudanzas); confirmacionPerfil = confirmacion; dibujar() }
+  async function guardar(siguiente, descripcion, mudanzas = [], confirmacion = '') {
+    await almacen.guardarRoster(siguiente, descripcion)
+    actual = siguiente
+    await alCambiar(actual, mudanzas)
+    confirmacionPerfil = confirmacion
+    dibujar()
+  }
   function visibles() {
     return todas().filter((p) => {
       if (filtro === 'activas' && !p.activo) return false
@@ -114,6 +120,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
     form.appendChild(bio)
     const perfilActual = () => Object.fromEntries([...bio.querySelectorAll('[data-perfil]')].map((e) => [e.dataset.perfil, e.value.trim()]))
     const personaBorrador = () => ({ ...datos, nombre: nombre.value.trim() || datos.nombre, grupo: Number(selectorGrupo.value), perfil: perfilActual() })
+    const errorGuardar = elemento('p', ['persona-error'])
+    errorGuardar.setAttribute('role', 'alert')
     const guardarCambios = boton(nueva ? 'Agregar persona' : 'Guardar cambios', async () => {
       const limpio = nombre.value.trim()
       if (!limpio) return
@@ -138,10 +146,11 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, esAdmi
       } catch (error) {
         guardarCambios.disabled = false
         guardarCambios.textContent = nueva ? 'Agregar persona' : 'Guardar cambios'
-        throw error
+        const detalle = error instanceof Error && error.message ? error.message : 'Revisá tu conexión e intentá de nuevo.'
+        errorGuardar.textContent = `No se guardaron los cambios: ${detalle}`
       }
     })
-    form.appendChild(guardarCambios)
+    form.append(guardarCambios, errorGuardar)
     if (!nueva && confirmacionPerfil) {
       const confirmacion = elemento('p', ['persona-confirmacion'], confirmacionPerfil)
       confirmacion.setAttribute('role', 'status')

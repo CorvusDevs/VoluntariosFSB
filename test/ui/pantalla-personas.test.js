@@ -341,12 +341,27 @@ describe('directorio de Personas', () => {
     await esperar()
     const confirmacion = raiz.querySelector('.persona-formulario > .persona-confirmacion')
     expect(confirmacion.textContent).toContain('guardado correctamente')
-    expect(confirmacion.previousElementSibling.textContent).toBe('Guardar cambios')
+    expect([...raiz.querySelectorAll('.persona-formulario button')].some((e) => e.textContent === 'Guardar cambios')).toBe(true)
     const persona = pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo')
     expect(persona.perfil).toMatchObject({ anioNacimiento: '2014-02-10', necesidades: 'Pausa tranquila' })
     tarjeta('Gonzalo').querySelector('button').click()
     expect([...raiz.querySelectorAll('.persona-acciones button')].some((e) => e.textContent === 'Descargar tarjeta PNG')).toBe(true)
     expect(raiz.querySelector('.vista-tarjeta-personal')).not.toBeNull()
+  })
+
+  it('conserva el borrador y explica el error cuando no se puede guardar un perfil', async () => {
+    tarjeta('Gonzalo').querySelector('button').click()
+    const editor = raiz.querySelector('.persona-editor')
+    const necesidades = editor.querySelector('[data-perfil="necesidades"]')
+    necesidades.value = 'Pausa tranquila'
+    almacen.guardarRoster = async () => { throw new Error('No tenés una sesión autorizada.') }
+    const guardarCambios = [...editor.querySelectorAll('button')].find((e) => e.textContent === 'Guardar cambios')
+    guardarCambios.click()
+    await esperar()
+    expect(guardarCambios.textContent).toBe('Guardar cambios')
+    expect(editor.querySelector('.persona-error').textContent).toContain('No tenés una sesión autorizada.')
+    expect(necesidades.value).toBe('Pausa tranquila')
+    expect(pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo').perfil?.necesidades).not.toBe('Pausa tranquila')
   })
 
   it('abre tarjetas desde Personas con vista, descarga y edición', () => {
