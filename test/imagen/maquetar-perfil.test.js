@@ -12,7 +12,7 @@ describe('maquetarPerfil', () => {
     expect(textos).toContain('Necesidades y apoyos')
     expect(textos).toContain('Pausa tranquila')
     expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'imagen', clave: 'logo', x: 816, y: 68, ancho: 200, alto: 75 }))
-    expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'icono', nombre: 'pelota' }))
+    expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'imagen', clave: 'icono-pelota' }))
     expect(plano.ordenes).toContainEqual(expect.objectContaining({ tipo: 'icono', nombre: 'candado' }))
   })
 })

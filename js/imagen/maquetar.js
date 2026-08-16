@@ -146,7 +146,7 @@ function bandaSuperior(ordenes, lista, m, y, medirTexto) {
     fuente: fuenteTitulo, color: COLORES.blanco, lineaBase: 'top',
   })
   const ladoPelota = Math.round(m.pxTitular * 0.54)
-  ordenes.push({ tipo: 'icono', nombre: 'pelota', x: m.margen + medirTexto(titulo, fuenteTitulo) + 18, y: y + alto - m.yTituloDesdeAbajo + 12, lado: ladoPelota, color: COLORES.blanco })
+  ordenes.push({ tipo: 'imagen', clave: 'icono-pelota', x: m.margen + medirTexto(titulo, fuenteTitulo) + 18, y: y + alto - m.yTituloDesdeAbajo + 12, ancho: ladoPelota, alto: ladoPelota })
   const sub = `${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`
   ordenes.push({
     tipo: 'texto', texto: sub, x: m.margen, y: y + alto - m.ySubtituloDesdeAbajo,
@@ -303,7 +303,7 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
   if (voluntarios.length > 0) {
     x = escribirSeparador(ordenes, '-', x, centro, m, clave, medirTexto)
     const lado = Math.round(m.pxVoluntario * 0.92)
-    ordenes.push({ tipo: 'icono', nombre: 'silbato', x, y: centro - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
+    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x, y: centro - lado / 2, ancho: lado, alto: lado, fila: clave })
     x += lado + 10
     x = escribirNombres(ordenes, voluntarios, x, centro, m,
       FUENTES.normal(m.pxVoluntario), COLORES.magentaTexto, clave, medirTexto, true)
@@ -372,7 +372,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
         const aire = lado ? 8 : 0
         const anchoEtiqueta = medirTexto(linea, fuente) + lado + aire
         const centroEtiqueta = primera.x + ancho / 2
-        if (lado) ordenes.push({ tipo: 'icono', nombre: 'silbato', x: centroEtiqueta - anchoEtiqueta / 2, y: primera.yVoluntario + n * GRILLA.pxVoluntario, lado, color: COLORES.magentaTexto, fila: clave })
+        if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: centroEtiqueta - anchoEtiqueta / 2, y: primera.yVoluntario + n * GRILLA.pxVoluntario, ancho: lado, alto: lado, fila: clave })
         ordenes.push({
           tipo: 'texto', texto: linea, x: centroEtiqueta + (lado + aire) / 2,
           y: primera.yVoluntario + n * GRILLA.pxVoluntario + GRILLA.pxVoluntario / 2,
@@ -407,7 +407,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     trazo(izquierda, yLinea, medio - hueco, yLinea)
     trazo(medio + hueco, yLinea, derecha, yLinea)
 
-    ordenes.push({ tipo: 'icono', nombre: 'silbato', x: medio - anchoEtiqueta / 2, y: yLinea - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
+    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: medio - anchoEtiqueta / 2, y: yLinea - lado / 2, ancho: lado, alto: lado, fila: clave })
 
     ordenes.push({
       tipo: 'texto', texto, x: medio + (lado + aire) / 2, y: yLinea,
@@ -801,7 +801,7 @@ function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medir
   if (hayVoluntarios) {
     const nombres = voluntarios.map((v) => v.nombre + (v.nuevo ? ' (nuevo)' : '')).join(' / ')
     const lado = Math.round(COLUMNAS.pxVoluntario * 0.92)
-    ordenes.push({ tipo: 'icono', nombre: 'silbato', x: textoX, y: centro + 20 - lado / 2, lado, color: COLORES.magentaTexto, fila: clave })
+    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: textoX, y: centro + 20 - lado / 2, ancho: lado, alto: lado, fila: clave })
     ordenes.push({
       tipo: 'texto', texto: nombres, x: textoX + lado + 10, y: centro + 20,
       fuente: FUENTES.normal(COLUMNAS.pxVoluntario), color: COLORES.magentaTexto,

@@ -37,6 +37,13 @@ const OPCIONES = [
 // no dispara ni onload ni onerror: la promesa queda colgada para siempre y sin
 // inyeccion esta rama no se podria probar.
 const cargarLogoReal = () => cargarImagen('assets/logo-aletea.png')
+const cargarIconosReales = async () => {
+  const [pelota, voluntario] = await Promise.all([
+    cargarImagen('assets/iconos/pelota-blanca.svg'),
+    cargarImagen('assets/iconos/voluntario-magenta.svg'),
+  ])
+  return { 'icono-pelota': pelota, 'icono-voluntario': voluntario }
+}
 
 export function crearPantallaVistaPrevia(raiz, opciones) {
   const { roster, alCambiar, crearContexto, cargarFoto } = opciones
@@ -420,6 +427,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   async function precargarFotos() {
     const logoPendiente = (opciones.cargarLogo ?? cargarLogoReal)()
+    const iconosPendientes = (opciones.cargarIconos ?? cargarIconosReales)()
     if (cargarFoto) {
       // Los voluntarios tambien, no solo los participantes. Cuando se escribio
       // esto ningun formato dibujaba la cara del voluntario; Retratos si, y sin
@@ -447,6 +455,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     const logo = await logoPendiente
     if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
+    const iconos = await iconosPendientes
+    if (!vivo) { Object.values(iconos).forEach(cerrar); return }
+    Object.entries(iconos).forEach(([clave, imagen]) => { if (imagen) imagenes[clave] = imagen })
     mensaje = ''
     redibujar()
   }

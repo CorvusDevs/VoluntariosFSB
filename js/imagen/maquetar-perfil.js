@@ -31,7 +31,7 @@ export function maquetarPerfil(persona, { medirTexto, anioActual = new Date().ge
   const fuentePrograma = FUENTES.normal(28)
   const programa = 'Fútbol sin Barreras'
   ordenes.push({ tipo: 'texto', texto: programa, x: MARGEN, y: 76, fuente: fuentePrograma, color: COLORES.blanco })
-  ordenes.push({ tipo: 'icono', nombre: 'pelota', x: MARGEN + medirTexto(programa, fuentePrograma) + 14, y: 49, lado: 30, color: COLORES.blanco })
+  ordenes.push({ tipo: 'imagen', clave: 'icono-pelota', x: MARGEN + medirTexto(programa, fuentePrograma) + 14, y: 49, ancho: 30, alto: 30 })
   ordenes.push({ tipo: 'texto', texto: 'Perfil personal · Uso interno', x: MARGEN, y: 130, fuente: FUENTES.titulo(42), color: COLORES.blanco })
   ordenes.push({ tipo: 'rect', x: 0, y: 210, ancho: ANCHO, alto: 12, color: color.fuerte })
   y = 258
