@@ -57,6 +57,33 @@ describe('maquetar', () => {
     expect(icono.x + icono.ancho).toBeLessThan(voluntario.x)
   })
 
+  it('omite el icono de voluntariado cuando la opcion esta apagada', () => {
+    const sinIcono = {
+      ...LISTA,
+      opcionesImagen: { ...LISTA.opcionesImagen, formato: 'grilla', mostrarIconoVoluntariado: false },
+    }
+    const plano = maquetar(sinIcono, ROSTER, opciones)
+    expect(plano.ordenes.some((o) => o.tipo === 'imagen' && o.clave === 'icono-voluntario')).toBe(false)
+    expect(textos(plano)).toContain('Abi')
+  })
+
+  it('solo dibuja el icono de voluntariado cuando se activa, en todos los formatos', () => {
+    ;['filas', 'columnas', 'grilla', 'retratos-nombre'].forEach((formato) => {
+      const conIcono = {
+        ...LISTA,
+        opcionesImagen: { ...LISTA.opcionesImagen, formato, mostrarIconoVoluntariado: true },
+      }
+      const sinIcono = {
+        ...conIcono,
+        opcionesImagen: { ...conIcono.opcionesImagen, mostrarIconoVoluntariado: false },
+      }
+      const cantidad = (lista) => maquetar(lista, ROSTER, opciones).ordenes
+        .filter((o) => o.tipo === 'imagen' && o.clave === 'icono-voluntario').length
+      expect(cantidad(conIcono)).toBeGreaterThan(0)
+      expect(cantidad(sinIcono)).toBe(0)
+    })
+  })
+
   it('un participante sin voluntario se dibuja sin separador', () => {
     const plano = maquetar(LISTA, ROSTER, opciones)
     const fila = plano.ordenes.filter((o) => o.fila === 'p2')

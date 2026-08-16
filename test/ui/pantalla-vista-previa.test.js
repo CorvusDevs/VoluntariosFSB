@@ -61,6 +61,7 @@ describe('pantalla de vista previa', () => {
     expect(etiquetas.some((t) => t.includes('Saludo'))).toBe(true)
     expect(etiquetas.some((t) => t.includes('Despedida'))).toBe(true)
     expect(etiquetas.some((t) => t.includes('Fotos'))).toBe(true)
+    expect(etiquetas.some((t) => t.includes('Ícono de voluntariado'))).toBe(true)
     expect(etiquetas.some((t) => t.includes('compacto'))).toBe(true)
   })
 
@@ -75,6 +76,17 @@ describe('pantalla de vista previa', () => {
     const nueva = crearLista('2026-08-08', ROSTER)
     expect(nueva.opcionesImagen.saludo).toBe(false)
     expect(nueva.opcionesImagen.despedida).toBe(false)
+    expect(nueva.opcionesImagen.mostrarIconoVoluntariado).toBe(false)
+  })
+
+  it('el icono de voluntariado arranca apagado y se puede activar', () => {
+    const nueva = crearLista('2026-08-08', ROSTER)
+    const p = armar(raiz, nueva)
+    const icono = raiz.querySelector('[data-opcion="mostrarIconoVoluntariado"]')
+    expect(icono.checked).toBe(false)
+    icono.checked = true
+    icono.dispatchEvent(new Event('change'))
+    expect(p.lista().opcionesImagen.mostrarIconoVoluntariado).toBe(true)
   })
 
   it('cambiar un interruptor actualiza la lista y avisa', () => {

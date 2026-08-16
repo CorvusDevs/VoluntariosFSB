@@ -15,6 +15,7 @@ export function maquetar(lista, roster, opciones = {}) {
 
   const compacto = Boolean(lista.opcionesImagen?.compacto)
   const conFotos = Boolean(lista.opcionesImagen?.fotos) && medidas(compacto).mostrarFotos
+  const mostrarIconoVoluntariado = Boolean(lista.opcionesImagen?.mostrarIconoVoluntariado)
   const base = medidas(compacto)
   const porId = indexar(roster)
   // Los apellidos se abrevian contra el resto de su propia lista: chicos con
@@ -60,7 +61,7 @@ export function maquetar(lista, roster, opciones = {}) {
   else if (formato === 'retratos' || formato === 'retratos-nombre') ancho = retratos.anchoImagen
   const m = {
     ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
-    esquinaVoluntario, tamanoVoluntario, asomoVoluntario, retratos, abreviar,
+    esquinaVoluntario, tamanoVoluntario, asomoVoluntario, mostrarIconoVoluntariado, retratos, abreviar,
   }
 
   const ordenes = []
@@ -302,9 +303,11 @@ function filaDeAsignacion(ordenes, fila, porId, m, y, conFotos, medirTexto, nume
 
   if (voluntarios.length > 0) {
     x = escribirSeparador(ordenes, '-', x, centro, m, clave, medirTexto)
-    const lado = Math.round(m.pxVoluntario * 0.92)
-    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x, y: centro - lado / 2, ancho: lado, alto: lado, fila: clave })
-    x += lado + 10
+    if (m.mostrarIconoVoluntariado) {
+      const lado = Math.round(m.pxVoluntario * 0.92)
+      ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x, y: centro - lado / 2, ancho: lado, alto: lado, fila: clave })
+      x += lado + 10
+    }
     x = escribirNombres(ordenes, voluntarios, x, centro, m,
       FUENTES.normal(m.pxVoluntario), COLORES.magentaTexto, clave, medirTexto, true)
   }
@@ -361,14 +364,14 @@ function tramosCompartidos(celdas, columnas) {
   return tramos
 }
 
-function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto) {
+function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto, mostrarIcono) {
   tramosCompartidos(celdas, columnas).forEach((tramo) => {
     const primera = celdas[tramo.inicio]
     const clave = primera.fila.participantes[0]
 
     if (!tramo.compartido) {
       primera.lineasVoluntario.forEach((linea, n) => {
-        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario) : 0
+        const lado = n === 0 && mostrarIcono ? Math.round(GRILLA.pxVoluntario) : 0
         const aire = lado ? 8 : 0
         const centroEtiqueta = primera.x + ancho / 2
         if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: centroEtiqueta - medirTexto(linea, fuente) / 2 - lado - aire, y: primera.yVoluntario + n * GRILLA.pxVoluntario - (lado - GRILLA.pxVoluntario) / 2, ancho: lado, alto: lado, fila: clave })
@@ -389,7 +392,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     // le quede por debajo cuando los nombres no ocupan lo mismo.
     const yLinea = Math.max(...abarcadas.map((c) => c.yVoluntario)) + GRILLA.aireLlave
     const texto = primera.lineasVoluntario.join(' ')
-    const lado = Math.round(GRILLA.pxVoluntario)
+    const lado = mostrarIcono ? Math.round(GRILLA.pxVoluntario) : 0
     const aire = 8
     const anchoTexto = medirTexto(texto, fuente)
     const hueco = anchoTexto / 2 + lado + aire + 12
@@ -406,7 +409,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     trazo(izquierda, yLinea, medio - hueco, yLinea)
     trazo(medio + hueco, yLinea, derecha, yLinea)
 
-    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: medio - anchoTexto / 2 - lado - aire, y: yLinea - lado / 2, ancho: lado, alto: lado, fila: clave })
+    if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: medio - anchoTexto / 2 - lado - aire, y: yLinea - lado / 2, ancho: lado, alto: lado, fila: clave })
 
     ordenes.push({
       tipo: 'texto', texto, x: medio, y: yLinea,
@@ -490,7 +493,7 @@ function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     if (columna === columnas - 1 || i === celdas.length - 1) cursor += altoCelda
   })
 
-  dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto)
+  dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto, m.mostrarIconoVoluntariado)
   return cursor
 }
 
@@ -725,7 +728,7 @@ function cuerpoEnRetratosConNombre(ordenes, grupo, porId, m, y, conFotos, medirT
     }
   })
 
-  dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto)
+  dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuenteVoluntario, medirTexto, m.mostrarIconoVoluntariado)
   return cursor
 }
 
@@ -800,9 +803,11 @@ function celdaDeAsignacion(ordenes, fila, porId, m, x, y, ancho, conFotos, medir
   if (hayVoluntarios) {
     const nombres = voluntarios.map((v) => v.nombre + (v.nuevo ? ' (nuevo)' : '')).join(' / ')
     const lado = Math.round(COLUMNAS.pxVoluntario * 0.92)
-    ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: textoX, y: centro + 20 - lado / 2, ancho: lado, alto: lado, fila: clave })
+    if (m.mostrarIconoVoluntariado) {
+      ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: textoX, y: centro + 20 - lado / 2, ancho: lado, alto: lado, fila: clave })
+    }
     ordenes.push({
-      tipo: 'texto', texto: nombres, x: textoX + lado + 10, y: centro + 20,
+      tipo: 'texto', texto: nombres, x: textoX + (m.mostrarIconoVoluntariado ? lado + 10 : 0), y: centro + 20,
       fuente: FUENTES.normal(COLUMNAS.pxVoluntario), color: COLORES.magentaTexto,
       lineaBase: 'middle', fila: clave,
     })

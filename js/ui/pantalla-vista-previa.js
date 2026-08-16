@@ -30,6 +30,7 @@ const OPCIONES = [
   ['saludo', 'Saludo'],
   ['despedida', 'Despedida'],
   ['fotos', 'Fotos'],
+  ['mostrarIconoVoluntariado', 'Ícono de voluntariado'],
   ['compacto', 'Modo compacto'],
 ]
 

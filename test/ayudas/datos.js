@@ -50,7 +50,7 @@ export const LISTA = {
   ],
   // Declarado a proposito: estas pruebas son sobre el formato apilado, no sobre
   // cual es el predeterminado. Ese tiene su propia prueba aparte.
-  opcionesImagen: { saludo: true, despedida: true, fotos: true, compacto: false, formato: 'filas' },
+  opcionesImagen: { saludo: true, despedida: true, fotos: true, compacto: false, mostrarIconoVoluntariado: true, formato: 'filas' },
 }
 
 export const SALUDO = 'Buenas tardes, esperamos que estén todos bien. Les compartimos las asignaciones para mañana:'

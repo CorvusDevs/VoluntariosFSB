@@ -52,7 +52,7 @@ export function crearLista(fecha, roster, base = {}) {
       // El saludo y la despedida arrancan apagados: la planilla se manda con un
       // mensaje escrito en el chat, y repetirlo adentro de la imagen solo la
       // alarga. Se prenden desde Vista previa cuando hacen falta.
-      saludo: false, despedida: false, fotos: true, compacto: false, formato: FORMATO_POR_DEFECTO,
+      saludo: false, despedida: false, fotos: true, compacto: false, mostrarIconoVoluntariado: false, formato: FORMATO_POR_DEFECTO,
       esquinaVoluntario: ESQUINA_VOLUNTARIO_POR_DEFECTO,
       tamanoVoluntario: TAMANO_VOLUNTARIO_POR_DEFECTO,
       asomoVoluntario: ASOMO_VOLUNTARIO_POR_DEFECTO,
