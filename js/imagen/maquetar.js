@@ -368,7 +368,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
 
     if (!tramo.compartido) {
       primera.lineasVoluntario.forEach((linea, n) => {
-        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario * 1.2) : 0
+        const lado = n === 0 ? Math.round(GRILLA.pxVoluntario) : 0
         const aire = lado ? 8 : 0
         const centroEtiqueta = primera.x + ancho / 2
         if (lado) ordenes.push({ tipo: 'imagen', clave: 'icono-voluntario', x: centroEtiqueta - medirTexto(linea, fuente) / 2 - lado - aire, y: primera.yVoluntario + n * GRILLA.pxVoluntario - (lado - GRILLA.pxVoluntario) / 2, ancho: lado, alto: lado, fila: clave })
@@ -389,7 +389,7 @@ function dibujarVoluntarios(ordenes, celdas, columnas, ancho, fuente, medirTexto
     // le quede por debajo cuando los nombres no ocupan lo mismo.
     const yLinea = Math.max(...abarcadas.map((c) => c.yVoluntario)) + GRILLA.aireLlave
     const texto = primera.lineasVoluntario.join(' ')
-    const lado = Math.round(GRILLA.pxVoluntario * 1.2)
+    const lado = Math.round(GRILLA.pxVoluntario)
     const aire = 8
     const anchoTexto = medirTexto(texto, fuente)
     const hueco = anchoTexto / 2 + lado + aire + 12
