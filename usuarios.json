@@ -60,6 +60,21 @@
         "iv": "rxksbV496diuoiWj",
         "datos": "vl8yTB/Ne0eSTAiCRsF46Z/PRvWHcykR73mbozy60QywYaEBykhwm0jksJ9Vn68Vm6hvGecLUBVCGICQywDhMx6ZDdfwxR1oBnnKI1kUew54PoXeWodrDlkV83baIGqBZ5zE0KxSF0YWa1NN3g=="
       }
+    },
+    {
+      "usuario": "monicacarreno",
+      "nombre": "Mónica Carreño",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "E8CykuCj1KlyyOp3wqBvqQ=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "Be6CvRdkF2CMMVYQ",
+        "datos": "wG8MNHmwr6HqP2lH7y/sABB9vekGdYrEUx1ZzkqFwDT4R4dJcwjqbAXSEwanogoCGBgX1W59pmtWxp4pUHMYvx799BXjfMaHKKJFpIJJXtaRjCWdmec5NUgvuaGjD840IzMilYba9PM4JPVXvQ=="
+      }
     }
   ]
 }
