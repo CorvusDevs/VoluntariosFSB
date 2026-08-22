@@ -10,7 +10,10 @@ export function escapar(texto) {
 export function elemento(etiqueta, clases = [], texto = null) {
   const el = document.createElement(etiqueta)
   if (clases.length) el.className = clases.join(' ')
-  if (texto !== null) el.textContent = texto
+  if (texto !== null) {
+    if (typeof texto === 'object' && texto && typeof texto.nodeType === 'number') el.appendChild(texto)
+    else el.textContent = texto
+  }
   return el
 }
 
@@ -69,6 +72,7 @@ const TRAZOS = {
   atras: 'M15.75 19.5 8.25 12l7.5-7.5',
   adelante: 'm8.25 4.5 7.5 7.5-7.5 7.5',
   casa: 'm2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25',
+  tablero: 'M3.75 3h6.75v6.75H3.75V3Zm9.75 0h6.75v6.75H13.5V3ZM3.75 13.5h6.75v6.75H3.75V13.5Zm9.75 0h6.75v6.75H13.5V13.5Z',
   vista: 'M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z',
   reporte: 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z',
   ajustes: 'M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75',
@@ -76,11 +80,24 @@ const TRAZOS = {
 
 function iconoParaEtiqueta(etiqueta) {
   const texto = String(etiqueta).trim()
+  if (texto === 'Nuevo comunicado') return 'sumar'
+  if (texto === 'Publicar comunicado') return 'verificar'
+  if (texto === 'Cerrar comunicado') return 'cerrar'
+  if (texto === 'Ayuda') return 'vista'
   const exactos = {
-    Inicio: 'casa', 'Armar lista': 'planilla', Lista: 'planilla', 'Vista previa': 'vista', Personas: 'personas', 'Ver Personas': 'personas', Reporte: 'reporte', Asistencias: 'verificar', Asistencia: 'verificar', Agenda: 'agenda', 'Ver Agenda': 'agenda', Ajustes: 'ajustes', Ingresar: 'ingresar', 'Entrar con el token': 'ingresar', 'Cerrar sesión': 'salir', 'Volver al ingreso': 'volver', Reintentar: 'reintentar', Cancelar: 'cerrar', Cerrar: 'cerrar', Deshacer: 'volver', Rehacer: 'reintentar', Copiar: 'copiar', 'Rotar el token': 'acceso', 'Dar acceso': 'acceso', 'Guardar permisos': 'verificar', 'Agregar a la agenda': 'sumar', 'Usar la jornada anterior': 'volver', 'Tomar asistencia': 'verificar', 'Agregar persona': 'sumar', 'Agregar foto': 'sumar', 'Cambiar foto': 'lapiz', 'Quitar foto': 'eliminar', 'Editar perfil': 'lapiz', Personalizar: 'ajustes', Tarjetas: 'vista', Seleccionar: 'verificar', 'Cancelar selección': 'cerrar', 'Marcar nuevas': 'verificar', Archivar: 'archivar', 'Archivar persona': 'archivar', 'Restaurar persona': 'volver', 'Quitar acceso': 'eliminar', 'Listo, ya las anoté': 'verificar', 'Listo, ya la anoté': 'verificar', 'Hoy no viene': 'cerrar', 'Sumar apoyo': 'sumar', 'Elegí quién': 'personas', Editar: 'lapiz', 'Guardar cambios': 'verificar', 'Guardar personalización': 'verificar', 'Agregar': 'sumar', 'Descargar tarjeta PNG': 'descargar', 'Descargar PNG': 'descargar', 'Descargar CSV': 'descargar', 'Eliminar mes': 'eliminar', 'Eliminar día': 'eliminar', 'Eliminar definitivamente': 'eliminar', Continuar: 'adelante', Quitar: 'eliminar',
+    Inicio: 'casa', Control: 'tablero', 'Centro de control': 'tablero', 'Mi trabajo': 'verificar', Áreas: 'tablero', Formularios: 'planilla', Biblioteca: 'copiar', Cambios: 'copiar', Accesos: 'acceso', 'Registro institucional': 'copiar', Familias: 'personas', Deportes: 'planilla', Comunicación: 'tablero', Capacitaciones: 'personas', Finanzas: 'reporte', Eventos: 'agenda', Administración: 'ajustes', 'Gestor institucional': 'tablero', 'Fútbol sin Barreras': 'planilla', 'Operación FSB': 'planilla', 'Abrir Fútbol sin Barreras': 'planilla', 'Abrir Familias': 'personas', 'Abrir Deportes': 'planilla', 'Abrir Comunicación': 'tablero', 'Abrir Capacitaciones': 'personas', 'Abrir Finanzas': 'reporte', 'Abrir Eventos': 'agenda', 'Abrir Administración': 'ajustes', 'Volver a Aletea': 'volver', Crear: 'sumar', 'Nueva tarea': 'planilla', 'Nueva directriz': 'tablero', 'Nota para ordenar': 'planilla', 'Pedido a un equipo': 'adelante', 'Actividad o evento': 'agenda', Proyecto: 'tablero', 'Entrada para revisar': 'sumar', 'Preparar reunión': 'personas', 'Nuevo equipo': 'personas', 'Nuevo proyecto': 'tablero', 'Nueva alianza': 'personas', 'Registrar alianza': 'personas', 'Guardar alianza': 'verificar', 'Editar alianza': 'lapiz', 'Nueva checklist': 'sumar', 'Usar modelo de actividad': 'planilla', 'Aplicar checklist': 'verificar', 'Guardar checklist': 'verificar', 'Crear equipo': 'personas', 'Crear proyecto': 'tablero', 'Nueva actividad': 'agenda', 'Agendar actividad': 'agenda', 'Editar actividad': 'lapiz', 'Guardar actividad': 'verificar', 'Completar tarea': 'verificar', 'Armar lista': 'planilla', Lista: 'planilla', 'Vista previa': 'vista', Personas: 'personas', 'Ver Personas': 'personas', Reporte: 'reporte', Asistencias: 'verificar', Asistencia: 'verificar', Agenda: 'agenda', 'Ver Agenda': 'agenda', 'Ver agenda': 'agenda', Ajustes: 'ajustes', Ingresar: 'ingresar', 'Entrar con el token': 'ingresar', 'Cerrar sesión': 'salir', 'Volver al ingreso': 'volver', Reintentar: 'reintentar', Cancelar: 'cerrar', Cerrar: 'cerrar', Deshacer: 'volver', Rehacer: 'reintentar', Copiar: 'copiar', 'Rotar el token': 'acceso', 'Dar acceso': 'acceso', 'Guardar permisos': 'verificar', 'Agregar a la agenda': 'sumar', 'Usar la jornada anterior': 'volver', 'Tomar asistencia': 'verificar', 'Agregar persona': 'sumar', 'Agregar foto': 'sumar', 'Cambiar foto': 'lapiz', 'Quitar foto': 'eliminar', 'Listo, ya las anoté': 'verificar', 'Listo, ya la anoté': 'verificar', 'Hoy no viene': 'cerrar', 'Sumar apoyo': 'sumar', 'Elegí quién': 'personas', Editar: 'lapiz', 'Guardar cambios': 'verificar', 'Guardar personalización': 'verificar', 'Agregar': 'sumar', 'Descargar tarjeta PNG': 'descargar', 'Descargar PNG': 'descargar', 'Descargar CSV': 'descargar', 'Eliminar mes': 'eliminar', 'Eliminar día': 'eliminar', 'Eliminar definitivamente': 'eliminar', Continuar: 'adelante', Quitar: 'eliminar',
   }
+  if (['Nuevo programa', 'Crear programa'].includes(texto)) return 'tablero'
+  if (texto === 'Guardar programa') return 'verificar'
+  if (texto === 'Editar programa') return 'lapiz'
   if (exactos[texto]) return exactos[texto]
   if (texto.startsWith('Descargar ')) return 'descargar'
+  if (texto.startsWith('Nuevo ') || texto.startsWith('Nueva ') || texto.startsWith('Crear ') || texto.startsWith('Registrar ')) return 'sumar'
+  if (texto.startsWith('Abrir ') || texto.startsWith('Solicitar ')) return 'adelante'
+  if (texto.startsWith('Ver ')) return 'vista'
+  if (texto.startsWith('Copiar ')) return 'copiar'
+  if (texto.startsWith('Marcar ')) return 'verificar'
+  if (texto.startsWith('Cerrar ')) return 'cerrar'
   if (texto.startsWith('Guardar ')) return 'verificar'
   if (texto.startsWith('Agregar ')) return 'sumar'
   if (texto.startsWith('Editar ')) return 'lapiz'

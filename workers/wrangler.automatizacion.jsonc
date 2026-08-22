@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "voluntarios-fsb-automatizaciones",
+  "main": "automatizacion-interna.js",
+  "compatibility_date": "2026-08-17",
+  "triggers": {
+    "crons": ["15 * * * *"]
+  },
+  "d1_databases": [
+    {
+      "binding": "BASE",
+      "database_name": "voluntarios-fsb",
+      "database_id": "6cf85846-b176-4796-a43c-0078b19332ec"
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

@@ -249,6 +249,7 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
       cargar()
     })
     const rotulo = elemento('label', ['campo'])
+    rotulo.classList.add('reporte-selector-mes')
     rotulo.append(elemento('span', ['campo-rotulo'], 'Mes'), selector)
     seccion.appendChild(rotulo)
 

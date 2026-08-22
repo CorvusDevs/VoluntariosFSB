@@ -6,6 +6,9 @@
   "description": "Armado de asignaciones semanales de Futbol sin Barreras (Aletea)",
   "scripts": {
     "construir:cloudflare": "node herramientas/preparar-cloudflare.mjs",
+    "respaldo:crear": "node herramientas/respaldar-d1.mjs",
+    "respaldo:verificar": "node herramientas/verificar-respaldo-d1.mjs",
+    "respaldo:preparar-recuperacion": "node herramientas/preparar-recuperacion-d1.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "servir": "python3 -m http.server 8765"

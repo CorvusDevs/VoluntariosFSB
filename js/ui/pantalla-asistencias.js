@@ -186,6 +186,19 @@ export function crearPantallaAsistencias(raiz, { roster, almacen, alIrALista = n
     seccion.appendChild(elemento('p', ['ayuda'],
       'Sale de la planilla de ese día. Tocá a quien no coincida con lo que pasó.'))
     if (error) seccion.appendChild(elemento('p', ['error-ajustes'], error))
+    const genteActiva = [...roster.participantes, ...roster.voluntarios].filter((persona) => persona.activo !== false)
+    const registrados = genteActiva.filter((persona) => [VINO, FALTO].includes(estadoDe(persona.id))).length
+    const progreso = elemento('section', ['progreso-asistencia'])
+    progreso.append(
+      elemento('strong', [], `${registrados} de ${genteActiva.length} con asistencia registrada`),
+      elemento('span', [], registrados === genteActiva.length ? 'La jornada está completa.' : 'Tocá una persona para completar o corregir su estado.'),
+    )
+    const barra = elemento('span', ['progreso-asistencia-barra'])
+    barra.style.setProperty('--progreso', `${genteActiva.length ? Math.round((registrados / genteActiva.length) * 100) : 0}%`)
+    barra.setAttribute('role', 'progressbar')
+    barra.setAttribute('aria-valuemin', '0'); barra.setAttribute('aria-valuemax', String(genteActiva.length)); barra.setAttribute('aria-valuenow', String(registrados))
+    progreso.appendChild(barra)
+    seccion.appendChild(progreso)
     const bloque = (titulo, gente) => {
       seccion.appendChild(elemento('h3', ['subtitulo-asistencia'], titulo))
       const columna = elemento('div', ['columna-asistencia'])

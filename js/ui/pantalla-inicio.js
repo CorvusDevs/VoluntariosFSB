@@ -2,10 +2,11 @@ import { elemento, boton, vaciar } from './componentes.js'
 import { eventosDe, recordatoriosDe } from '../modelo/agenda.js'
 import { perfilesIncompletos, posiblesDuplicados } from '../modelo/roster.js'
 import { coincide } from '../util/nombres.js'
+import { evitarCortesHora, hoyISO } from '../util/fechas.js'
 
 const fechaLocal = (fecha) => new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long' }).format(new Date(`${fecha}T00:00:00`))
 
-export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = null, alIrA }) {
+export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = null, ultimaSincronizacion = null, alIrA, esModuloCMS = false, alVolverCMS = null }) {
   function dibujarResultados(caja, texto) {
     caja.replaceChildren()
     const consulta = texto.trim()
@@ -44,7 +45,15 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
 
   vaciar(raiz)
   const seccion = elemento('section', ['inicio'])
-  seccion.append(elemento('h2', [], 'Hoy en Fútbol sin Barreras'), elemento('p', ['ayuda'], 'Accesos y alertas para preparar la próxima jornada.'))
+  const encabezado = elemento('div', ['inicio-encabezado'])
+  const textoEncabezado = elemento('div', [])
+  textoEncabezado.append(
+    elemento('h2', [], esModuloCMS ? 'Fútbol sin Barreras' : 'Hoy en Fútbol sin Barreras'),
+    elemento('p', ['ayuda'], esModuloCMS ? 'Centro operativo del programa dentro de Aletea.' : 'Accesos y alertas para preparar la próxima jornada.'),
+  )
+  encabezado.append(textoEncabezado)
+  if (esModuloCMS && alVolverCMS) encabezado.appendChild(boton('Volver a Aletea', alVolverCMS))
+  seccion.appendChild(encabezado)
   const participantes = roster.participantes.filter((persona) => persona.activo !== false).length
   const voluntarios = roster.voluntarios.filter((persona) => persona.activo !== false).length
   const resumen = elemento('div', ['inicio-resumen'])
@@ -85,8 +94,14 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
   const incompletos = perfilesIncompletos(roster)
   const duplicados = posiblesDuplicados(roster)
   const recordatorios = recordatoriosDe(roster)
-  const fila = (texto, accion) => trabajo.appendChild(boton(texto, accion, ['inicio-tarea']))
-  if (incompletos.length) fila(`${incompletos.length} perfiles con datos básicos pendientes`, () => alIrA('personas'))
+  const fila = (texto, accion, clases = []) => trabajo.appendChild(boton(texto, accion, ['inicio-tarea', ...clases]))
+  if (incompletos.length) {
+    trabajo.appendChild(elemento('p', ['inicio-pendientes-resumen'], `${incompletos.length} perfiles con datos básicos pendientes`))
+    incompletos.slice(0, 3).forEach((persona) => {
+      fila(`Completar perfil: ${persona.nombre}`, () => alIrA('personas', { busqueda: persona.nombre }), ['inicio-tarea-prioritaria'])
+    })
+    if (incompletos.length > 3) fila(`Ver los ${incompletos.length} perfiles pendientes`, () => alIrA('personas'))
+  }
   if (duplicados.length) fila(`${duplicados.length} posible${duplicados.length === 1 ? '' : 's'} duplicado${duplicados.length === 1 ? '' : 's'} para revisar`, () => alIrA('personas'))
   recordatorios.forEach((evento) => fila(`${evento.faltan === 0 ? 'Hoy' : `En ${evento.faltan} días`}: ${evento.titulo}`, () => alIrA('agenda')))
   if (!incompletos.length && !duplicados.length && !recordatorios.length) trabajo.appendChild(elemento('p', ['ayuda'], 'No hay tareas administrativas pendientes.'))
@@ -94,7 +109,14 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
 
   const estado = elemento('section', ['inicio-estado'])
   const enLinea = typeof navigator === 'undefined' || navigator.onLine !== false
-  estado.append(elemento('strong', [], enLinea ? 'Listo para guardar' : 'Sin conexión'), elemento('span', [], enLinea ? 'Los cambios confirman su estado arriba de la pantalla.' : 'Los cambios no se guardarán hasta recuperar la conexión.'))
+  const horaSincronizacion = ultimaSincronizacion
+    ? evitarCortesHora(new Intl.DateTimeFormat('es-UY', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Montevideo' }).format(ultimaSincronizacion))
+    : 'Aún no se guardaron cambios en esta sesión.'
+  estado.append(
+    elemento('strong', [], enLinea ? 'Listo para guardar' : 'Sin conexión'),
+    elemento('span', [], enLinea ? 'Los cambios confirman su estado arriba de la pantalla.' : 'Los cambios no se guardarán hasta recuperar la conexión.'),
+    elemento('span', ['inicio-sincronizacion'], ultimaSincronizacion ? `Última sincronización: ${horaSincronizacion}` : horaSincronizacion),
+  )
   const resumenSemanal = elemento('section', ['inicio-semanal'])
   resumenSemanal.appendChild(elemento('h3', [], 'Resumen de la semana'))
   resumenSemanal.appendChild(elemento('p', [], tendencia?.texto ?? 'Todavía no hay jornadas registradas para calcular asistencia.'))
@@ -104,7 +126,7 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
 
   const proximos = elemento('section', ['inicio-proximos'])
   proximos.appendChild(elemento('h3', [], 'Próximas fechas'))
-  eventosDe(roster).filter((evento) => evento.fecha >= new Date().toISOString().slice(0, 10)).slice(0, 5).forEach((evento) => {
+  eventosDe(roster).filter((evento) => evento.fecha >= hoyISO()).slice(0, 5).forEach((evento) => {
     proximos.appendChild(elemento('p', ['inicio-fecha'], `${fechaLocal(evento.fecha)} · ${evento.tipo === 'cumpleanos' ? `Cumpleaños de ${evento.persona.nombre}` : evento.titulo}`))
   })
   seccion.appendChild(proximos)

@@ -21,11 +21,23 @@ export function fechaPerfil(texto) {
 
 export function perfilDe(persona) {
   return {
-    anioNacimiento: '',
     desde: '',
     leGusta: '',
     noLeGusta: '',
-    necesidades: '',
+    apoyosOperativos: '',
     ...persona.perfil,
+  }
+}
+
+export function privacidadDe(persona) {
+  const privacidad = persona?.privacidad ?? {}
+  return {
+    perfilInterno: privacidad.perfilInterno === true,
+    fotoInterna: privacidad.fotoInterna === true,
+    fotoPublica: privacidad.fotoPublica === true,
+    contacto: privacidad.contacto === true,
+    datosSensibles: privacidad.datosSensibles === true,
+    revisadoEl: String(privacidad.revisadoEl ?? ''),
+    ...privacidad,
   }
 }

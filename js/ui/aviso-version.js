@@ -20,14 +20,28 @@ export function trabajadorAlMando(navegador = typeof navigator !== 'undefined' ?
 
 export function sello(navegador) {
   const alMando = trabajadorAlMando(navegador)
-  const p = elemento('p', ['sello-version'])
-  p.dataset.version = VERSION
-  p.dataset.trabajador = alMando ? 'si' : 'no'
-  p.appendChild(elemento('span', [], `Versión ${VERSION}`))
-  p.appendChild(elemento('span', ['sello-estado'], alMando
-    ? ' · al día'
-    : ' · recargá una vez para activar las actualizaciones'))
-  return p
+  const pie = elemento('footer', ['sello-version'])
+  pie.dataset.version = VERSION
+  pie.dataset.trabajador = alMando ? 'si' : 'no'
+  const atribucion = elemento('span', ['sello-atribucion'], 'Sistema de Gestión Institucional desarrollado por ')
+  const corvus = elemento('a', [], 'CorvusDevs')
+  corvus.href = 'https://corvusdevs.github.io/'
+  corvus.target = '_blank'
+  corvus.rel = 'noreferrer'
+  atribucion.appendChild(corvus)
+  pie.append(
+    atribucion,
+    elemento('span', [], ` · Versión ${VERSION} · ${fechaVersion()}`),
+    elemento('span', ['sello-estado'], alMando ? ' · al día' : ' · recargá una vez para activar las actualizaciones'),
+  )
+  return pie
+}
+
+function fechaVersion(version = VERSION) {
+  const partes = /^(\d{4})-(\d{2})-(\d{2})/.exec(version)
+  if (!partes) return 'fecha no disponible'
+  return new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long', year: 'numeric' })
+    .format(new Date(`${partes[1]}-${partes[2]}-${partes[3]}T12:00:00`))
 }
 
 // Devuelve la version publicada, o null si no se pudo averiguar. Nunca lanza:

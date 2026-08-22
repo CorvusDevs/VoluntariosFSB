@@ -7,16 +7,21 @@ import { crearPantallaIngreso } from './ui/pantalla-ingreso.js'
 import { crearPantallaIngresoCloudflare } from './ui/pantalla-ingreso-cloudflare.js'
 import { crearPantallaAjustes } from './ui/pantalla-ajustes.js'
 import { crearPantallaAccesosCloudflare } from './ui/pantalla-accesos-cloudflare.js'
+import { crearPantallaRegistroInstitucional } from './ui/pantalla-registro-institucional.js'
+import { crearPantallaCambios } from './ui/pantalla-cambios.js'
+import { crearPantallaAyuda } from './ui/pantalla-ayuda.js'
+import { novedadesPendientes } from './ui/novedades.js'
 import { crearPantallaRegistro } from './ui/pantalla-registro.js'
 import { crearPantallaReporte } from './ui/pantalla-reporte.js'
 import { crearPantallaAsistencias } from './ui/pantalla-asistencias.js'
 import { crearPantallaAgenda } from './ui/pantalla-agenda.js'
 import { crearPantallaInicio } from './ui/pantalla-inicio.js'
+import { crearPantallaCMS } from './ui/pantalla-cms.js'
 import { crearFranjaAlerta } from './ui/franja-alerta.js'
 import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
 import { crearLista, sincronizarConRoster, moverAGrupo, duplicarListaParaFecha } from './modelo/lista.js'
 import { proximoSabado, hoyISO } from './util/fechas.js'
-import { boton, vaciar, elemento } from './ui/componentes.js'
+import { boton, vaciar, elemento, icono } from './ui/componentes.js'
 import { CONFIG } from './config.js'
 import { esAdmin, leerUsuarios } from './acceso/usuarios.js'
 import { olvidar, recordar, recuperarRecordado } from './acceso/sesion.js'
@@ -24,7 +29,7 @@ import { cerrarSesionCloudflare, ingresarCloudflare, leerSesionCloudflare } from
 import { sello, vigilarVersion } from './ui/aviso-version.js'
 import { registrarTrabajador } from './ui/trabajador.js'
 import {
-  guardarUltimaPantalla, leerUltimaPantalla, olvidarUltimaPantalla, pantallaPermitida,
+  guardarUltimaPantalla, hashParaPantalla, leerUltimaPantalla, olvidarUltimaPantalla, pantallaPermitida, rutaCompartidaDesdeHash,
 } from './ui/ultima-pantalla.js'
 import { VERSION } from './version.js'
 
@@ -55,15 +60,52 @@ let tendencia = null
 let ocultarEstadoGuardado = null
 let intentoGuardado = 0
 let estadoGuardadoActual = null
+let ultimaSincronizacion = null
+let limpiarNavegacionMovil = null
+let notificacionesPendientes = 0
 
-function abrirPantalla(destino, contexto = {}) {
+function pintarContadoresNotificaciones() {
+  contenedor.querySelectorAll('[data-contador-notificaciones]').forEach((contador) => {
+    contador.textContent = notificacionesPendientes > 99 ? '99+' : String(notificacionesPendientes)
+    contador.hidden = notificacionesPendientes < 1
+    contador.setAttribute('aria-label', `${notificacionesPendientes} ${notificacionesPendientes === 1 ? 'aviso pendiente' : 'avisos pendientes'}`)
+  })
+}
+
+async function actualizarResumenNotificaciones() {
+  if (sesion?.origen !== 'cloudflare') return
+  try {
+    const respuesta = await fetch('/api/cms/notificaciones/resumen', { headers: { accept: 'application/json' } })
+    const resumen = await respuesta.json()
+    if (!respuesta.ok) throw new Error(resumen.error || 'No se pudo leer el resumen de avisos.')
+    notificacionesPendientes = Math.max(0, Number(resumen.pendientes || 0))
+    pintarContadoresNotificaciones()
+  } catch { /* La navegación sigue disponible aunque falle el contador. */ }
+}
+
+function actualizarRuta(destino, contexto = {}, reemplazar = false) {
+  const hash = hashParaPantalla(destino, contexto)
+  if (!hash || location.hash === hash) return
+  const metodo = reemplazar ? 'replaceState' : 'pushState'
+  history[metodo]({ pantalla: destino }, '', `${location.pathname}${location.search}${hash}`)
+}
+
+function abrirPantalla(destino, contexto = {}, opciones = {}) {
   if (!pantallaPermitida(destino, {
     admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos,
   })) return
   pantalla = destino
   contextoPantalla = contexto
   guardarUltimaPantalla(pantalla)
+  if (!opciones.desdeHistorial) actualizarRuta(pantalla, contexto)
   dibujar()
+}
+
+async function copiarEnlacePantalla(destino, contexto = {}) {
+  const url = new URL(location.href)
+  url.hash = hashParaPantalla(destino, contexto)
+  await navigator.clipboard.writeText(url.href)
+  return url.href
 }
 
 function cambiarEstadoGuardado(estado, mensaje, alReintentar = null) {
@@ -101,6 +143,7 @@ async function guardarListaConEstado(siguiente, descripcion, confirmacion = null
   cambiarEstadoGuardado('guardando', 'Guardando…')
   try {
     await deposito.guardarLista(siguiente, descripcion)
+    ultimaSincronizacion = new Date()
     if (esteIntento === intentoGuardado) {
       cambiarEstadoGuardado('guardado', confirmacion ?? 'Guardado')
     }
@@ -119,6 +162,7 @@ async function guardarRosterConEstado(siguiente, descripcion) {
   cambiarEstadoGuardado('guardando', 'Guardando cambios de personas…')
   try {
     await deposito.guardarRoster(siguiente, descripcion)
+    ultimaSincronizacion = new Date()
     cambiarEstadoGuardado('guardado', 'Cambios guardados')
   } catch (fallo) {
     cambiarEstadoGuardado('error', `No se pudieron guardar los cambios: ${fallo.message}`, () => {
@@ -160,6 +204,13 @@ function navegacion() {
     if (!pantallaPermitida(destino, { admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos })) return null
     const b = boton(etiqueta, () => abrirPantalla(destino))
     b.dataset.pantalla = destino
+    if (destino === 'cms-trabajo') {
+      const contador = elemento('span', ['navegacion-contador'], String(notificacionesPendientes))
+      contador.dataset.contadorNotificaciones = ''
+      contador.hidden = notificacionesPendientes < 1
+      contador.setAttribute('aria-label', `${notificacionesPendientes} avisos pendientes`)
+      b.appendChild(contador)
+    }
     if (pantalla === destino) {
       b.classList.add('activa')
       b.setAttribute('aria-current', 'page')
@@ -167,12 +218,127 @@ function navegacion() {
     return b
   }
 
+  if (sesion?.origen === 'cloudflare') {
+    caja.classList.add('navegacion-cms-contenedor')
+    const escritorio = elemento('aside', ['navegacion-cms', 'navegacion-escritorio'])
+    const marca = elemento('button', ['navegacion-cms-marca'])
+    marca.type = 'button'
+    marca.setAttribute('aria-label', 'Ir al centro de control')
+    const logo = document.createElement('img')
+    logo.src = 'assets/logo-aletea-violeta.png'
+    logo.alt = 'Aletea'
+    marca.append(logo, elemento('small', [], 'Gestión institucional'))
+    marca.addEventListener('click', () => abrirPantalla('inicio'))
+    escritorio.appendChild(marca)
+
+    const bloque = (titulo, destinos) => {
+      const grupo = elemento('div', ['navegacion-cms-grupo'])
+      grupo.appendChild(elemento('span', ['navegacion-cms-rotulo'], titulo))
+      destinos.forEach(([destino, etiqueta]) => {
+        const control = ir(destino, etiqueta)
+        if (control) grupo.appendChild(control)
+      })
+      escritorio.appendChild(grupo)
+    }
+    bloque('Trabajo', [
+      ['inicio', 'Centro de control'], ['cms-trabajo', 'Mi trabajo'], ['cms-agenda', 'Agenda'],
+    ])
+    bloque('Organización', [
+      ['cms-areas', 'Áreas'], ['cms-formularios', 'Formularios'], ['cms-biblioteca', 'Biblioteca'],
+    ])
+    if (esAdmin(sesion)) bloque('Administración', [
+      ['accesos', 'Accesos'], ['registro-institucional', 'Registro institucional'],
+    ])
+    bloque('Equipos', [
+      ['cms-familias', 'Familias'], ['cms-deportes', 'Deportes'], ['cms-comunicacion', 'Comunicación'],
+      ['cms-capacitaciones', 'Capacitaciones'], ['cms-finanzas', 'Finanzas'], ['cms-eventos', 'Eventos'],
+      ['cms-administracion', 'Administración'],
+    ])
+    const sistema = elemento('div', ['navegacion-cms-sistema'])
+    sistema.appendChild(elemento('span', ['navegacion-cms-rotulo'], 'Sistema'))
+    const ayuda = ir('ayuda', 'Ayuda')
+    if (ayuda) sistema.appendChild(ayuda)
+    const cambios = ir('cambios', 'Cambios')
+    if (cambios) sistema.appendChild(cambios)
+    escritorio.appendChild(sistema)
+    const cuenta = elemento('div', ['navegacion-cms-cuenta'])
+    cuenta.append(elemento('span', ['navegacion-cms-usuario'], sesion?.nombre || 'Cuenta Aletea'))
+    const salir = boton('Cerrar sesión', cerrarSesion)
+    salir.dataset.accion = 'cerrar-sesion'
+    cuenta.appendChild(salir)
+    escritorio.appendChild(cuenta)
+
+    const movil = elemento('nav', ['navegacion-movil', 'navegacion-cms-movil'])
+    movil.setAttribute('aria-label', 'Secciones principales')
+    ;[['inicio', 'Inicio'], ['cms-trabajo', 'Mi trabajo'], ['cms-agenda', 'Agenda']].forEach(([destino, etiqueta]) => {
+      const control = ir(destino, etiqueta)
+      if (control) movil.appendChild(control)
+    })
+    const mas = document.createElement('details')
+    mas.className = 'navegacion-mas'
+    const resumen = elemento('summary', ['boton-navegacion'])
+    resumen.append(icono('tablero'), document.createTextNode('Más'))
+    const secundarios = ['cms-areas', 'cms-formularios', 'cms-biblioteca', 'cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion', 'accesos', 'registro-institucional', 'ayuda', 'cambios']
+    if (secundarios.includes(pantalla)) resumen.classList.add('activa')
+    mas.appendChild(resumen)
+    const menu = elemento('div', ['menu-navegacion'])
+    const etiquetas = { 'cms-areas': 'Áreas', 'cms-formularios': 'Formularios', 'cms-biblioteca': 'Biblioteca', 'cms-familias': 'Familias', 'cms-deportes': 'Deportes', 'cms-comunicacion': 'Comunicación', 'cms-capacitaciones': 'Capacitaciones', 'cms-finanzas': 'Finanzas', 'cms-eventos': 'Eventos', 'cms-administracion': 'Administración', accesos: 'Accesos', 'registro-institucional': 'Registro institucional', ayuda: 'Ayuda', cambios: 'Cambios' }
+    const agregarGrupo = (titulo, destinos) => {
+      const controles = destinos.map((destino) => ir(destino, etiquetas[destino])).filter(Boolean)
+      if (!controles.length) return
+      const grupo = elemento('section', ['menu-navegacion-grupo'])
+      grupo.append(elemento('span', ['menu-navegacion-titulo'], titulo), ...controles)
+      menu.appendChild(grupo)
+    }
+    agregarGrupo('Organización', ['cms-areas', 'cms-formularios', 'cms-biblioteca'])
+    agregarGrupo('Equipos', ['cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion'])
+    agregarGrupo('Administración', ['accesos', 'registro-institucional'])
+    agregarGrupo('Sistema', ['ayuda', 'cambios'])
+    const salirMovil = boton('Cerrar sesión', cerrarSesion)
+    salirMovil.dataset.accion = 'cerrar-sesion-movil'
+    menu.appendChild(salirMovil)
+    mas.appendChild(menu)
+    const cerrarFuera = (evento) => {
+      if (mas.open && !mas.contains(evento.target)) mas.open = false
+    }
+    const cerrarConTecla = (evento) => {
+      if (evento.key !== 'Escape' || !mas.open) return
+      mas.open = false
+      resumen.focus()
+    }
+    document.addEventListener('pointerdown', cerrarFuera)
+    document.addEventListener('keydown', cerrarConTecla)
+    limpiarNavegacionMovil = () => {
+      document.removeEventListener('pointerdown', cerrarFuera)
+      document.removeEventListener('keydown', cerrarConTecla)
+    }
+    movil.appendChild(mas)
+    caja.append(escritorio, movil)
+    return caja
+  }
+
   const escritorio = elemento('nav', ['navegacion', 'navegacion-escritorio'])
   escritorio.setAttribute('aria-label', 'Secciones')
-  escritorio.append(...['inicio', 'lista', 'vista-previa', 'personas'].map((destino) => ir(destino, { inicio: 'Inicio', lista: 'Armar lista', 'vista-previa': 'Vista previa', personas: 'Personas' }[destino])).filter(Boolean))
+  const principales = sesion?.origen === 'cloudflare'
+    ? ['inicio', 'operacion']
+    : ['inicio', 'lista', 'vista-previa', 'personas']
+  escritorio.append(...principales.map((destino) => ir(destino, { inicio: 'Centro de control', operacion: 'Operación FSB', lista: 'Armar lista', 'vista-previa': 'Vista previa', personas: 'Personas' }[destino])).filter(Boolean))
+  if (sesion?.origen === 'cloudflare') {
+    const areas = document.createElement('details')
+    areas.className = 'navegacion-mas navegacion-areas'
+    const resumenAreas = elemento('summary', ['boton-navegacion'], 'Áreas')
+    const destinosAreas = ['cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion']
+    if (destinosAreas.includes(pantalla)) resumenAreas.classList.add('activa')
+    areas.appendChild(resumenAreas)
+    const menuAreas = elemento('div', ['menu-navegacion'])
+    const etiquetasAreas = { 'cms-familias': 'Familias', 'cms-deportes': 'Deportes', 'cms-comunicacion': 'Comunicación', 'cms-capacitaciones': 'Capacitaciones', 'cms-finanzas': 'Finanzas', 'cms-eventos': 'Eventos', 'cms-administracion': 'Administración' }
+    menuAreas.append(...destinosAreas.map((destino) => ir(destino, etiquetasAreas[destino])).filter(Boolean))
+    areas.appendChild(menuAreas)
+    escritorio.appendChild(areas)
+  }
   // Reporte y asistencias los ven los dos roles: quien coordina ya ve el nombre
   // y la foto de cada chico, asi que la asistencia no agrega exposicion.
-  escritorio.append(...['reporte', 'asistencias', 'agenda'].map((destino) => ir(destino, { reporte: 'Reporte', asistencias: 'Asistencias', agenda: 'Agenda' }[destino])).filter(Boolean))
+  if (sesion?.origen !== 'cloudflare') escritorio.append(...['reporte', 'asistencias', 'agenda'].map((destino) => ir(destino, { reporte: 'Reporte', asistencias: 'Asistencias', agenda: 'Agenda' }[destino])).filter(Boolean))
   // Los ajustes son de la administracion: para el resto no existen ni como
   // boton. El guardia de verdad vive en usuarios.js y en la propia pantalla.
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') escritorio.appendChild(ir('registro', 'Registro'))
@@ -195,20 +361,23 @@ function navegacion() {
   // filas antes de que aparezca la planilla.
   const movil = elemento('nav', ['navegacion-movil'])
   movil.setAttribute('aria-label', 'Secciones principales')
-  movil.append(...['lista', 'personas', 'asistencias'].map((destino) => ir(destino, { lista: 'Lista', personas: 'Personas', asistencias: 'Asistencia' }[destino])).filter(Boolean))
+  const principalesMovil = sesion?.origen === 'cloudflare' ? ['inicio', 'operacion'] : ['lista', 'personas', 'asistencias']
+  movil.append(...principalesMovil.map((destino) => ir(destino, { inicio: 'Control', operacion: 'Programa', lista: 'Lista', personas: 'Personas', asistencias: 'Asistencia' }[destino])).filter(Boolean))
 
   const mas = document.createElement('details')
   mas.className = 'navegacion-mas'
   const resumen = elemento('summary', ['boton-navegacion'], 'Más')
   resumen.setAttribute('aria-label', 'Más secciones')
-  const destinosSecundarios = ['inicio', 'vista-previa', 'reporte', 'agenda', 'registro', 'ajustes']
+  const destinosSecundarios = sesion?.origen === 'cloudflare'
+    ? ['cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion', 'ajustes']
+    : ['inicio', 'vista-previa', 'reporte', 'agenda', 'registro', 'ajustes']
   if (destinosSecundarios.includes(pantalla)) {
     resumen.classList.add('activa')
     resumen.setAttribute('aria-current', 'page')
   }
   mas.appendChild(resumen)
   const menu = elemento('div', ['menu-navegacion'])
-  menu.append(...['inicio', 'vista-previa', 'reporte', 'agenda'].map((destino) => ir(destino, { inicio: 'Inicio', 'vista-previa': 'Vista previa', reporte: 'Reporte', agenda: 'Agenda' }[destino])).filter(Boolean))
+  menu.append(...destinosSecundarios.filter((destino) => !['registro', 'ajustes'].includes(destino)).map((destino) => ir(destino, { inicio: 'Centro de control', 'vista-previa': 'Vista previa', personas: 'Personas', reporte: 'Reporte', asistencias: 'Asistencias', agenda: 'Agenda', 'cms-familias': 'Familias', 'cms-deportes': 'Deportes', 'cms-comunicacion': 'Comunicación', 'cms-capacitaciones': 'Capacitaciones', 'cms-finanzas': 'Finanzas', 'cms-eventos': 'Eventos', 'cms-administracion': 'Administración' }[destino])).filter(Boolean))
   if (esAdmin(sesion) && sesion?.origen !== 'cloudflare') menu.appendChild(ir('registro', 'Registro'))
   if (esAdmin(sesion)) menu.appendChild(ir('ajustes', 'Ajustes'))
   if (sesion) {
@@ -301,7 +470,10 @@ async function anotarSeguimiento(persona, nota) {
 
 function dibujar() {
   olvidarVista()
+  limpiarNavegacionMovil?.()
+  limpiarNavegacionMovil = null
   vaciar(contenedor)
+  contenedor.classList.toggle('app-cms', sesion?.origen === 'cloudflare')
   contenedor.appendChild(navegacion())
   const estadoGuardado = elemento('div', ['estado-guardado'])
   estadoGuardado.dataset.estadoGuardado = ''
@@ -314,8 +486,23 @@ function dibujar() {
   contenedor.appendChild(cuerpo)
   contenedor.appendChild(sello())
 
-  if (pantalla === 'inicio') {
-    vista = crearPantallaInicio(cuerpo, { roster, alertas, tendencia, alIrA: abrirPantalla })
+  if ((pantalla === 'inicio' || pantalla.startsWith('cms-')) && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaCMS(cuerpo, {
+      sesion,
+      alIrA: abrirPantalla,
+      area: pantalla === 'inicio' ? 'control' : pantalla.slice(4),
+      contexto: contextoPantalla,
+      alCambiarNotificaciones: (cantidad) => {
+        notificacionesPendientes = Math.max(0, Number(cantidad || 0))
+        pintarContadoresNotificaciones()
+      },
+    })
+  } else if (pantalla === 'inicio' || pantalla === 'operacion') {
+    vista = crearPantallaInicio(cuerpo, {
+      roster, alertas, tendencia, ultimaSincronizacion, alIrA: abrirPantalla,
+      esModuloCMS: pantalla === 'operacion' && sesion?.origen === 'cloudflare',
+      alVolverCMS: () => abrirPantalla('inicio'),
+    })
   } else if (pantalla === 'lista') {
     vista = crearPantallaLista(cuerpo, {
       lista,
@@ -380,6 +567,7 @@ function dibujar() {
     vista = crearPantallaAgenda(cuerpo, {
       roster,
       almacen: deposito,
+      sesion,
       alGuardar: guardarRosterConEstado,
       alCambiar: async (siguiente) => {
         roster = siguiente
@@ -407,8 +595,17 @@ function dibujar() {
         rama: CONFIG.rama,
       }),
     })
-  } else if (pantalla === 'ajustes' && esAdmin(sesion) && sesion?.origen === 'cloudflare') {
+  } else if ((pantalla === 'accesos' || pantalla === 'ajustes') && esAdmin(sesion) && sesion?.origen === 'cloudflare') {
     vista = crearPantallaAccesosCloudflare(cuerpo, { sesion })
+  } else if (pantalla === 'registro-institucional' && esAdmin(sesion) && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaRegistroInstitucional(cuerpo)
+  } else if (pantalla === 'ayuda' && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaAyuda(cuerpo, { alIrA: abrirPantalla, admin: esAdmin(sesion), busquedaInicial: contextoPantalla.busqueda, alCopiarEnlace: (busqueda) => copiarEnlacePantalla('ayuda', { busqueda }) })
+  } else if (pantalla === 'cambios' && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaCambios(cuerpo, {
+      novedades: contextoPantalla.novedades || [],
+      alCerrarNovedades: () => { contextoPantalla = {} },
+    })
   } else if (pantalla === 'ajustes' && esAdmin(sesion)) {
     vista = crearPantallaAjustes(cuerpo, {
       sesion,
@@ -426,6 +623,7 @@ function dibujar() {
     vista = crearPantallaPersonas(cuerpo, {
       roster,
       almacen: deposito,
+      sesion,
       esAdmin: esAdmin(sesion),
       busquedaInicial: contextoPantalla.busqueda,
       alGuardar: guardarRosterConEstado,
@@ -465,10 +663,22 @@ async function abrirAplicacion() {
     roster = await deposito.leerRoster()
     const sabado = proximoSabado()
     lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
-    const restaurada = leerUltimaPantalla()
+    const inicioPorDefecto = sesion?.origen === 'cloudflare' && pantallaPermitida('inicio', {
+      admin: esAdmin(sesion), cloudflare: true, permisos: sesion?.permisos,
+    }) ? 'inicio' : 'lista'
+    const rutaCompartida = rutaCompartidaDesdeHash(location.hash)
+    const restaurada = rutaCompartida?.pantalla || leerUltimaPantalla(globalThis.sessionStorage, inicioPorDefecto)
     pantalla = pantallaPermitida(restaurada, {
       admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos,
-    }) ? restaurada : 'lista'
+    }) ? restaurada : inicioPorDefecto
+    contextoPantalla = rutaCompartida?.pantalla === pantalla ? rutaCompartida.contexto : {}
+    await actualizarResumenNotificaciones()
+    const novedades = sesion?.origen === 'cloudflare' ? novedadesPendientes() : []
+    if (novedades.length && !rutaCompartida) {
+      pantalla = 'cambios'
+      contextoPantalla = { novedades }
+    }
+    actualizarRuta(pantalla, contextoPantalla, true)
     dibujar()
     // Despues de dibujar y sin await en el camino critico: la planilla tiene que
     // aparecer ya, y el aviso se suma cuando este listo.
@@ -514,8 +724,13 @@ async function entrarCloudflare({ usuario, contrasena }) {
 
 async function cerrarSesion() {
   olvidarUltimaPantalla()
-  if (sesion?.origen === 'cloudflare') {
-    await cerrarSesionCloudflare()
+  // Pages nunca debe caer al ingreso legado de GitHub. En particular, si la
+  // comprobacion de sesion fallo antes de poblar `sesion`, el boton de
+  // recuperacion sigue llevando al acceso institucional.
+  if (sesion?.origen === 'cloudflare' || location.hostname.endsWith('.pages.dev')) {
+    // Cerrar en el servidor es un intento de mejor esfuerzo: si esa llamada
+    // tambien falla, igual hay que permitir que la persona vuelva a ingresar.
+    try { await cerrarSesionCloudflare() } catch {}
     sesion = null
     configurar({ modo: 'local', token: null, autor: null })
     deposito = null
@@ -555,3 +770,10 @@ if (esCloudflare) {
   }
 } else if (recordada) await entrar({ ...recordada, recordar: false })
 else mostrarIngreso()
+
+window.addEventListener('popstate', () => {
+  if (!sesion) return
+  const ruta = rutaCompartidaDesdeHash(location.hash)
+  if (!ruta || ruta.pantalla === pantalla) return
+  abrirPantalla(ruta.pantalla, ruta.contexto, { desdeHistorial: true })
+})

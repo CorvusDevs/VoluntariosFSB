@@ -31,6 +31,21 @@ export function hoyISO() {
   return `${ahora.getFullYear()}-${p(ahora.getMonth() + 1)}-${p(ahora.getDate())}`
 }
 
+export function evitarCortesHora(texto) {
+  return String(texto ?? '').replace(
+    /(\d{1,2}:\d{2})\s+([ap])\.\s*m\./gi,
+    (_, hora, periodo) => `${hora}\u00a0${periodo}.\u00a0m.`,
+  )
+}
+
+export function fechaDesdeUTC(valor) {
+  const texto = String(valor ?? '').trim()
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(texto)) {
+    return new Date(`${texto.replace(' ', 'T')}Z`)
+  }
+  return new Date(texto)
+}
+
 export function proximoSabado(desdeISO) {
   const base = desdeISO ?? hoyISO()
   const { diaSemana } = partes(base)

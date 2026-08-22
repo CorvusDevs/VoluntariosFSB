@@ -69,6 +69,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   let ocupado = false
   // Los bosquejos arrancan plegados: se abren al tocar "Cambiar".
   let formatoAbierto = false
+  let pestanaActiva = 'resultado'
   // Aviso puntual para la coordinadora, por ejemplo cuando compartir no anda.
   let mensaje = ''
 
@@ -407,15 +408,26 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (!vivo) return
     vaciar(raiz)
     calcular()
-    raiz.appendChild(panelDeFormato())
-    raiz.appendChild(interruptores())
-    raiz.appendChild(mensajes())
-    raiz.appendChild(informacion())
+    const pestanas = elemento('div', ['vista-pestanas'])
+    ;[['resultado', 'Vista previa'], ['configuracion', 'Configuración']].forEach(([valor, etiqueta]) => {
+      const control = boton(etiqueta, () => { pestanaActiva = valor; redibujar() })
+      control.classList.add('vista-pestana')
+      control.classList.toggle('activa', pestanaActiva === valor)
+      control.setAttribute('aria-pressed', String(pestanaActiva === valor))
+      pestanas.appendChild(control)
+    })
+    raiz.appendChild(pestanas)
+    const configuracion = elemento('div', ['vista-panel-configuracion'])
+    configuracion.hidden = pestanaActiva !== 'configuracion'
+    configuracion.append(panelDeFormato(), interruptores(), informacion(), mensajes())
+    raiz.appendChild(configuracion)
     const aviso = avisoRecorte()
     if (aviso) raiz.appendChild(aviso)
     if (mensaje) raiz.appendChild(elemento('div', ['aviso'], mensaje))
-    raiz.appendChild(acciones())
-    raiz.appendChild(lienzo)
+    const resultado = elemento('div', ['vista-panel-resultado'])
+    resultado.hidden = pestanaActiva !== 'resultado'
+    resultado.append(acciones(), lienzo)
+    raiz.appendChild(resultado)
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
     // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.
     if (ocupado) controles().forEach((c) => { c.disabled = true })

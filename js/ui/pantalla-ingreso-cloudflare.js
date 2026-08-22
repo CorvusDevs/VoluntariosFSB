@@ -1,4 +1,6 @@
 import { elemento, vaciar } from './componentes.js'
+import { sello } from './aviso-version.js'
+import { crearSeccionCambios } from './pantalla-cambios.js'
 
 function campo(rotulo, tipo, nombre, atributos = {}) {
   const caja = elemento('label', ['campo'])
@@ -49,13 +51,21 @@ export function crearPantallaIngresoCloudflare(raiz, { alEntrar }) {
     }
   })
   vaciar(raiz)
-  const caja = elemento('section', ['ingreso'])
-  caja.append(
-    elemento('h1', ['titulo-ingreso'], 'Fútbol sin Barreras'),
-    elemento('p', ['ayuda-ingreso'], 'Ingresá con el usuario y la contraseña que te entregó la administración.'),
+  const caja = elemento('main', ['ingreso', 'ingreso-aletea'])
+  const marca = elemento('header', ['ingreso-marca'])
+  const logo = document.createElement('img')
+  logo.src = 'assets/logo-aletea-violeta.png'
+  logo.alt = 'Aletea'
+  marca.append(logo, elemento('p', [], 'Gestión institucional'))
+  const tarjeta = elemento('section', ['ingreso-tarjeta'])
+  tarjeta.append(
+    elemento('p', ['ingreso-eyebrow'], 'Bienvenida'),
+    elemento('h1', ['titulo-ingreso'], 'Aletea institucional'),
+    elemento('p', ['ayuda-ingreso'], 'Ingresá con tu usuario de acceso y la contraseña que te asignó la administración.'),
     formulario,
     error,
   )
+  caja.append(marca, tarjeta, crearSeccionCambios({ compacto: true }), sello())
   raiz.appendChild(caja)
   return { error: () => error.textContent }
 }

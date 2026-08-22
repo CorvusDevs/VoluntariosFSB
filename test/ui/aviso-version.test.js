@@ -15,7 +15,10 @@ describe('sello de version', () => {
   })
 
   it('escribe la version en la pantalla', () => {
-    expect(sello().textContent).toContain(VERSION)
+    const pie = sello()
+    expect(pie.textContent).toContain(VERSION)
+    expect(pie.textContent).toContain('Sistema de Gestión Institucional desarrollado por CorvusDevs')
+    expect(pie.querySelector('a').href).toBe('https://corvusdevs.github.io/')
   })
 })
 

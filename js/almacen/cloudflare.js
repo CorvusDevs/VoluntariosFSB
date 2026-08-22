@@ -42,6 +42,18 @@ export function crearAlmacenCloudflare({ fetchFn } = {}) {
   return {
     leerRoster: () => leerJson('roster.json', { version: 1, participantes: [], voluntarios: [] }),
     guardarRoster: (datos) => guardarJson('roster.json', datos),
+    async leerFichaProtegida(id) {
+      const respuesta = await pedir(`/api/personas/${encodeURIComponent(id)}/protegida`)
+      if (!respuesta.ok) throw new Error((await respuesta.json()).error || 'No se pudo abrir la ficha protegida.')
+      return respuesta.json()
+    },
+    async guardarFichaProtegida(id, datos) {
+      const respuesta = await pedir(`/api/personas/${encodeURIComponent(id)}/protegida`, {
+        method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(datos),
+      })
+      if (!respuesta.ok) throw new Error((await respuesta.json()).error || 'No se pudo guardar la ficha protegida.')
+      return respuesta.json()
+    },
     leerLista: (fecha) => leerJson(rutaLista(fecha)),
     guardarLista: (datos) => guardarJson(rutaLista(datos.fecha), datos),
     async listarListas() {

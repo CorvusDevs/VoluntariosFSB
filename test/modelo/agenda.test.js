@@ -23,12 +23,15 @@ describe('agenda', () => {
     expect(quitarEvento(conEvento, conEvento.agenda.eventos[0].id).agenda.eventos).toHaveLength(0)
   })
 
-  it('incluye efemérides inclusivas de Uruguay y las fechas móviles familiares', () => {
+  it('incluye fechas nacionales, internacionales e inclusivas, también las móviles familiares', () => {
     const eventos = efemeridesUruguay([2026])
     expect(eventos).toEqual(expect.arrayContaining([
-      expect.objectContaining({ fecha: '2026-04-02', titulo: 'Día Nacional de las Personas con TEA' }),
+      expect.objectContaining({ fecha: '2026-01-24', titulo: 'Día Internacional de la Educación' }),
+      expect.objectContaining({ fecha: '2026-02-16', titulo: 'Carnaval' }),
+      expect.objectContaining({ fecha: '2026-04-02', titulo: 'Día Mundial de Concienciación sobre el Autismo' }),
       expect.objectContaining({ fecha: '2026-05-10', titulo: 'Día de la Madre' }),
       expect.objectContaining({ fecha: '2026-08-09', titulo: 'Día de la Niñez' }),
+      expect.objectContaining({ fecha: '2026-08-25', titulo: 'Declaratoria de la Independencia' }),
       expect.objectContaining({ fecha: '2026-10-12', titulo: 'Día de la Diversidad Cultural' }),
       expect.objectContaining({ fecha: '2026-12-03', titulo: 'Día Internacional de las Personas con Discapacidad' }),
     ]))

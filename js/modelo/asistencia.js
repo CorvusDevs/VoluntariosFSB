@@ -56,17 +56,26 @@ export function historial(listas, roster, correcciones = []) {
   const ordenadas = [...listas].sort((a, b) => a.fecha.localeCompare(b.fecha))
   const fechas = ordenadas.map((l) => l.fecha)
   const conocidas = new Set(fechas)
+  const corregidas = new Set()
 
   const porFecha = new Map(ordenadas.map((l) => [l.fecha, estadoDeSabado(l, roster)]))
   correcciones.forEach((c) => {
     // Una correccion de un sabado que no tiene planilla no tiene donde apoyarse.
     if (!conocidas.has(c.fecha)) return
     porFecha.get(c.fecha).set(c.persona, c.vino ? VINO : FALTO)
+    corregidas.add(`${c.fecha}:${c.persona}`)
   })
 
   const fila = (persona, recortarArranque) => {
     let estados = fechas.map((f) => porFecha.get(f).get(persona.id) ?? NO_ESTABA)
-    if (recortarArranque) {
+    if (recortarArranque && persona.activo === false) {
+      // Una persona archivada ya no aparece en las planillas nuevas. Para un
+      // voluntario, esa ausencia no prueba que haya faltado: solo conservamos
+      // presencias y correcciones explicitas del mes.
+      estados = estados.map((estado, indice) => (
+        estado === VINO || corregidas.has(`${fechas[indice]}:${persona.id}`) ? estado : NO_ESTABA
+      ))
+    } else if (recortarArranque) {
       // Del voluntario, "no aparece" y "todavia no estaba" son el mismo dato en
       // una planilla suelta. Se separan aca: hasta que se lo ve por primera vez
       // no habia nada que faltar.
@@ -83,10 +92,14 @@ export function historial(listas, roster, correcciones = []) {
     }
   }
 
+  // El directorio conserva personas archivadas para no perder su historial.
+  // En el reporte mensual solo deben aparecer si ese mes tiene evidencia real.
+  const visibleEnReporte = (registro) => registro.persona.activo !== false || registro.de > 0
+
   return {
     fechas,
-    participantes: (roster.participantes ?? []).map((p) => fila(p, false)),
-    voluntarios: (roster.voluntarios ?? []).map((v) => fila(v, true)),
+    participantes: (roster.participantes ?? []).map((p) => fila(p, false)).filter(visibleEnReporte),
+    voluntarios: (roster.voluntarios ?? []).map((v) => fila(v, true)).filter(visibleEnReporte),
   }
 }
 

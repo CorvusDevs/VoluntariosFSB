@@ -1,11 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { ficha, boton, escapar } from '../../js/ui/componentes.js'
+import { ficha, boton, escapar, elemento } from '../../js/ui/componentes.js'
 
 describe('escapar', () => {
   it('neutraliza los caracteres peligrosos de HTML', () => {
     expect(escapar('<script>')).toBe('&lt;script&gt;')
     expect(escapar('a & b')).toBe('a &amp; b')
     expect(escapar('"x"')).toBe('&quot;x&quot;')
+  })
+})
+
+describe('elemento', () => {
+  it('incorpora controles DOM sin convertirlos en texto', () => {
+    const selector = document.createElement('select')
+    selector.appendChild(new Option('Toda la organización', 'global'))
+    const contenedor = elemento('label', ['cms-campo'], selector)
+
+    expect(contenedor.querySelector('select')).toBe(selector)
+    expect(contenedor.textContent).not.toContain('[object HTMLSelectElement]')
   })
 })
 
@@ -53,5 +64,11 @@ describe('boton', () => {
     expect(el.querySelector('svg')).not.toBeNull()
     expect(el.textContent).toBe('Armar lista')
     expect(el.classList.contains('boton-con-icono')).toBe(true)
+  })
+
+  it('identifica Accesos y Registro institucional con iconos', () => {
+    ;['Accesos', 'Registro institucional'].forEach((etiqueta) => {
+      expect(boton(etiqueta, () => {}).querySelector('svg')).not.toBeNull()
+    })
   })
 })

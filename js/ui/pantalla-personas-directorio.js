@@ -2,7 +2,7 @@ import { elemento, boton, vaciar } from './componentes.js'
 import { activos, agregarParticipante, agregarVoluntario, desactivarPersona, editarPersona, reactivarPersona } from '../modelo/roster.js'
 import { coincide } from '../util/nombres.js'
 import { crearEditorDeFoto } from './editor-foto.js'
-import { edadDesdeAnio, perfilDe } from '../modelo/perfil.js'
+import { perfilDe } from '../modelo/perfil.js'
 import { maquetarPerfil } from '../imagen/maquetar-perfil.js'
 import { cargarImagen, descargar, esperarFuentes, medidorDesde } from '../imagen/exportar.js'
 import { pintar } from '../imagen/pintar.js'
@@ -17,10 +17,11 @@ function leerFiltros() {
   try { return JSON.parse(sessionStorage.getItem(CLAVE_FILTROS) ?? '{}') } catch { return {} }
 }
 
-export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuardar = null, esAdmin = false, busquedaInicial = '' }) {
+export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuardar = null, sesion = null, esAdmin = false, busquedaInicial = '' }) {
   const guardados = leerFiltros()
   let actual = roster, texto = busquedaInicial || guardados.texto || '', tipo = busquedaInicial ? 'todas' : guardados.tipo || 'participante', filtro = guardados.filtro || 'activas', grupo = guardados.grupo || 'todos'
   let editando = null, agregando = false, seleccionando = false, seleccion = new Set(), deshacer = [], personalizando = false, viendoTarjetas = false, tarjetaElegida = null, confirmacionPerfil = ''
+  let filtrosAbiertos = !globalThis.matchMedia?.('(max-width: 620px)').matches
   const miniaturas = new Map()
   const urlsMiniaturas = new Set()
   let logoAleteaPendiente = null, iconoPelotaPendiente = null
@@ -57,7 +58,12 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
     chip(chips, 'Todas', 'todas', tipo, (v) => { tipo = v }); chip(chips, 'Participantes', 'participante', tipo, (v) => { tipo = v }); chip(chips, 'Voluntarios', 'voluntario', tipo, (v) => { tipo = v })
     chip(chips, 'Grupo 1', '1', grupo, (v) => { grupo = grupo === v ? 'todos' : v }); chip(chips, 'Grupo 2', '2', grupo, (v) => { grupo = grupo === v ? 'todos' : v })
     chip(chips, 'Sin foto', 'sin-foto', filtro, (v) => { filtro = filtro === v ? 'activas' : v }); chip(chips, 'Nuevas', 'nuevas', filtro, (v) => { filtro = filtro === v ? 'activas' : v }); chip(chips, 'Archivadas', 'archivadas', filtro, (v) => { filtro = filtro === v ? 'activas' : v })
-    caja.appendChild(chips); return caja
+    const activos = [tipo !== 'participante', grupo !== 'todos', filtro !== 'activas'].filter(Boolean).length
+    const abrir = boton(`Filtrar${activos ? ` (${activos})` : ''}`, () => { filtrosAbiertos = !filtrosAbiertos; dibujar() })
+    abrir.classList.add('personas-abrir-filtros')
+    abrir.setAttribute('aria-expanded', String(filtrosAbiertos))
+    chips.hidden = !filtrosAbiertos
+    caja.append(abrir, chips); return caja
   }
   function cargarMiniatura(persona, avatar) {
     if (!persona.foto || !ajustes().fotos) return
@@ -89,6 +95,7 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
     if (seleccionando && p.activo) { const marcar = document.createElement('input'); marcar.type = 'checkbox'; marcar.checked = seleccion.has(p.id); marcar.className = 'persona-seleccionar'; marcar.addEventListener('change', () => { marcar.checked ? seleccion.add(p.id) : seleccion.delete(p.id); dibujar() }); fila.appendChild(marcar) }
     return fila
   }
+  const puedeGestionarFicha = () => sesion?.nivel_datos_personales === 'sensible'
   async function foto(p, archivo) { const mapa = await createImageBitmap(archivo); crearEditorDeFoto({ mapa, persona: p, tipo: tipoDe(p), acompanante: null, alGuardar: async (blob) => { const clave = `${p.id}.jpg`; await almacen.guardarFoto(clave, blob, p.nombre); await guardar(editarPersona(actual, p.id, { foto: clave }), `Cambiar la foto de ${p.nombre}`) }, alCancelar: () => {} }) }
   async function lienzoDeTarjeta(p) {
     await esperarFuentes(); const lienzo = document.createElement('canvas'); const ctx = lienzo.getContext('2d'); const plano = maquetarPerfil(p, { medirTexto: medidorDesde(ctx) }); const imagenes = {}
@@ -113,18 +120,11 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
     const campoPerfil = (clave, rotulo, tipo = 'text', ayuda = '') => { const etiqueta = elemento('label', ['campo']); etiqueta.appendChild(elemento('span', ['campo-rotulo'], rotulo)); const entrada = document.createElement(tipo === 'textarea' ? 'textarea' : 'input'); if (tipo !== 'textarea') entrada.type = tipo; else entrada.rows = 3; entrada.value = perfil[clave] ?? ''; entrada.dataset.perfil = clave; if (ayuda) entrada.placeholder = ayuda; etiqueta.appendChild(entrada); bio.appendChild(etiqueta); return entrada }
     const hoy = new Date()
     const maximo = hoy.toISOString().slice(0, 10)
-    const nacimiento = crearSelectorFecha({ clave: 'anioNacimiento', rotulo: 'Fecha de nacimiento', valor: perfil.anioNacimiento, max: maximo }).entrada
-    bio.appendChild(nacimiento.closest('.selector-fecha'))
-    const edad = elemento('p', ['persona-edad'])
-    const actualizarEdad = () => { const valor = edadDesdeAnio(nacimiento.value); edad.textContent = valor === null ? 'Edad: agregar una fecha de nacimiento válida' : `Edad: ${valor} años` }
-    nacimiento.addEventListener('input', actualizarEdad)
-    actualizarEdad()
-    bio.appendChild(edad)
     const desde = crearSelectorFecha({ clave: 'desde', rotulo: 'En la organización desde', valor: perfil.desde, max: maximo })
     bio.appendChild(desde.campo)
     campoPerfil('leGusta', 'Le gusta', 'textarea', 'Actividades, intereses o motivadores')
     campoPerfil('noLeGusta', 'Prefiere evitar', 'textarea', 'Situaciones, sonidos o actividades')
-    campoPerfil('necesidades', 'Necesidades y apoyos', 'textarea', 'Información útil para acompañar a la persona')
+    campoPerfil('apoyosOperativos', 'Apoyos operativos', 'textarea', 'Indicaciones útiles para la jornada, sin detalle sensible')
     form.appendChild(bio)
     const perfilActual = () => Object.fromEntries([...bio.querySelectorAll('[data-perfil]')].map((e) => [e.dataset.perfil, e.value.trim()]))
     const personaBorrador = () => ({ ...datos, nombre: nombre.value.trim() || datos.nombre, grupo: Number(selectorGrupo.value), perfil: perfilActual() })
@@ -165,12 +165,73 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
       form.appendChild(confirmacion)
     }
     form.addEventListener('submit', (e) => e.preventDefault()); caja.appendChild(form)
+    if (!nueva) {
+      const protegida = elemento('section', ['persona-ficha-protegida'])
+      protegida.append(
+        elemento('h3', [], 'Ficha protegida'),
+        elemento('p', ['ayuda-ajustes'], 'Contacto, fecha de nacimiento, necesidades sensibles y consentimientos. Cada apertura queda registrada.'),
+      )
+      if (!puedeGestionarFicha()) {
+        protegida.appendChild(elemento('p', ['ayuda-ajustes'], 'Tu acceso actual no permite abrir esta ficha. Pedí a Administración un acceso temporal de ficha protegida.'))
+      } else {
+        const abrir = boton('Abrir ficha protegida', async () => {
+          abrir.disabled = true; abrir.textContent = 'Abriendo...'
+          try {
+            const privada = await almacen.leerFichaProtegida(datos.id)
+            const formulario = elemento('div', ['persona-ficha-protegida-formulario'])
+            const campo = (rotulo, clave, tipo = 'text', ayuda = '', maxFecha = '') => {
+              if (tipo === 'date') {
+                const selector = crearSelectorFecha({ clave, rotulo, valor: privada[clave] ?? '', max: maxFecha || maximo })
+                selector.entrada.dataset.protegido = clave
+                formulario.appendChild(selector.campo)
+                return selector.entrada
+              }
+              const etiqueta = elemento('label', ['campo']); etiqueta.appendChild(elemento('span', ['campo-rotulo'], rotulo))
+              const entrada = document.createElement(tipo === 'textarea' ? 'textarea' : 'input')
+              if (tipo === 'textarea') entrada.rows = 3; else entrada.type = tipo
+              entrada.value = privada[clave] ?? ''; entrada.dataset.protegido = clave; entrada.placeholder = ayuda; etiqueta.appendChild(entrada); formulario.appendChild(etiqueta); return entrada
+            }
+            campo('Fecha de nacimiento', 'anioNacimiento', 'date', '', maximo)
+            campo('Contacto de emergencia', 'contactoEmergencia', 'textarea', 'Nombre, vínculo y teléfono')
+            campo('Necesidades sensibles', 'necesidades', 'textarea', 'Información clínica, de bienestar o apoyos reservados')
+            const privacidad = privada.privacidad ?? {}
+            const consentimiento = elemento('fieldset', ['persona-bio']); consentimiento.appendChild(elemento('legend', [], 'Consentimientos diferenciados'))
+            const marcas = [['perfilInterno', 'Perfil interno y apoyos operativos'], ['fotoInterna', 'Foto para uso interno'], ['fotoPublica', 'Foto para difusión pública'], ['contacto', 'Contacto de emergencia'], ['datosSensibles', 'Necesidades sensibles']].map(([clave, texto]) => {
+              const etiqueta = document.createElement('label'); const entrada = document.createElement('input'); entrada.type = 'checkbox'; entrada.checked = privacidad[clave] === true; entrada.dataset.consentimiento = clave; etiqueta.append(entrada, document.createTextNode(` ${texto}`)); consentimiento.appendChild(etiqueta); return entrada
+            })
+            formulario.appendChild(consentimiento)
+            campo('Autorizado por', 'autorizadoPor', 'text', 'Madre, padre, tutor o persona adulta responsable')
+            campo('Consentimiento documentado el', 'documentadoEl', 'date', '', maximo)
+            campo('Última revisión', 'revisadoEl', 'date', '', maximo)
+            const estado = elemento('p', ['persona-confirmacion']); estado.setAttribute('role', 'status')
+            const guardarProtegida = boton('Guardar ficha protegida', async () => {
+              guardarProtegida.disabled = true; guardarProtegida.textContent = 'Guardando...'
+              try {
+                const valores = Object.fromEntries([...formulario.querySelectorAll('[data-protegido]')].map((entrada) => [entrada.dataset.protegido, entrada.value.trim()]))
+                const consentimientos = Object.fromEntries(marcas.map((entrada) => [entrada.dataset.consentimiento, entrada.checked]))
+                const resultado = await almacen.guardarFichaProtegida(datos.id, { ...valores, privacidad: consentimientos })
+                actual = editarPersona(actual, datos.id, resultado.persona)
+                await alCambiar(actual, [])
+                estado.textContent = 'Ficha protegida guardada y consentimiento registrado.'
+              } catch (error) { estado.textContent = `No se guardó la ficha: ${error.message || 'revisá los datos.'}` }
+              finally { guardarProtegida.disabled = false; guardarProtegida.textContent = 'Guardar ficha protegida' }
+            })
+            formulario.append(guardarProtegida, estado)
+            protegida.replaceChildren(elemento('h3', [], 'Ficha protegida'), elemento('p', ['ayuda-ajustes'], 'Contacto, fecha de nacimiento, necesidades sensibles y consentimientos. Cada apertura queda registrada.'), formulario)
+          } catch (error) { abrir.disabled = false; abrir.textContent = 'Abrir ficha protegida'; protegida.appendChild(elemento('p', ['persona-error'], error.message || 'No se pudo abrir la ficha.')) }
+        })
+        protegida.appendChild(abrir)
+      }
+      caja.appendChild(protegida)
+    }
     if (!nueva) { const vista = elemento('section', ['vista-tarjeta-personal']); vista.appendChild(elemento('h3', [], 'Vista previa de tarjeta')); const textoVista = elemento('p', ['ayuda-ajustes'], 'La tarjeta se actualiza mientras editás.'); const lienzos = elemento('div', ['contenedor-lienzo-tarjeta']); vista.append(textoVista, lienzos); let revisionVista = 0; const actualizarVista = () => { const revision = ++revisionVista; lienzoDeTarjeta(personaBorrador()).then((lienzo) => { if (!vista.isConnected || revision !== revisionVista) return; lienzo.className = 'lienzo-tarjeta-personal'; lienzos.replaceChildren(lienzo) }).catch(() => { if (revision === revisionVista) textoVista.textContent = 'No se pudo preparar la vista previa.' }) }; form.querySelectorAll('input, textarea, select').forEach((entrada) => entrada.addEventListener('input', actualizarVista)); form.querySelectorAll('select').forEach((entrada) => entrada.addEventListener('change', actualizarVista)); actualizarVista(); caja.appendChild(vista) }
     const acciones = elemento('div', ['persona-acciones'])
-    if (!nueva) { const archivo = document.createElement('input'); archivo.type = 'file'; archivo.accept = 'image/*'; archivo.capture = 'user'; archivo.className = 'oculto-visualmente'; archivo.addEventListener('change', async () => { if (archivo.files?.[0]) await foto(datos, archivo.files[0]) }); const fotoBoton = elemento('label', ['boton', 'boton-foto'], datos.foto ? 'Cambiar foto' : 'Agregar foto'); fotoBoton.appendChild(archivo); acciones.appendChild(fotoBoton)
+    if (!nueva && puedeGestionarFicha() && datos.privacidad?.fotoInterna) { const archivo = document.createElement('input'); archivo.type = 'file'; archivo.accept = 'image/*'; archivo.capture = 'user'; archivo.className = 'oculto-visualmente'; archivo.addEventListener('change', async () => { if (archivo.files?.[0]) await foto(datos, archivo.files[0]) }); const fotoBoton = elemento('label', ['boton', 'boton-foto'], datos.foto ? 'Cambiar foto' : 'Agregar foto'); fotoBoton.appendChild(archivo); acciones.appendChild(fotoBoton)
+      if (datos.foto) acciones.appendChild(boton('Quitar foto', async () => { const clave = datos.foto; await guardar(editarPersona(actual, datos.id, { foto: null }), `Quitar la foto de ${datos.nombre}`); try { await almacen.borrarFoto(clave, datos.nombre) } catch {} })) }
+    if (!nueva) {
       acciones.appendChild(boton('Descargar tarjeta PNG', () => descargarTarjeta(personaBorrador())))
-      if (datos.foto) acciones.appendChild(boton('Quitar foto', async () => { const clave = datos.foto; await guardar(editarPersona(actual, datos.id, { foto: null }), `Quitar la foto de ${datos.nombre}`); try { await almacen.borrarFoto(clave, datos.nombre) } catch {} }))
-      acciones.appendChild(boton(datos.activo ? 'Archivar persona' : 'Restaurar persona', async () => { if (datos.activo) deshacer = [datos.id]; await guardar(datos.activo ? desactivarPersona(actual, datos.id) : reactivarPersona(actual, datos.id), `${datos.activo ? 'Archivar' : 'Restaurar'} a ${datos.nombre}`) })) }
+      acciones.appendChild(boton(datos.activo ? 'Archivar persona' : 'Restaurar persona', async () => { if (datos.activo) deshacer = [datos.id]; await guardar(datos.activo ? desactivarPersona(actual, datos.id) : reactivarPersona(actual, datos.id), `${datos.activo ? 'Archivar' : 'Restaurar'} a ${datos.nombre}`) }))
+    }
     acciones.appendChild(boton('Cerrar', () => { editando = null; agregando = false; dibujar() })); caja.appendChild(acciones); return caja
   }
   function masivas() { const caja = elemento('div', ['personas-masivas'], `${seleccion.size} seleccionadas`); const aplicar = async (cambios, texto, soloParticipantes = false) => { let siguiente = actual; const mudanzas = []; seleccion.forEach((id) => { const p = todas().find((x) => x.id === id); if (!p || (soloParticipantes && p.tipo !== 'participante')) return; siguiente = editarPersona(siguiente, id, cambios); if (cambios.grupo && p.grupo !== cambios.grupo) mudanzas.push({ id, grupo: cambios.grupo }) }); seleccion = new Set(); await guardar(siguiente, texto, mudanzas) }; caja.append(boton('Grupo 1', () => aplicar({ grupo: 1 }, 'Mover personas al grupo 1', true)), boton('Grupo 2', () => aplicar({ grupo: 2 }, 'Mover personas al grupo 2', true)), boton('Marcar nuevas', () => aplicar({ nuevo: true }, 'Marcar personas como nuevas')), boton('Archivar', async () => { deshacer = [...seleccion]; let siguiente = actual; seleccion.forEach((id) => { siguiente = desactivarPersona(siguiente, id) }); seleccion = new Set(); await guardar(siguiente, 'Archivar personas seleccionadas') }), boton('Cancelar', () => { seleccionando = false; seleccion = new Set(); dibujar() })); return caja }

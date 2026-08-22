@@ -36,7 +36,7 @@ export async function leerUsuarios({ duenio, repoPublico, rama, fetchFn }) {
 }
 
 export const ROLES = ['admin', 'coordinacion']
-export const PERMISOS = ['planilla', 'personas', 'asistencias', 'reportes', 'agenda']
+export const PERMISOS = ['planilla', 'personas', 'asistencias', 'reportes', 'agenda', 'cms']
 
 export function tienePermiso(registro, permiso) {
   if (!registro || registro.rol === 'admin') return true

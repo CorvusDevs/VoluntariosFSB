@@ -39,4 +39,19 @@ describe('pantalla de inicio', () => {
     buscar.dispatchEvent(new Event('input'))
     expect(raiz.textContent).toContain('Ver Personas')
   })
+
+  it('muestra Fútbol sin Barreras como módulo del CMS sin texto técnico', () => {
+    document.body.innerHTML = '<div id="raiz"></div>'
+    const raiz = document.getElementById('raiz')
+    crearPantallaInicio(raiz, {
+      roster: ROSTER,
+      alertas: [],
+      tendencia: null,
+      alIrA: vi.fn(),
+      esModuloCMS: true,
+      alVolverCMS: vi.fn(),
+    })
+    expect(raiz.textContent).toContain('Centro operativo del programa dentro de Aletea.')
+    expect(raiz.textContent).not.toContain('[object HTMLHeadingElement]')
+  })
 })

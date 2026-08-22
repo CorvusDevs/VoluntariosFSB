@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../../">
+  <title>Auditoría visual de equipos en Accesos</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <main id="aplicacion" class="app app-cms">
+    <div id="contenido-cms" class="cuerpo"></div>
+  </main>
+  <script type="module">
+    import { crearPantallaAccesosCloudflare } from './js/ui/pantalla-accesos-cloudflare.js'
+
+    const usuarios = [
+      { correo: 'admin@aletea.org', nombre: 'Administración', rol: 'admin', perfil_acceso: 'administracion' },
+      { correo: 'claudia@aletea.org', nombre: 'Claudia', rol: 'usuario', perfil_acceso: 'coordinacion', nivel_datos_personales: 'ninguno' },
+    ]
+    const equipos = [{ id: 'e1', nombre: 'Familias' }, { id: 'e2', nombre: 'Deportes' }, { id: 'e3', nombre: 'Eventos' }]
+    const responsabilidades = [
+      { id: 'r1', equipo_id: 'e1', equipo_nombre: 'Familias', usuario_correo: 'claudia@aletea.org', tipo: 'coordinacion' },
+      { id: 'r2', equipo_id: 'e3', equipo_nombre: 'Eventos', usuario_correo: 'claudia@aletea.org', tipo: 'referente' },
+    ]
+    window.fetch = async (url, opciones = {}) => {
+      if (url === '/api/usuarios' && !opciones.method) return new Response(JSON.stringify({ usuarios }))
+      if (url === '/api/cms/equipos') return new Response(JSON.stringify({ equipos }))
+      if (url === '/api/cms/responsabilidades' && !opciones.method) return new Response(JSON.stringify({ responsabilidades }))
+      return new Response(JSON.stringify({ guardado: true }), { status: opciones.method === 'POST' ? 201 : 200 })
+    }
+    crearPantallaAccesosCloudflare(document.querySelector('#contenido-cms'), { sesion: { correo: 'admin@aletea.org' } })
+  </script>
+</body>
+</html>

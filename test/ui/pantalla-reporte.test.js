@@ -3,8 +3,14 @@ import { crearPantallaReporte } from '../../js/ui/pantalla-reporte.js'
 
 const ROSTER = {
   version: 1,
-  participantes: [{ id: 'p1', nombre: 'Gaia', grupo: 1, activo: true }],
-  voluntarios: [{ id: 'v1', nombre: 'Abi', activo: true }],
+  participantes: [
+    { id: 'p1', nombre: 'Gaia', grupo: 1, activo: true },
+    { id: 'prueba1', nombre: 'Prueba 1', grupo: 1, activo: false },
+  ],
+  voluntarios: [
+    { id: 'v1', nombre: 'Abi', activo: true },
+    { id: 'isa', nombre: 'Isa', activo: false },
+  ],
 }
 
 const LISTAS = {
@@ -60,6 +66,8 @@ describe('pantalla de reporte', () => {
   it('dibuja una fila por persona', async () => {
     await abrir()
     expect(raiz.querySelectorAll('tbody tr[data-persona]')).toHaveLength(2)
+    expect(raiz.querySelector('tr[data-persona="prueba1"]')).toBeNull()
+    expect(raiz.querySelector('tr[data-persona="isa"]')).toBeNull()
   })
 
   it('marca presente y ausente', async () => {

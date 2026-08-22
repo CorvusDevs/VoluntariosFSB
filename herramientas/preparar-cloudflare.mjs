@@ -10,7 +10,7 @@ for (const nombre of ['assets', 'css', 'js']) {
   await cp(new URL(`${nombre}/`, raiz), new URL(`${nombre}/`, salida), { recursive: true })
 }
 
-for (const nombre of ['index.html', 'sw.js', 'version.json']) {
+for (const nombre of ['index.html', 'formulario.html', 'sw.js', 'version.json']) {
   await cp(new URL(nombre, raiz), new URL(nombre, salida))
 }
 

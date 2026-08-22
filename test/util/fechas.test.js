@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatearFechaLarga, formatearFechaCorta, hoyISO, proximoSabado } from '../../js/util/fechas.js'
+import { evitarCortesHora, fechaDesdeUTC, formatearFechaLarga, formatearFechaCorta, hoyISO, proximoSabado } from '../../js/util/fechas.js'
 
 describe('formatearFechaLarga', () => {
   it('devuelve el dia de la semana capitalizado y el mes en minuscula', () => {
@@ -36,6 +36,27 @@ describe('formatearFechaCorta', () => {
 describe('hoyISO', () => {
   it('devuelve una cadena AAAA-MM-DD', () => {
     expect(hoyISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+  })
+})
+
+describe('evitarCortesHora', () => {
+  it('mantiene juntas las abreviaturas de la hora uruguaya', () => {
+    expect(evitarCortesHora('18 ago. 2026, 2:48 p. m.')).toBe('18 ago. 2026, 2:48\u00a0p.\u00a0m.')
+    expect(evitarCortesHora('8:05 a. m.')).toBe('8:05\u00a0a.\u00a0m.')
+  })
+
+  it('no altera textos sin una hora', () => {
+    expect(evitarCortesHora('Aún no ingresó')).toBe('Aún no ingresó')
+  })
+})
+
+describe('fechaDesdeUTC', () => {
+  it('interpreta las fechas sin zona de D1 como UTC', () => {
+    expect(fechaDesdeUTC('2026-08-21 21:52:00').toISOString()).toBe('2026-08-21T21:52:00.000Z')
+  })
+
+  it('conserva fechas ISO que ya declaran su zona', () => {
+    expect(fechaDesdeUTC('2026-08-21T21:52:00Z').toISOString()).toBe('2026-08-21T21:52:00.000Z')
   })
 })
 

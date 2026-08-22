@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../../">
+  <title>Auditoría visual CMS Aletea</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <main id="aplicacion" class="app app-cms">
+    <aside class="navegacion-cms navegacion-escritorio" aria-label="Navegación institucional">
+      <strong class="navegacion-cms-marca">Aletea</strong>
+      <span class="navegacion-cms-rotulo">Trabajo</span>
+      <button class="navegacion-cms-enlace activa">Centro de control</button>
+      <button class="navegacion-cms-enlace">Agenda</button>
+      <span class="navegacion-cms-rotulo">Equipos</span>
+      <button class="navegacion-cms-enlace">Deportes</button>
+    </aside>
+    <div id="contenido-cms" class="cuerpo"></div>
+  </main>
+  <script type="module">
+    import { crearPantallaCMS } from './js/ui/pantalla-cms.js'
+    const equipos = ['Familias', 'Deportes', 'Comunicación', 'Capacitaciones', 'Finanzas', 'Eventos', 'Administración'].map((nombre, indice) => ({ id: `e${indice + 1}`, nombre }))
+    const tablero = {
+      alcance: { perfil: 'direccion', equipos: equipos.map(({ id }) => id), puede_gestionar: true, global: true },
+      equipos,
+      tareas: [
+        { id: 't1', titulo: 'Confirmar accesibilidad de la sede', descripcion: 'Validar ingreso, baños y apoyos.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 6, fecha_limite: '2026-08-18', equipo_id: 'e6', equipo_nombre: 'Eventos', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', creado_en: '2026-08-16 10:00:00', asignado_en: '2026-08-16 12:00:00' },
+        { id: 't2', titulo: 'Cerrar contenidos de campaña', estado: 'esperando_respuesta', prioridad: 'normal', esfuerzo_horas: 4, fecha_limite: '2026-08-22', equipo_id: 'e3', equipo_nombre: 'Comunicación', responsable_nombre: 'Martina', responsable_correo: 'martina@aletea.org', creado_en: '2026-08-17 10:00:00', asignado_en: '2026-08-17 18:00:00' },
+        { id: 't3', titulo: 'Asignar referente de familias', estado: 'pendiente', prioridad: 'alta', fecha_limite: '2026-08-20', equipo_id: 'e1', equipo_nombre: 'Familias' },
+      ],
+      proyectos: [{ id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', equipo_id: 'e2', equipo_nombre: 'Deportes' }],
+      responsables: [{ correo: 'claudia@aletea.org', nombre: 'Claudia' }, { correo: 'martina@aletea.org', nombre: 'Martina' }],
+      responsabilidades: [{ id: 'resp1', equipo_id: 'e1', usuario_correo: 'claudia@aletea.org', usuario_nombre: 'Claudia', tipo: 'coordinacion' }],
+      reuniones: [{ id: 'r1', titulo: 'Coordinación mensual', fecha_hora: '2026-08-21T18:30', estado: 'planificada' }],
+      decisiones: [{ id: 'd1', titulo: 'Definir sede para el encuentro', estado: 'vigente', reunion_titulo: 'Coordinación mensual', responsable_nombre: 'Claudia' }],
+      documentos: [{ id: 'doc1', titulo: 'Guía de accesibilidad', descripcion: 'Criterios para actividades.', tipo: 'guia', sensibilidad: 'interno', equipo_nombre: 'Eventos', url: '#' }],
+      entradas: [{ id: 'en1', tipo: 'voluntariado', nombre: 'Nueva postulación', detalle: 'Interés en colaborar.', estado: 'derivada', equipo_nombre: 'Familias', tarea_titulo: 'Revisar postulación' }],
+      formularios: [{ id: 'f1', titulo: 'Sumate como voluntario', descripcion: 'Formulario público de interés.', tipo: 'voluntariado', visibilidad: 'publica', estado: 'activa', respuestas_total: 12, campos_json: JSON.stringify([{ clave: 'disponibilidad', etiqueta: 'Disponibilidad semanal', tipo: 'seleccion', requerido: true, opciones: ['Mañana', 'Tarde', 'Fin de semana'], ayuda: 'Elegí la franja que mejor te resulte.' }, { clave: 'experiencia', etiqueta: 'Experiencia previa', tipo: 'texto_largo', requerido: false, opciones: [], mostrar_si: null }]) }],
+      alianzas: [], programas: [{ id: 'pr1', nombre: 'Fútbol sin Barreras', estado: 'activo', descripcion: 'Programa deportivo inclusivo.', equipo_nombre: 'Deportes' }],
+      eventos: [
+        { id: 'ev1', titulo: 'Encuentro FSB', fecha_hora: '2026-08-22T10:00', estado: 'planificado', equipo_id: 'e2', equipo_nombre: 'Deportes', lugar: 'Tres Cruces', tareas_total: 5, tareas_completadas: 3, tareas_pendientes: 2 },
+        { id: 'ev2', titulo: 'Taller para familias', fecha_hora: '2026-08-27T18:00', estado: 'planificado', equipo_id: 'e1', equipo_nombre: 'Familias', lugar: 'Aletea' },
+      ],
+      plantillas: [], riesgos: [], hitos: [], gastos: [],
+      notificaciones: [{ id: 'n1', titulo: 'Nueva tarea asignada', detalle: 'Confirmar accesibilidad de la sede', leida_en: null }],
+      recurrencias: [], comunicados: [{ id: 'c1', titulo: 'Próxima reunión de coordinación', detalle: 'Traer avances y bloqueos.', prioridad: 'normal' }], conflictos: [], revisionSemanal: null,
+      capacidad: [
+        { usuario_correo: 'claudia@aletea.org', usuario_nombre: 'Claudia', horas_semanales: 5, horas_asignadas: 6, tareas_abiertas: 1, tareas_sin_estimacion: 0, nota: 'Disponible martes y jueves.' },
+        { usuario_correo: 'martina@aletea.org', usuario_nombre: 'Martina', horas_semanales: 8, horas_asignadas: 4, tareas_abiertas: 1, tareas_sin_estimacion: 0, nota: '' },
+      ],
+      metricasTareas: [
+        { id: 't1', estado: 'pendiente', fecha_limite: '2026-08-18', creado_en: '2026-08-16 10:00:00', asignado_en: '2026-08-16 12:00:00' },
+        { id: 't2', estado: 'esperando_respuesta', fecha_limite: '2026-08-22', creado_en: '2026-08-17 10:00:00', asignado_en: '2026-08-17 18:00:00' },
+        { id: 't4', estado: 'completada', creado_en: '2026-08-01 10:00:00', asignado_en: '2026-08-01 14:00:00', completado_en: '2026-08-03 10:00:00' },
+      ],
+    }
+    window.fetch = async (url) => new Response(JSON.stringify(url === '/api/cms/tablero' ? tablero : {}), { status: 200, headers: { 'content-type': 'application/json' } })
+    const raiz = document.getElementById('contenido-cms')
+    const parametros = new URLSearchParams(location.search)
+    const pantalla = parametros.get('area') || 'control'
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, area: pantalla, alIrA: (destino) => { location.search = `?area=${destino.replace(/^cms-/, '').replace('inicio', 'control')}` } })
+    if (parametros.has('mobile-audit')) requestAnimationFrame(() => requestAnimationFrame(() => {
+      const visible = (control) => {
+        const estilo = getComputedStyle(control)
+        const caja = control.getBoundingClientRect()
+        return estilo.display !== 'none' && estilo.visibility !== 'hidden' && caja.width > 0 && caja.height > 0
+      }
+      const controles = [...document.querySelectorAll('button,input,select,textarea,a')].filter(visible)
+      parent.postMessage({ tipo: 'auditoria-movil-cms', resultado: {
+        area: pantalla,
+        width: innerWidth,
+        height: innerHeight,
+        overflow: Math.max(0, document.documentElement.scrollWidth - innerWidth),
+        unnamed: controles.filter((control) => !((control.getAttribute('aria-label') || control.textContent || control.title || '').trim())).length,
+        tooSmall: controles.filter((control) => {
+          const caja = control.getBoundingClientRect()
+          return caja.width < 44 || caja.height < 44
+        }).map((control) => {
+          const caja = control.getBoundingClientRect()
+          const estilo = getComputedStyle(control)
+          const cadena = []
+          let actual = control
+          while (actual && cadena.length < 4) {
+            const estiloActual = getComputedStyle(actual)
+            const cajaActual = actual.getBoundingClientRect()
+            cadena.push({ tag: actual.tagName, className: String(actual.className || '').slice(0, 70), display: estiloActual.display, minHeight: estiloActual.minHeight, padding: estiloActual.padding, height: Math.round(cajaActual.height) })
+            actual = actual.parentElement
+          }
+          return {
+            label: (control.getAttribute('aria-label') || control.textContent || control.title || '').trim().slice(0, 50),
+            width: Math.round(caja.width), height: Math.round(caja.height),
+            rects: [...control.getClientRects()].map((recta) => ({ width: Math.round(recta.width), height: Math.round(recta.height) })),
+            computed: { display: estilo.display, minHeight: estilo.minHeight, lineHeight: estilo.lineHeight, padding: estilo.padding },
+            chain: cadena,
+          }
+        }),
+        desktopNavVisible: [...document.querySelectorAll('.navegacion-escritorio')].some(visible),
+        mobileSections: document.querySelectorAll('details.cms-seccion-movil').length,
+      } }, location.origin)
+    }))
+  </script>
+</body>
+</html>

@@ -144,6 +144,47 @@ describe('historial', () => {
     expect(martin.vino).toBe(1)
     expect(martin.de).toBe(1)
   })
+
+  it('oculta personas archivadas sin actividad durante el mes', () => {
+    const roster = {
+      ...ROSTER,
+      participantes: [...ROSTER.participantes, { id: 'prueba1', nombre: 'Prueba 1', grupo: 1, activo: false }],
+      voluntarios: [...ROSTER.voluntarios, { id: 'isa', nombre: 'Isa', activo: false }],
+    }
+    const h = historial(SABADOS, roster, [])
+    expect(h.participantes.find((f) => f.persona.id === 'prueba1')).toBeUndefined()
+    expect(h.voluntarios.find((f) => f.persona.id === 'isa')).toBeUndefined()
+  })
+
+  it('conserva una persona archivada si tuvo una marca durante el mes', () => {
+    const roster = {
+      ...ROSTER,
+      participantes: ROSTER.participantes.map((p) => p.id === 'p1' ? { ...p, activo: false } : p),
+    }
+    const gaia = historial(SABADOS, roster, []).participantes.find((f) => f.persona.id === 'p1')
+    expect(gaia).toMatchObject({ vino: 2, de: 3 })
+  })
+
+  it('no inventa faltas posteriores para un voluntario archivado', () => {
+    const roster = {
+      ...ROSTER,
+      voluntarios: ROSTER.voluntarios.map((v) => v.id === 'v1' ? { ...v, activo: false } : v),
+    }
+    const abi = historial(SABADOS, roster, []).voluntarios.find((f) => f.persona.id === 'v1')
+    expect(abi.estados).toEqual([VINO, VINO, NO_ESTABA])
+    expect(abi).toMatchObject({ vino: 2, de: 2 })
+  })
+
+  it('conserva una correccion explicita de una persona archivada', () => {
+    const roster = {
+      ...ROSTER,
+      voluntarios: [...ROSTER.voluntarios, { id: 'juli', nombre: 'Juli', activo: false }],
+    }
+    const juli = historial(SABADOS, roster, [{ fecha: '2026-08-08', persona: 'juli', vino: false }])
+      .voluntarios.find((f) => f.persona.id === 'juli')
+    expect(juli.estados).toEqual([NO_ESTABA, FALTO, NO_ESTABA])
+    expect(juli.de).toBe(1)
+  })
 })
 
 const cuatroSabados = (estadosP1) => estadosP1.map((vino, i) => ({

@@ -317,25 +317,15 @@ describe('directorio de Personas', () => {
     expect(editor.querySelector('.persona-acciones')).not.toBeNull()
   })
 
-  it('guarda el perfil personal y ofrece descargar una tarjeta', async () => {
+  it('guarda el perfil operativo sin exponer la ficha protegida y ofrece descargar una tarjeta', async () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')
-    const selectorNacimiento = editor.querySelector('.selector-fecha')
-    const selectorDesde = editor.querySelectorAll('.selector-fecha')[1]
-    expect(selectorNacimiento.querySelector('button').getAttribute('aria-label')).toBe('Fecha de nacimiento')
+    const selectorDesde = editor.querySelector('.selector-fecha')
     expect(selectorDesde.querySelector('button').getAttribute('aria-label')).toBe('En la organización desde')
-    selectorNacimiento.querySelector('button').click()
-    expect(selectorNacimiento.querySelector('[role=dialog]')).not.toBeNull()
-    const anio = selectorNacimiento.querySelector('.selector-fecha-anio')
-    anio.value = '2014'
-    anio.dispatchEvent(new Event('change'))
-    selectorNacimiento.querySelector('.selector-fecha-dia:not(:disabled)').click()
-    expect(editor.querySelector('[data-perfil="anioNacimiento"]').value).toMatch(/^2014-/)
     expect(editor.querySelector('.vista-tarjeta-personal .ayuda-ajustes').textContent).toContain('actualiza mientras editás')
-    editor.querySelector('[data-perfil="anioNacimiento"]').value = '2014-02-10'
-    editor.querySelector('[data-perfil="anioNacimiento"]').dispatchEvent(new Event('input'))
-    editor.querySelector('[data-perfil="necesidades"]').value = 'Pausa tranquila'
-    expect(editor.querySelector('.persona-edad').textContent).toBe(`Edad: ${new Date().getFullYear() - 2014} años`)
+    expect(editor.querySelector('[data-perfil="anioNacimiento"]')).toBeNull()
+    expect(editor.querySelector('[data-perfil="necesidades"]')).toBeNull()
+    editor.querySelector('[data-perfil="apoyosOperativos"]').value = 'Llegar con calma'
     const guardarCambios = [...editor.querySelectorAll('button')].find((e) => e.textContent === 'Guardar cambios')
     guardarCambios.click()
     expect(guardarCambios.textContent).toBe('Guardando…')
@@ -344,7 +334,7 @@ describe('directorio de Personas', () => {
     expect(confirmacion.textContent).toContain('guardado correctamente')
     expect([...raiz.querySelectorAll('.persona-formulario button')].some((e) => e.textContent === 'Guardar cambios')).toBe(true)
     const persona = pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo')
-    expect(persona.perfil).toMatchObject({ anioNacimiento: '2014-02-10', necesidades: 'Pausa tranquila' })
+    expect(persona.perfil).toMatchObject({ apoyosOperativos: 'Llegar con calma' })
     tarjeta('Gonzalo').querySelector('button').click()
     expect([...raiz.querySelectorAll('.persona-acciones button')].some((e) => e.textContent === 'Descargar tarjeta PNG')).toBe(true)
     expect(raiz.querySelector('.vista-tarjeta-personal')).not.toBeNull()
@@ -353,16 +343,16 @@ describe('directorio de Personas', () => {
   it('conserva el borrador y explica el error cuando no se puede guardar un perfil', async () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')
-    const necesidades = editor.querySelector('[data-perfil="necesidades"]')
-    necesidades.value = 'Pausa tranquila'
+    const apoyos = editor.querySelector('[data-perfil="apoyosOperativos"]')
+    apoyos.value = 'Pausa tranquila'
     almacen.guardarRoster = async () => { throw new Error('No tenés una sesión autorizada.') }
     const guardarCambios = [...editor.querySelectorAll('button')].find((e) => e.textContent === 'Guardar cambios')
     guardarCambios.click()
     await esperar()
     expect(guardarCambios.textContent).toBe('Guardar cambios')
     expect(editor.querySelector('.persona-error').textContent).toContain('No tenés una sesión autorizada.')
-    expect(necesidades.value).toBe('Pausa tranquila')
-    expect(pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo').perfil?.necesidades).not.toBe('Pausa tranquila')
+    expect(apoyos.value).toBe('Pausa tranquila')
+    expect(pantalla.roster().participantes.find((p) => p.nombre === 'Gonzalo').perfil?.apoyosOperativos).not.toBe('Pausa tranquila')
   })
 
   it('abre tarjetas desde Personas con vista, descarga y edición', () => {
