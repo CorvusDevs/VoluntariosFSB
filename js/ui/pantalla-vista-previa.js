@@ -3,7 +3,8 @@ import { selectorVisual } from './selector-visual.js'
 import { dibujarMuestra } from './muestra-celda.js'
 import { maquetar } from '../imagen/maquetar.js'
 import { pintar } from '../imagen/pintar.js'
-import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
+import { crearLienzoWhatsApp } from '../imagen/whatsapp.js'
+import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo, nombreDeArchivoWhatsApp }
   from '../imagen/exportar.js'
 import { formatearFechaLarga } from '../util/fechas.js'
 import {
@@ -387,11 +388,30 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function acciones() {
     const caja = elemento('div', ['acciones-imagen'])
+    caja.appendChild(boton('Compartir para WhatsApp', () => conControlesBloqueados(async () => {
+      mensaje = ''
+      await dibujar()
+      const { lienzo: horizontal, composicion } = crearLienzoWhatsApp({
+        lista,
+        roster,
+        imagenes,
+        medirTexto: medidorDesde(ctx),
+      })
+      const nombre = nombreDeArchivoWhatsApp(lista)
+      const texto = `Fútbol sin Barreras, ${formatearFechaLarga(lista.fecha)}`
+      const compartido = await compartir(horizontal, nombre, texto)
+      if (!compartido) {
+        await descargar(horizontal, nombre)
+        avisar('Descargamos la versión horizontal para WhatsApp. Adjuntala desde el chat para que ambos grupos se vean completos.')
+      } else if (!composicion.legible) {
+        avisar('La lista es excepcionalmente grande. Si algún nombre queda chico, compartí una imagen por grupo.')
+      }
+    }), ['boton-principal']))
     caja.appendChild(boton('Descargar planificación', () => conControlesBloqueados(async () => {
       await dibujar()
       await descargar(lienzo, nombreDeArchivo(lista))
     })))
-    caja.appendChild(boton('Compartir', () => conControlesBloqueados(async () => {
+    caja.appendChild(boton('Compartir imagen vertical', () => conControlesBloqueados(async () => {
       mensaje = ''
       await dibujar()
       const texto = `Fútbol sin Barreras, ${formatearFechaLarga(lista.fecha)}`

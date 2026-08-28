@@ -3,6 +3,10 @@ export function nombreDeArchivo(lista, grupo = null) {
   return grupo ? `${base}-grupo-${grupo}.png` : `${base}.png`
 }
 
+export function nombreDeArchivoWhatsApp(lista) {
+  return `futbol-sin-barreras-${lista.fecha}-whatsapp.png`
+}
+
 export function medidorDesde(ctx) {
   return (texto, fuente) => {
     ctx.font = fuente

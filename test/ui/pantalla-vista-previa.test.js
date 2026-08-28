@@ -128,7 +128,8 @@ describe('pantalla de vista previa', () => {
   it('tiene botones de descargar y compartir', () => {
     const botones = [...raiz.querySelectorAll('button')].map((e) => e.textContent)
     expect(botones.some((t) => t.includes('Descargar'))).toBe(true)
-    expect(botones.some((t) => t.includes('Compartir'))).toBe(true)
+    expect(botones).toContain('Compartir para WhatsApp')
+    expect(botones).toContain('Compartir imagen vertical')
   })
 
   it('el nombre del archivo lleva la fecha de la lista', () => {
@@ -243,7 +244,8 @@ describe('pantalla de vista previa', () => {
     HTMLCanvasElement.prototype.toBlob = function (cb) { cb(new Blob(['x'])) }
     window.alert = () => { alertas += 1 }
     try {
-      const botonCompartir = [...r10.querySelectorAll('button')].find((b) => b.textContent.includes('Compartir'))
+      const botonCompartir = [...r10.querySelectorAll('button')]
+        .find((b) => b.textContent === 'Compartir imagen vertical')
       botonCompartir.click()
       for (let i = 0; i < 20 && !r10.querySelector('.aviso'); i += 1) {
         await new Promise((r) => setTimeout(r, 0))
