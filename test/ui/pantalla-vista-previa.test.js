@@ -101,10 +101,10 @@ describe('pantalla de vista previa', () => {
     expect(p.lista().opcionesImagen.compacto).toBe(true)
   })
 
-  it('informa que la imagen final es horizontal 16:10', () => {
+  it('informa las medidas reales de la imagen horizontal ampliada', () => {
     const info = raiz.querySelector('.info-imagen').textContent
-    expect(info).toContain('1920 por 1200 px')
-    expect(info).toContain('16:10')
+    expect(info).toContain('1920 por 1240 px')
+    expect(info).toContain('horizontal ampliada')
   })
 
   it('ofrece la descarga horizontal como acción principal y conserva la vertical', () => {
@@ -201,7 +201,7 @@ describe('pantalla de vista previa', () => {
     const previa = raiz.querySelector('.lienzo-vista-previa-horizontal')
     expect(previa).not.toBeNull()
     expect(previa.width).toBe(1920)
-    expect(previa.height).toBe(1200)
+    expect(previa.height).toBe(1240)
   })
 
   it('las instrucciones estan en rioplatense y con acentos', () => {

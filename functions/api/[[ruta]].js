@@ -1442,14 +1442,24 @@ async function formularioPublico(contexto, ruta) {
   const ventana = String(Math.floor(Date.now() / 600000))
   const clave = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${env.SESION_SECRETO || 'formulario'}:${ip}`))
   const limite = [...new Uint8Array(clave)].map((valor) => valor.toString(16).padStart(2, '0')).join('')
-  const permitido = await env.BASE.prepare(`INSERT INTO limites_formularios_publicos_cms (formulario_id, clave, ventana, cantidad)
-    VALUES (?1, ?2, ?3, 1) ON CONFLICT(formulario_id, clave, ventana)
-    DO UPDATE SET cantidad = cantidad + 1, actualizado_en = CURRENT_TIMESTAMP WHERE cantidad < 4`)
-    .bind(formulario.id, limite, ventana).run()
-  if (!Number(permitido.meta?.changes || 0)) return error('Probá nuevamente en unos minutos.', 429)
+  if (!await reservarEnvioFormularioPublico(env.BASE, formulario.id, limite, ventana)) {
+    return error('Probá nuevamente en unos minutos.', 429)
+  }
   const derivada = await derivarEntradaCms(env.BASE, resultado.entrada, { correo: formulario.creado_por }, formulario.id, false)
   await registrar(env.BASE, { correo: formulario.creado_por }, 'recibir formulario público', `formularios/${formulario.id}`, derivada.entrada.nombre)
   return responder({ recibida: true }, 201)
+}
+
+export async function reservarEnvioFormularioPublico(base, formularioId, clave, ventana) {
+  await base.prepare(`INSERT INTO limites_formularios_publicos_cms (formulario_id, clave, ventana, cantidad)
+    VALUES (?1, ?2, ?3, 1) ON CONFLICT(formulario_id, clave, ventana)
+    DO UPDATE SET cantidad = CASE WHEN cantidad < 5 THEN cantidad + 1 ELSE cantidad END,
+      actualizado_en = CURRENT_TIMESTAMP`)
+    .bind(formularioId, clave, ventana).run()
+  const uso = await base.prepare(`SELECT cantidad FROM limites_formularios_publicos_cms
+    WHERE formulario_id = ?1 AND clave = ?2 AND ventana = ?3`)
+    .bind(formularioId, clave, ventana).first()
+  return Number(uso?.cantidad || 0) <= 4
 }
 
 async function cms(contexto, sesion, ruta) {

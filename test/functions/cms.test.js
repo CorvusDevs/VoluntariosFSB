@@ -1,7 +1,27 @@
 import { describe, expect, it } from 'vitest'
-import { alianzaCmsDesde, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, conflictoAgendaCms, conflictosAgendaCms, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, gastoProyectoCmsDesde, hitoProyectoCmsDesde, perfilAccesoDe, plantillaTareasCmsDesde, puedeVerAuditoria, puedeVerDocumentoCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, tareaCmsDesde, tareaRecurrenteCmsDesde } from '../../functions/api/[[ruta]].js'
+import { alianzaCmsDesde, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, conflictoAgendaCms, conflictosAgendaCms, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, gastoProyectoCmsDesde, hitoProyectoCmsDesde, perfilAccesoDe, plantillaTareasCmsDesde, puedeVerAuditoria, puedeVerDocumentoCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, reservarEnvioFormularioPublico, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, tareaCmsDesde, tareaRecurrenteCmsDesde } from '../../functions/api/[[ruta]].js'
 
 describe('validación del CMS en Cloudflare', () => {
+  it('acepta cuatro envíos públicos y rechaza desde el quinto', async () => {
+    let cantidad = 0
+    const base = {
+      prepare(sql) {
+        return { bind() { return {
+          async run() {
+            if (sql.includes('INSERT INTO limites_formularios_publicos_cms')) cantidad = cantidad === 0 ? 1 : Math.min(5, cantidad + 1)
+            return { success: true, meta: { changes: 1 } }
+          },
+          async first() { return { cantidad } },
+        } } }
+      },
+    }
+    const resultados = []
+    for (let intento = 0; intento < 6; intento += 1) {
+      resultados.push(await reservarEnvioFormularioPublico(base, 'formulario', 'clave', 'ventana'))
+    }
+    expect(resultados).toEqual([true, true, true, true, false, false])
+  })
+
   it('aplica una espera progresiva sin bloquear prematuramente direcciones compartidas', () => {
     expect(esperaIntentoIngreso(4, 'usuario')).toBe(0)
     expect(esperaIntentoIngreso(5, 'usuario')).toBe(60)

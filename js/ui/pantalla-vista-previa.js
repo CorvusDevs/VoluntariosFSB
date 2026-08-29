@@ -359,7 +359,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function informacion() {
     const caja = elemento('div', ['info-imagen'])
-    caja.textContent = `Imagen final horizontal de ${ANCHO_WHATSAPP} por ${ALTO_WHATSAPP} px, relación 16:10.`
+    caja.textContent = `Imagen final horizontal ampliada de ${ANCHO_WHATSAPP} por ${ALTO_WHATSAPP} px, relación 48:31.`
     return caja
   }
 
