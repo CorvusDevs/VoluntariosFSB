@@ -42,7 +42,10 @@ export function maquetar(lista, roster, opciones = {}) {
   // participantes: se agregan columnas y la celda mantiene su tamaño, asi la cara
   // no se achica dentro del archivo. Los otros dos formatos conservan el ancho fijo.
   const masPobladoDelGrupo = Math.max(1, ...lista.grupos.map((g) => g.filas.length))
-  const columnasGrilla = columnasNecesarias(masPobladoDelGrupo)
+  const columnasPedidas = Number(lista.opcionesImagen?.columnasPorFila)
+  const columnasGrilla = Number.isInteger(columnasPedidas) && columnasPedidas >= 3 && columnasPedidas <= 8
+    ? columnasPedidas
+    : columnasNecesarias(masPobladoDelGrupo)
   const esquinaVoluntario = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
   const tamanoVoluntario = lista.opcionesImagen?.tamanoVoluntario ?? TAMANO_POR_DEFECTO
   const asomoVoluntario = lista.opcionesImagen?.asomoVoluntario ?? ASOMO_POR_DEFECTO

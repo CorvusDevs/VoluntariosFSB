@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista WhatsApp horizontal</title>
+  <style>
+    @font-face { font-family: Poppins; src: url('../../assets/fuentes/poppins-400.woff2'); font-weight: 400; }
+    @font-face { font-family: Poppins; src: url('../../assets/fuentes/poppins-500.woff2'); font-weight: 500; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 32px; background: #211727; font-family: Poppins, sans-serif; }
+    main { max-width: 1280px; margin: auto; }
+    h1 { color: white; font-size: 22px; font-weight: 500; }
+    canvas { display: block; width: 100%; height: auto; border-radius: 20px; box-shadow: 0 24px 70px #0008; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Imagen final horizontal, 1920 por 1200</h1>
+    <div id="resultado"></div>
+  </main>
+  <script type="module">
+    import { crearLienzoWhatsApp } from '../../js/imagen/whatsapp.js'
+
+    const nombres = [
+      'Ángel', 'Fabi', 'Facundo', 'Gonzalo S.', 'Thiago', 'Juan', 'Mateo', 'Santiago', 'Sofi', 'Agustín',
+      'Ezequiel', 'Francisco Planells', 'Gaia', 'Gonzalo P.', 'Julián', 'Luan', 'Nicolás', 'Nikita', 'Valentina', 'Tomás',
+    ]
+    const participantes = nombres.map((nombre, indice) => ({
+      id: `p${indice + 1}`, nombre, grupo: indice < 10 ? 1 : 2, activo: true, foto: null,
+    }))
+    const roster = { participantes, voluntarios: [] }
+    const filas = (desde, hasta) => participantes.slice(desde, hasta).map((persona) => ({
+      participantes: [persona.id], voluntarios: [],
+    }))
+    const lista = {
+      fecha: '2026-08-29', hora: '11:00', lugar: 'Tres Cruces',
+      grupos: [
+        { numero: 1, titulo: 'Grupo 1', subtitulo: '10 a 17 años', cancha: 'Cancha 1', filas: filas(0, 10), apoyo: [] },
+        { numero: 2, titulo: 'Grupo 2', subtitulo: '5 a 9 años', cancha: 'Cancha 2', filas: filas(10, 20), apoyo: [] },
+      ],
+      opcionesImagen: { formato: 'retratos-nombre', fotos: true, saludo: false, despedida: false, compacto: false },
+    }
+    await document.fonts.ready
+    const medida = document.createElement('canvas').getContext('2d')
+    const medirTexto = (texto, fuente) => { medida.font = fuente; return medida.measureText(texto).width }
+    const logo = new Image()
+    logo.src = '../../assets/logo-aletea.png'
+    await logo.decode()
+    const { lienzo } = crearLienzoWhatsApp({ lista, roster, imagenes: { logo }, medirTexto })
+    document.getElementById('resultado').append(lienzo)
+  </script>
+</body>
+</html>

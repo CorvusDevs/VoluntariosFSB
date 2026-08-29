@@ -7,20 +7,22 @@ import {
 } from '../../js/imagen/whatsapp.js'
 
 describe('composición para WhatsApp', () => {
-  it('produce una imagen horizontal 16:9 con ambos grupos completos', () => {
+  it('produce una imagen horizontal 16:10 con cabecera y pie compartidos', () => {
     const composicion = calcularComposicionWhatsApp([
-      { ancho: 1080, alto: 920 },
-      { ancho: 1080, alto: 980 },
+      { ancho: 1080, alto: 920, recorteY: 210, altoCuerpo: 638 },
+      { ancho: 1080, alto: 980, recorteY: 210, altoCuerpo: 698 },
     ])
     expect(composicion.ancho).toBe(1920)
-    expect(composicion.alto).toBe(1080)
-    expect(composicion.ancho / composicion.alto).toBeCloseTo(16 / 9, 2)
+    expect(composicion.alto).toBe(1200)
+    expect(composicion.ancho / composicion.alto).toBeCloseTo(16 / 10, 2)
     expect(composicion.paneles).toHaveLength(2)
     composicion.paneles.forEach((panel) => {
       expect(panel.x).toBeGreaterThanOrEqual(MARGEN_WHATSAPP)
       expect(panel.y).toBeGreaterThanOrEqual(MARGEN_WHATSAPP)
       expect(panel.x + panel.ancho).toBeLessThanOrEqual(ANCHO_WHATSAPP - MARGEN_WHATSAPP)
       expect(panel.y + panel.alto).toBeLessThanOrEqual(ALTO_WHATSAPP - MARGEN_WHATSAPP)
+      expect(panel.y).toBeGreaterThan(MARGEN_WHATSAPP + 156)
+      expect(panel.recorteY).toBe(210)
     })
   })
 

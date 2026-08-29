@@ -4,4 +4,4 @@
 // un arreglo ya llego, y se terminaba depurando un problema ya resuelto.
 // Lo escribe herramientas/sellar.sh; una prueba falla si se desincroniza de
 // version.json.
-export const VERSION = '2026-08-28.2027'
+export const VERSION = '2026-08-28.2125'

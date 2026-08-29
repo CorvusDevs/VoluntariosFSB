@@ -267,6 +267,7 @@ button, input, select, textarea { font: inherit; }
   display: block; width: calc(100% - 32px); height: auto; margin: 0 16px 24px;
   border: 1px solid var(--linea); border-radius: 12px;
 }
+.lienzo-vista-previa-horizontal { aspect-ratio: 16 / 10; }
 
 /* Ingreso institucional: la marca encuadra el acceso sin desperdiciar el
    escritorio ni convertir el formulario en una franja de pantalla completa. */
@@ -462,10 +463,9 @@ button, input, select, textarea { font: inherit; }
   .seccion,
   .ajustes { max-width: 760px; }
 
-  /* La imagen es vertical. Estirarla al ancho del monitor la vuelve una losa y
-     deja de parecerse a lo que se va a ver en el telefono. */
+  /* La vista horizontal necesita aire, pero no debe superar el ancho util. */
   .lienzo-vista-previa {
-    width: 420px;
+    width: calc(100% - 32px);
     max-width: 100%;
   }
 }

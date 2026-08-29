@@ -101,39 +101,25 @@ describe('pantalla de vista previa', () => {
     expect(p.lista().opcionesImagen.compacto).toBe(true)
   })
 
-  it('informa el tamaño real del archivo, no el del lienzo logico', () => {
+  it('informa que la imagen final es horizontal 16:10', () => {
     const info = raiz.querySelector('.info-imagen').textContent
-    const logico = pantalla.plano().ancho
-    expect(info).toContain(String(logico * DENSIDAD))
-    expect(info).not.toContain(`${logico} por`)
-    expect(info).toContain('px')
+    expect(info).toContain('1920 por 1200 px')
+    expect(info).toContain('16:10')
   })
 
-  it('avisa cuando WhatsApp recortaria la imagen', () => {
-    const larga = structuredClone(lista)
-    for (let i = 0; i < 40; i += 1) {
-      larga.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
-    }
-    document.body.innerHTML = '<div id="r3"></div>'
-    const r3 = document.getElementById('r3')
-    armar(r3, apilada(larga))
-    expect(r3.querySelector('.aviso-recorte')).not.toBeNull()
-    expect(r3.querySelector('.aviso-recorte').textContent).toContain('recorte')
-  })
-
-  it('no avisa de recorte con una lista normal', () => {
-    expect(raiz.querySelector('.aviso-recorte')).toBeNull()
-  })
-
-  it('tiene botones de descargar y compartir', () => {
+  it('ofrece la descarga horizontal como acción principal y conserva la vertical', () => {
     const botones = [...raiz.querySelectorAll('button')].map((e) => e.textContent)
-    expect(botones.some((t) => t.includes('Descargar'))).toBe(true)
-    expect(botones).toContain('Compartir para WhatsApp')
-    expect(botones).toContain('Compartir imagen vertical')
+    expect(botones).toContain('Descargar imagen horizontal')
+    expect(botones).toContain('Descargar imagen vertical')
+    expect(botones.some((texto) => texto.includes('WhatsApp'))).toBe(false)
+    expect(raiz.querySelector('.acciones-imagen .boton-principal').textContent)
+      .toBe('Descargar imagen horizontal')
   })
 
   it('el nombre del archivo lleva la fecha de la lista', () => {
     expect(pantalla.nombreDeArchivo()).toBe('futbol-sin-barreras-2026-08-08.png')
+    expect(pantalla.nombreDeArchivoHorizontal())
+      .toBe('futbol-sin-barreras-2026-08-08-horizontal.png')
   })
 
   it('activar el modo compacto achica la imagen', () => {
@@ -160,31 +146,6 @@ describe('pantalla de vista previa', () => {
     expect(r4.querySelector('.lienzo-vista-previa')).not.toBeNull()
   })
 
-  it('cuando el modo compacto no alcanza, propone otra salida', () => {
-    const enorme = structuredClone(lista)
-    for (let i = 0; i < 80; i += 1) {
-      enorme.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
-    }
-    document.body.innerHTML = '<div id="r7"></div>'
-    const r7 = document.getElementById('r7')
-    armar(r7, apilada(enorme))
-    expect(r7.querySelector('.aviso-recorte').textContent).toContain('por grupo')
-  })
-
-  it('con una lista que el modo compacto si arregla, sigue proponiendo el modo compacto', () => {
-    const larga = structuredClone(lista)
-    for (let i = 0; i < 25; i += 1) {
-      larga.grupos[0].filas.push({ participantes: ['p2'], voluntarios: [] })
-    }
-    document.body.innerHTML = '<div id="r8"></div>'
-    const r8 = document.getElementById('r8')
-    armar(r8, apilada(larga))
-    const aviso = r8.querySelector('.aviso-recorte')
-    expect(aviso).not.toBeNull()
-    expect(aviso.textContent).toContain('compacto')
-    expect(aviso.textContent).not.toContain('por grupo')
-  })
-
   it('bloquea los interruptores mientras genera el archivo', async () => {
     document.body.innerHTML = '<div id="r9"></div>'
     const r9 = document.getElementById('r9')
@@ -199,7 +160,8 @@ describe('pantalla de vista previa', () => {
     URL.createObjectURL = () => 'blob:falso'
     URL.revokeObjectURL = () => {}
     try {
-      const botonDescargar = [...r9.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar'))
+      const botonDescargar = [...r9.querySelectorAll('button')]
+        .find((b) => b.textContent === 'Descargar imagen horizontal')
       const compacto = r9.querySelector('[data-opcion="compacto"]')
       expect(compacto.disabled).toBe(false)
 
@@ -224,7 +186,8 @@ describe('pantalla de vista previa', () => {
         await new Promise((r) => setTimeout(r, 0))
       }
       expect(r9.querySelector('[data-opcion="compacto"]').disabled).toBe(false)
-      const botonFinal = [...r9.querySelectorAll('button')].find((b) => b.textContent.includes('Descargar'))
+      const botonFinal = [...r9.querySelectorAll('button')]
+        .find((b) => b.textContent === 'Descargar imagen horizontal')
       expect(botonFinal.disabled).toBe(false)
     } finally {
       HTMLCanvasElement.prototype.toBlob = toBlobOriginal
@@ -233,31 +196,12 @@ describe('pantalla de vista previa', () => {
     }
   })
 
-  it('cuando el dispositivo no puede compartir, lo dice en pantalla y no con un alert', async () => {
-    document.body.innerHTML = '<div id="r10"></div>'
-    const r10 = document.getElementById('r10')
-    armar(r10, lista)
+  it('muestra como vista previa el mismo lienzo horizontal que se descarga', async () => {
     await new Promise((r) => setTimeout(r, 0))
-    const toBlobOriginal = HTMLCanvasElement.prototype.toBlob
-    const alertOriginal = window.alert
-    let alertas = 0
-    HTMLCanvasElement.prototype.toBlob = function (cb) { cb(new Blob(['x'])) }
-    window.alert = () => { alertas += 1 }
-    try {
-      const botonCompartir = [...r10.querySelectorAll('button')]
-        .find((b) => b.textContent === 'Compartir imagen vertical')
-      botonCompartir.click()
-      for (let i = 0; i < 20 && !r10.querySelector('.aviso'); i += 1) {
-        await new Promise((r) => setTimeout(r, 0))
-      }
-      const aviso = r10.querySelector('.aviso')
-      expect(aviso).not.toBeNull()
-      expect(aviso.textContent).toContain('Descargar planificación')
-      expect(alertas).toBe(0)
-    } finally {
-      HTMLCanvasElement.prototype.toBlob = toBlobOriginal
-      window.alert = alertOriginal
-    }
+    const previa = raiz.querySelector('.lienzo-vista-previa-horizontal')
+    expect(previa).not.toBeNull()
+    expect(previa.width).toBe(1920)
+    expect(previa.height).toBe(1200)
   })
 
   it('las instrucciones estan en rioplatense y con acentos', () => {
@@ -268,7 +212,6 @@ describe('pantalla de vista previa', () => {
     document.body.innerHTML = '<div id="r11"></div>'
     const r11 = document.getElementById('r11')
     armar(r11, apilada(larga))
-    expect(r11.querySelector('.aviso-recorte').textContent).toContain('preferís evitarlo, activá')
     expect(r11.querySelector('.info-imagen').textContent).toContain('relación')
   })
 
@@ -392,7 +335,7 @@ describe('selector de formato', () => {
     armar(rp, lista)
     expect(rp.querySelector('.selector-visual')).toBeNull()
     expect(rp.querySelector('[data-accion="cambiar-formato"]')).not.toBeNull()
-    expect(rp.querySelector('.panel-formato-resumen').textContent).toContain('Grilla')
+    expect(rp.querySelector('.panel-formato-resumen').textContent).toContain('Retratos, nombre abajo')
     rp.querySelector('[data-accion="cambiar-formato"]').click()
     expect(rp.querySelector('.selector-visual')).not.toBeNull()
   })
@@ -447,9 +390,9 @@ describe('selector de formato', () => {
     expect(pantalla.lista().opcionesImagen.esquinaVoluntario).toBe('superpuesto-abajo-derecha')
   })
 
-  it('el formato por defecto es la grilla', () => {
-    expect(FORMATO_POR_DEFECTO).toBe('grilla')
-    expect(crearLista('2026-08-08', ROSTER).opcionesImagen.formato).toBe('grilla')
+  it('el formato por defecto mantiene el nombre debajo de la foto', () => {
+    expect(FORMATO_POR_DEFECTO).toBe('retratos-nombre')
+    expect(crearLista('2026-08-08', ROSTER).opcionesImagen.formato).toBe('retratos-nombre')
   })
 
   it('cambiar a columnas actualiza la lista y avisa', () => {
