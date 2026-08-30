@@ -360,6 +360,69 @@ describe('directorio de Personas', () => {
     expect(editor.querySelector('.persona-acciones')).not.toBeNull()
   })
 
+  it('permite gestionar fotos de participantes y voluntarios en el modo de prueba de GitHub', () => {
+    document.body.innerHTML = '<div id="github-fotos"></div>'
+    raiz = document.getElementById('github-fotos')
+    crearPantallaPersonas(raiz, {
+      roster: structuredClone(ROSTER), almacen: almacenFalso(), alCambiar: () => {},
+      sesion: { origen: 'github', usuario: 'claudia' }, modoPruebaGitHub: true,
+    })
+
+    expect(tarjeta('Gonzalo').querySelector('.persona-flecha').textContent).toContain('Editar perfil')
+    tarjeta('Gonzalo').querySelector('button').click()
+    const editorParticipante = raiz.querySelector('.persona-editor')
+    expect(editorParticipante.children[1].classList.contains('persona-foto-perfil')).toBe(true)
+    expect(editorParticipante.querySelector('input[type=file]')).not.toBeNull()
+    expect(raiz.querySelector('.persona-foto-perfil h3').textContent).toBe('Foto de perfil')
+    expect(raiz.querySelector('.persona-ficha-protegida')).toBeNull()
+    ;[...raiz.querySelectorAll('.persona-editor button')].find((e) => e.textContent === 'Cerrar').click()
+
+    ;[...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Voluntarios').click()
+    tarjeta('Abi').querySelector('button').click()
+    expect(raiz.querySelector('.persona-editor input[type=file]')).not.toBeNull()
+    expect(raiz.querySelector('.persona-editor .boton-foto').textContent).toBe('Agregar foto')
+  })
+
+  it('mantiene la gestión de fotos protegida en el gestor institucional', () => {
+    document.body.innerHTML = '<div id="institucional-fotos"></div>'
+    raiz = document.getElementById('institucional-fotos')
+    const roster = structuredClone(ROSTER)
+    crearPantallaPersonas(raiz, {
+      roster, almacen: almacenFalso(), alCambiar: () => {},
+      sesion: { origen: 'cloudflare', nivel_datos_personales: 'ninguno' },
+    })
+    tarjeta('Gonzalo').querySelector('button').click()
+    expect(raiz.querySelector('.persona-editor input[type=file]')).toBeNull()
+    expect(raiz.querySelector('.persona-ficha-protegida').textContent).toContain('no permite abrir esta ficha')
+
+    const rosterAutorizado = structuredClone(ROSTER)
+    rosterAutorizado.participantes[0].privacidad = { fotoInterna: true }
+    crearPantallaPersonas(raiz, {
+      roster: rosterAutorizado, almacen: almacenFalso(), alCambiar: () => {},
+      sesion: { origen: 'cloudflare', nivel_datos_personales: 'sensible' },
+      personaInicial: 'p1',
+    })
+    expect(raiz.querySelector('.persona-editor input[type=file]')).not.toBeNull()
+  })
+
+  it('permite quitar una foto desde GitHub aunque no exista permiso sensible institucional', async () => {
+    document.body.innerHTML = '<div id="github-quitar-foto"></div>'
+    raiz = document.getElementById('github-quitar-foto')
+    const roster = structuredClone(ROSTER)
+    roster.participantes[0].foto = 'p1.jpg'
+    almacen = almacenFalso()
+    await almacen.guardarFoto('p1.jpg', new Blob(['foto']))
+    pantalla = crearPantallaPersonas(raiz, {
+      roster, almacen, alCambiar: () => {}, modoPruebaGitHub: true,
+      sesion: { origen: 'github', usuario: 'claudia' }, personaInicial: 'p1',
+    })
+
+    ;[...raiz.querySelectorAll('.persona-acciones button')].find((e) => e.textContent === 'Quitar foto').click()
+    await esperar()
+    expect(pantalla.roster().participantes[0].foto).toBeNull()
+    expect(await almacen.leerFoto('p1.jpg')).toBeNull()
+  })
+
   it('guarda el perfil operativo sin exponer la ficha protegida y ofrece descargar una tarjeta', async () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')

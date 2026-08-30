@@ -18,7 +18,7 @@ function leerFiltros() {
   try { return JSON.parse(sessionStorage.getItem(CLAVE_FILTROS) ?? '{}') } catch { return {} }
 }
 
-export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuardar = null, sesion = null, esAdmin = false, busquedaInicial = '', personaInicial = '', accionInicial = '' }) {
+export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuardar = null, sesion = null, modoPruebaGitHub = false, esAdmin = false, busquedaInicial = '', personaInicial = '', accionInicial = '' }) {
   const guardados = leerFiltros()
   let actual = roster, texto = busquedaInicial || guardados.texto || '', tipo = busquedaInicial ? 'todas' : guardados.tipo || 'participante', filtro = guardados.filtro || 'activas', grupo = guardados.grupo || 'todos'
   let editando = todasLasPersonas(roster).some((persona) => persona.id === personaInicial) ? personaInicial : null
@@ -95,11 +95,12 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
     if (ajustes().estado && p.nuevo) detalle.appendChild(document.createTextNode(' · Nuevo')); if (ajustes().fotos) detalle.appendChild(document.createTextNode(` · ${p.foto ? 'Foto' : 'Sin foto'}`))
     if (p.tipo === 'participante' && p.equipo?.entregado) detalle.appendChild(document.createTextNode(` · Equipo ${p.equipo.condicion}, talle ${p.equipo.talle}`))
     const textoTarjeta = elemento('span', ['persona-texto']); textoTarjeta.append(elemento('strong', [], p.nombre), detalle)
-    abrir.append(textoTarjeta, elemento('span', ['persona-flecha'], '›')); fila.appendChild(abrir)
+    abrir.append(textoTarjeta, elemento('span', ['persona-flecha'], 'Editar perfil ›')); fila.appendChild(abrir)
     if (seleccionando && p.activo) { const marcar = document.createElement('input'); marcar.type = 'checkbox'; marcar.checked = seleccion.has(p.id); marcar.className = 'persona-seleccionar'; marcar.addEventListener('change', () => { marcar.checked ? seleccion.add(p.id) : seleccion.delete(p.id); dibujar() }); fila.appendChild(marcar) }
     return fila
   }
   const puedeGestionarFicha = () => sesion?.nivel_datos_personales === 'sensible'
+  const puedeGestionarFoto = (persona) => modoPruebaGitHub || (puedeGestionarFicha() && persona.privacidad?.fotoInterna)
   async function foto(p, archivo) { const mapa = await createImageBitmap(archivo); crearEditorDeFoto({ mapa, persona: p, tipo: tipoDe(p), acompanante: null, alGuardar: async (blob) => { const clave = `${p.id}.jpg`; await almacen.guardarFoto(clave, blob, p.nombre); await guardar(editarPersona(actual, p.id, { foto: clave }), `Cambiar la foto de ${p.nombre}`) }, alCancelar: () => {} }) }
   async function lienzoDeTarjeta(p) {
     await esperarFuentes(); const lienzo = document.createElement('canvas'); const ctx = lienzo.getContext('2d'); const plano = maquetarPerfil(p, { medirTexto: medidorDesde(ctx) }); const imagenes = {}
@@ -217,7 +218,17 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
       form.appendChild(confirmacion)
     }
     form.addEventListener('submit', (e) => e.preventDefault()); caja.appendChild(form)
-    if (!nueva) {
+    if (!nueva && puedeGestionarFoto(datos)) {
+      const fotoPerfil = elemento('section', ['persona-foto-perfil'])
+      fotoPerfil.appendChild(elemento('h3', [], 'Foto de perfil'))
+      const accionesFoto = elemento('div', ['persona-acciones', 'persona-foto-acciones'])
+      const archivo = document.createElement('input'); archivo.type = 'file'; archivo.accept = 'image/*'; archivo.capture = 'user'; archivo.className = 'oculto-visualmente'; archivo.addEventListener('change', async () => { if (archivo.files?.[0]) await foto(datos, archivo.files[0]) })
+      const fotoBoton = elemento('label', ['boton', 'boton-foto'], datos.foto ? 'Cambiar foto' : 'Agregar foto'); fotoBoton.appendChild(archivo); accionesFoto.appendChild(fotoBoton)
+      if (datos.foto) accionesFoto.appendChild(boton('Quitar foto', async () => { const clave = datos.foto; await guardar(editarPersona(actual, datos.id, { foto: null }), `Quitar la foto de ${datos.nombre}`); try { await almacen.borrarFoto(clave, datos.nombre) } catch {} }))
+      fotoPerfil.appendChild(accionesFoto)
+      caja.insertBefore(fotoPerfil, form)
+    }
+    if (!nueva && !modoPruebaGitHub) {
       const protegida = elemento('section', ['persona-ficha-protegida'])
       protegida.append(
         elemento('h3', [], 'Ficha protegida'),
@@ -264,7 +275,8 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
                 const resultado = await almacen.guardarFichaProtegida(datos.id, { ...valores, privacidad: consentimientos })
                 actual = editarPersona(actual, datos.id, resultado.persona)
                 await alCambiar(actual, [])
-                estado.textContent = 'Ficha protegida guardada y consentimiento registrado.'
+                confirmacionPerfil = 'Ficha protegida guardada y consentimiento registrado.'
+                dibujar()
               } catch (error) { estado.textContent = `No se guardó la ficha: ${error.message || 'revisá los datos.'}` }
               finally { guardarProtegida.disabled = false; guardarProtegida.textContent = 'Guardar ficha protegida' }
             })
@@ -278,8 +290,6 @@ export function crearPantallaPersonas(raiz, { roster, almacen, alCambiar, alGuar
     }
     if (!nueva) { const vista = elemento('section', ['vista-tarjeta-personal']); vista.appendChild(elemento('h3', [], 'Vista previa de tarjeta')); const textoVista = elemento('p', ['ayuda-ajustes'], 'La tarjeta se actualiza mientras editás.'); const lienzos = elemento('div', ['contenedor-lienzo-tarjeta']); vista.append(textoVista, lienzos); let revisionVista = 0; const actualizarVista = () => { const revision = ++revisionVista; lienzoDeTarjeta(personaBorrador()).then((lienzo) => { if (!vista.isConnected || revision !== revisionVista) return; lienzo.className = 'lienzo-tarjeta-personal'; lienzos.replaceChildren(lienzo) }).catch(() => { if (revision === revisionVista) textoVista.textContent = 'No se pudo preparar la vista previa.' }) }; form.querySelectorAll('input, textarea, select').forEach((entrada) => entrada.addEventListener('input', actualizarVista)); form.querySelectorAll('select').forEach((entrada) => entrada.addEventListener('change', actualizarVista)); actualizarVista(); caja.appendChild(vista) }
     const acciones = elemento('div', ['persona-acciones'])
-    if (!nueva && puedeGestionarFicha() && datos.privacidad?.fotoInterna) { const archivo = document.createElement('input'); archivo.type = 'file'; archivo.accept = 'image/*'; archivo.capture = 'user'; archivo.className = 'oculto-visualmente'; archivo.addEventListener('change', async () => { if (archivo.files?.[0]) await foto(datos, archivo.files[0]) }); const fotoBoton = elemento('label', ['boton', 'boton-foto'], datos.foto ? 'Cambiar foto' : 'Agregar foto'); fotoBoton.appendChild(archivo); acciones.appendChild(fotoBoton)
-      if (datos.foto) acciones.appendChild(boton('Quitar foto', async () => { const clave = datos.foto; await guardar(editarPersona(actual, datos.id, { foto: null }), `Quitar la foto de ${datos.nombre}`); try { await almacen.borrarFoto(clave, datos.nombre) } catch {} })) }
     if (!nueva) {
       acciones.appendChild(boton('Descargar tarjeta PNG', () => descargarTarjeta(personaBorrador())))
       acciones.appendChild(boton(datos.activo ? 'Archivar persona' : 'Restaurar persona', cambiarEstado))

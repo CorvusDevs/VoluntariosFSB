@@ -669,6 +669,7 @@ function dibujar() {
       roster,
       almacen: deposito,
       sesion,
+      modoPruebaGitHub: sesion?.origen === 'github',
       esAdmin: esAdmin(sesion),
       busquedaInicial: contextoPantalla.busqueda,
       personaInicial: contextoPantalla.personaId,
@@ -764,7 +765,7 @@ function mostrarIngresoCloudflare() {
 
 async function entrar({ token, nombre, usuario, rol, recordar: recordarme }) {
   if (recordarme) await recordar(token, nombre, { usuario, rol })
-  sesion = { token, nombre, usuario, rol }
+  sesion = { token, nombre, usuario, rol, origen: 'github' }
   configurar({ modo: 'github', token, autor: nombre })
   await abrirAplicacion()
 }

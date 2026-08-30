@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="/">
+  <title>Personas y fotos en modo GitHub</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+  <main id="raiz"></main>
+  <script type="module">
+    import { crearPantallaPersonas } from 'js/ui/pantalla-personas.js'
+
+    const roster = {
+      version: 1,
+      participantes: [
+        { id: 'p1', nombre: 'Ángel', grupo: 1, foto: null, activo: true, notas: '' },
+        { id: 'p2', nombre: 'Sofi', grupo: 1, foto: null, activo: true, notas: '' },
+      ],
+      voluntarios: [
+        { id: 'v1', nombre: 'Claudia', foto: null, activo: true, notas: '' },
+      ],
+    }
+    const almacen = {
+      async guardarRoster() {},
+      async leerFoto() { return null },
+      async guardarFoto() {},
+      async borrarFoto() {},
+    }
+
+    crearPantallaPersonas(document.getElementById('raiz'), {
+      roster,
+      almacen,
+      alCambiar: () => {},
+      sesion: { origen: 'github', usuario: 'prueba' },
+      modoPruebaGitHub: true,
+    })
+  </script>
+</body>
+</html>

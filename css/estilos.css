@@ -710,7 +710,7 @@ input.fila-nombre:focus {
 .persona-grupo { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 700; }
 .persona-grupo-1 { background: #DDF4F1; color: #0F766E; }
 .persona-grupo-2 { background: #FBE3EF; color: #C21870; }
-.persona-flecha { font-size: 24px; color: var(--texto-suave); }
+.persona-flecha { white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--violeta); }
 .persona-seleccionar { width: 24px; height: 24px; margin: 10px; }
 .persona-editor, .personas-personalizacion { position: fixed; z-index: 80; right: 0; bottom: 0; left: 0; box-sizing: border-box; max-height: min(82dvh, 760px); overflow: auto; overscroll-behavior: contain; border-radius: 18px 18px 0 0; background: var(--fondo); box-shadow: 0 -12px 36px rgba(41, 23, 58, .18); }
 .persona-editor h2, .personas-personalizacion h2 { margin-top: 0; }
@@ -718,6 +718,9 @@ input.fila-nombre:focus {
 .persona-bio { display: grid; gap: 12px; margin: 4px 0 0; padding: 16px; border: 1px solid var(--linea); border-radius: 14px; background: #FAF8FB; }
 .persona-bio legend { padding: 0 6px; color: var(--violeta); font-weight: 700; }
 .persona-confirmacion { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #A7DED8; border-radius: 10px; color: var(--turquesa-texto); background: #F1FAF8; font-weight: 700; }
+.persona-foto-perfil { margin: 14px 0; padding: 14px; border: 1px solid #A7DED8; border-radius: 14px; background: #F1FAF8; }
+.persona-foto-perfil h3 { margin: 0; color: var(--turquesa-texto); }
+.persona-foto-perfil .persona-acciones { margin-top: 10px; }
 .persona-error { margin: 0 0 12px; padding: 10px 12px; border: 1px solid #E9A7C8; border-radius: 10px; color: #9D174D; background: #FFF1F6; font-weight: 700; }
 .persona-edad { margin: -4px 0 0; color: var(--violeta); font-size: 14px; font-weight: 700; }
 .persona-bio .campo { display: grid; gap: 6px; }
