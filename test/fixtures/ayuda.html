@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ayuda de Aletea</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+  <div id="raiz"></div>
+  <script type="module">
+    import { crearPantallaAyuda } from '../../js/ui/pantalla-ayuda.js'
+    const parametros = new URLSearchParams(location.search)
+    crearPantallaAyuda(document.getElementById('raiz'), {
+      admin: parametros.get('admin') !== '0',
+      busquedaInicial: parametros.get('busqueda') || '',
+      alIrA: (destino) => { document.body.dataset.destino = destino },
+      alCopiarEnlace: async () => {},
+      alCopiarTexto: async () => {},
+    })
+  </script>
+</body>
+</html>

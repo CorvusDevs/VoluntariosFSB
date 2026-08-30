@@ -6,3 +6,7 @@ test-results/
 playwright-report/
 *.png.tmp
 respaldos/
+.env
+.env.*
+!.env.example
+exportacion-d1*.sql

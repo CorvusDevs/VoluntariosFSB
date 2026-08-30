@@ -1,0 +1,6 @@
+# Aletea: los archivos de aplicacion no forman parte del sitio publico.
+<IfModule mod_rewrite.c>
+RewriteEngine On
+RewriteRule ^(?:servidor-cpanel|functions|migrations|dist|tmp)(?:/|$) - [R=404,L,NC]
+RewriteRule ^(?:app\.js|package(?:-lock)?\.json|MANIFEST\.sha256|stderr\.log|php\.ini|.*\.sql|.*\.cjs|.*\.zip)$ - [R=404,L,NC]
+</IfModule>

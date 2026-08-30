@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Vista previa - Editor de Página web</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body class="app-cms">
+  <main id="preview"></main>
+  <script type="module">
+    const fetchReal = window.fetch.bind(window)
+    window.fetch = async (url, opciones = {}) => {
+      if (String(url) === '/api/cms/pagina-web' && (!opciones.method || opciones.method === 'GET')) {
+        return new Response(JSON.stringify({ borrador: null, publicado: null, revisionBorrador: 0, revisionPublicada: 0, historial: [], permisos: { editar: true, publicar: true } }), { headers: { 'content-type': 'application/json' } })
+      }
+      if (String(url) === '/api/cms/pagina-web/medios' && (!opciones.method || opciones.method === 'GET')) {
+        return new Response(JSON.stringify({ medios: [{
+          id: 'preview-comunidad',
+          nombre: 'comunidad.webp',
+          tipo: 'image/webp',
+          ancho: 1920,
+          alto: 1280,
+          bytes: 319488,
+          texto_alternativo: 'Encuentro de la comunidad de Aletea',
+          url: 'http://127.0.0.1:4321/assets/images/comunidad.webp',
+        }] }), { headers: { 'content-type': 'application/json' } })
+      }
+      if (String(url) === '/api/cms/pagina-web/formularios' && (!opciones.method || opciones.method === 'GET')) {
+        return new Response(JSON.stringify({ formularios: [
+          { id: 'orientacion-familias', titulo: 'Orientación para familias', descripcion: 'Contanos qué necesitás para dirigir tu consulta.', tipo: 'inscripcion', enlace: 'https://gestor.aletea.org/formulario.html?id=orientacion-familias' },
+          { id: 'voluntariado', titulo: 'Sumate como voluntario', descripcion: 'Contanos cómo te gustaría colaborar.', tipo: 'voluntariado', enlace: 'https://gestor.aletea.org/formulario.html?id=voluntariado' },
+        ] }), { headers: { 'content-type': 'application/json' } })
+      }
+      if (String(url).startsWith('/api/cms/pagina-web/metricas') && (!opciones.method || opciones.method === 'GET')) {
+        return new Response(JSON.stringify({
+          estado: 'con_datos', muestra: true, periodoDias: 30, desde: '2026-07-26', hasta: '2026-08-24',
+          resumen: { visitas: 1240, paginasVistas: 2185, acciones: 164 },
+          variacion: { visitas: 12, paginasVistas: 9, acciones: 18 },
+          paginas: [{ ruta: '/', vistas: 820 }, { ruta: '/familias/', vistas: 510 }, { ruta: '/actividades/', vistas: 330 }],
+          acciones: [{ accion: 'contacto:whatsapp', cantidad: 78 }, { accion: 'consultar:actividad', cantidad: 54 }, { accion: 'donar', cantidad: 32 }],
+          privacidad: { agregadas: true, identificadoresPersonales: false, datosFormularios: false },
+        }), { headers: { 'content-type': 'application/json' } })
+      }
+      return fetchReal(url, opciones)
+    }
+    const { crearPantallaPaginaWeb } = await import('./js/ui/pantalla-pagina-web.js')
+    crearPantallaPaginaWeb(document.querySelector('#preview'), { sesion: { nombre: 'Vista previa local', perfil_acceso: 'direccion' } })
+  </script>
+</body>
+</html>

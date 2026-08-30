@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { ficha, boton, escapar, elemento } from '../../js/ui/componentes.js'
+import { ficha, boton, enlaceBoton, escapar, elemento } from '../../js/ui/componentes.js'
 
 describe('escapar', () => {
   it('neutraliza los caracteres peligrosos de HTML', () => {
@@ -57,6 +57,8 @@ describe('boton', () => {
     el.click()
     expect(el.textContent).toBe('Deshacer')
     expect(veces).toBe(1)
+    expect(el.dataset.ayuda).toBeUndefined()
+    expect(el.getAttribute('aria-description')).toBeNull()
   })
 
   it('agrega un SVG oficial a las acciones conocidas sin cambiar su etiqueta', () => {
@@ -70,5 +72,47 @@ describe('boton', () => {
     ;['Accesos', 'Registro institucional'].forEach((etiqueta) => {
       expect(boton(etiqueta, () => {}).querySelector('svg')).not.toBeNull()
     })
+  })
+
+  it('muestra un icono de edición en Contenido', () => {
+    const el = boton('Contenido', () => {})
+    expect(el.querySelector('svg')).not.toBeNull()
+    expect(el.classList.contains('boton-con-icono')).toBe(true)
+  })
+
+  it('muestra un icono en el editor de piezas', () => {
+    expect(boton('Editor de piezas', () => {}).querySelector('svg')).not.toBeNull()
+  })
+
+  it('explica para qué sirve cada ficha', () => {
+    expect(ficha({ id: 'p1', nombre: 'Claudia' }).dataset.ayuda).toBe('Abre la ficha de Claudia.')
+  })
+})
+
+describe('enlaceBoton', () => {
+  it('conserva href y usa la navegación interna en un clic simple', () => {
+    let veces = 0
+    const enlace = enlaceBoton('Finanzas', '/finanzas', () => { veces += 1 })
+    document.body.appendChild(enlace)
+
+    expect(enlace.tagName).toBe('A')
+    expect(enlace.getAttribute('href')).toBe('/finanzas')
+    expect(enlace.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))).toBe(false)
+    expect(veces).toBe(1)
+  })
+
+  it('deja el clic central y los modificadores al navegador', () => {
+    let veces = 0
+    const enlace = enlaceBoton('Biblioteca', '/biblioteca', () => { veces += 1 })
+    const delegados = []
+    enlace.addEventListener('click', (evento) => {
+      delegados.push(!evento.defaultPrevented)
+      evento.preventDefault()
+    })
+
+    enlace.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 1 }))
+    enlace.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0, ctrlKey: true }))
+    expect(delegados).toEqual([true, true])
+    expect(veces).toBe(0)
   })
 })

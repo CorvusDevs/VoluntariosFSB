@@ -1,9 +1,36 @@
+import { clonarContenidoPaginaWeb, contenidoComoBorrador, validarContenidoPaginaWeb } from '../../js/modelo/pagina-web.js'
+import { importeCentavosFsb, prepararCuotasFsb, prepararRecargosFsb, resumenFinanzasFsb, signoMovimientoFsb } from '../../js/modelo/finanzas-fsb.js'
+import { bytesImagenConLimite, LIMITE_IMAGEN_REMOTA, urlDescargaGoogleDrive } from '../../js/imagen/cargar-remota.js'
+import { MENSAJE_ENLACE_INVALIDO, normalizarEnlaceUsuario } from '../../js/util/enlaces.js'
+import {
+  perfilAccesoInstitucional, puedeGestionarPaginaWeb, puedeUsarComunicacionVisual, puedeVerMetricasPaginaWeb,
+} from '../../js/acceso/permisos-funciones.js'
+
 const responder = (datos, estado = 200, cabeceras = {}) => new Response(
   datos === null ? null : JSON.stringify(datos),
   { status: estado, headers: { 'content-type': 'application/json; charset=utf-8', ...cabeceras } },
 )
 
 const error = (mensaje, estado, cabeceras = {}) => responder({ error: mensaje }, estado, cabeceras)
+
+const ORIGENES_FORMULARIOS_PUBLICOS = new Set([
+  'https://prueba.aletea.org',
+  'http://127.0.0.1:4321',
+  'http://127.0.0.1:8778',
+  'http://localhost:4321',
+])
+
+export function cabecerasFormularioPublico(request) {
+  const origen = request.headers.get('origin') || ''
+  if (!ORIGENES_FORMULARIOS_PUBLICOS.has(origen)) return {}
+  return {
+    'access-control-allow-origin': origen,
+    'access-control-allow-methods': 'GET, POST, OPTIONS',
+    'access-control-allow-headers': 'content-type',
+    'access-control-max-age': '86400',
+    vary: 'Origin',
+  }
+}
 
 const CODIFICADOR = new TextEncoder()
 const DURACION_SESION = 60 * 60 * 24 * 7
@@ -137,7 +164,7 @@ async function sesionDe(contexto) {
   const firmada = await leerSesionFirmada(cookies(contexto.request).vfsb_sesion, contexto.env.SESSION_SECRET)
   if (!firmada) return null
   const cuenta = await contexto.env.BASE.prepare(
-    'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
+    'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
   ).bind(firmada.usuario).first()
   return cuenta?.version_sesion === firmada.version ? exponerCuenta(cuenta) : null
 }
@@ -162,8 +189,7 @@ const PERMISOS_POR_PERFIL = {
 }
 
 export function perfilAccesoDe(cuenta) {
-  if (PERFILES_ACCESO.includes(cuenta?.perfil_acceso)) return cuenta.perfil_acceso
-  return cuenta?.rol === 'admin' ? 'administracion' : 'coordinacion'
+  return perfilAccesoInstitucional(cuenta)
 }
 
 export const puedeVerAuditoria = (sesion) => esAdmin(sesion)
@@ -192,7 +218,9 @@ function permisosDe(cuenta) {
 
 function exponerCuenta(cuenta) {
   const { sal, hash_contrasena, version_sesion, activo, ...publica } = cuenta
-  return { ...publica, perfil_acceso: perfilAccesoDe(cuenta), nivel_datos_personales: nivelDatosPersonalesDe(cuenta), permisos: permisosDe(cuenta) }
+  const nivelDatos = nivelDatosPersonalesDe(cuenta)
+  const vigenciaDatos = nivelDatos === 'ninguno' ? 'ninguna' : cuenta?.datos_personales_sin_vencimiento ? 'indefinida' : 'temporal'
+  return { ...publica, perfil_acceso: perfilAccesoDe(cuenta), nivel_datos_personales: nivelDatos, vigencia_datos_personales: vigenciaDatos, permisos: permisosDe(cuenta) }
 }
 
 async function claveFotoPerfil(correo) {
@@ -204,8 +232,104 @@ async function claveFotoPerfil(correo) {
 export function nivelDatosPersonalesDe(cuenta) {
   const nivel = NIVELES_DATOS_PERSONALES.includes(cuenta?.nivel_datos_personales) ? cuenta.nivel_datos_personales : 'ninguno'
   if (nivel === 'ninguno') return nivel
+  if (Number(cuenta?.datos_personales_sin_vencimiento) === 1) return nivel
   const vence = String(cuenta?.datos_personales_hasta ?? '')
   return fechaValida(vence) && vence >= fechaActualCms() ? nivel : 'ninguno'
+}
+
+export function vigenciaDatosPersonalesDesde({ nivel = 'ninguno', vigencia = '', hasta = '' } = {}) {
+  if (nivel === 'ninguno') return { vigencia: 'ninguna', hastaGuardado: null, sinVencimiento: 0 }
+  const modo = String(vigencia || (hasta ? 'temporal' : '')).trim()
+  if (!['temporal', 'indefinida'].includes(modo)) return { error: 'Elegí si el acceso vence o queda sin vencimiento.' }
+  if (modo === 'temporal' && (!fechaValida(hasta) || hasta < fechaActualCms())) return { error: 'Indicá una fecha válida para el acceso temporal.' }
+  return {
+    vigencia: modo,
+    hastaGuardado: modo === 'temporal' ? hasta : null,
+    sinVencimiento: modo === 'indefinida' ? 1 : 0,
+  }
+}
+
+export function puedeVerRespuestasCms(cuenta) {
+  return nivelDatosPersonalesDe(cuenta) !== 'ninguno'
+}
+
+export function puedeGestionarSolicitudesPrivacidadCms(cuenta) {
+  return esAdmin(cuenta) && nivelDatosPersonalesDe(cuenta) === 'sensible'
+}
+
+export function puedeAccederFinanzasFsb(cuenta, alcance = {}, equipoId = null) {
+  if (nivelDatosPersonalesDe(cuenta) !== 'sensible') return false
+  return Boolean(alcance.global || (equipoId && alcance.equipos?.has?.(equipoId)))
+}
+
+export function puedeGestionarFinanzasFsb(cuenta, alcance = {}, equipoId = null) {
+  return puedeAccederFinanzasFsb(cuenta, alcance, equipoId)
+    && ['administracion', 'direccion', 'coordinacion'].includes(perfilAccesoDe(cuenta))
+}
+
+const DESCRIPCION_TAREA_FORMULARIO = 'Creada desde una respuesta de formulario.'
+const DESCRIPCION_TAREA_ENTRADA = 'Creada desde la bandeja de entradas institucionales.'
+
+function esTareaDerivadaDeEntradaCms(tarea) {
+  return [DESCRIPCION_TAREA_FORMULARIO, DESCRIPCION_TAREA_ENTRADA].includes(tarea?.descripcion ?? tarea?.tarea_descripcion)
+}
+
+export function tareaCmsSinDatosDeFormulario(tarea) {
+  if (!esTareaDerivadaDeEntradaCms(tarea)) return tarea
+  return {
+    ...tarea,
+    titulo: tarea?.descripcion === DESCRIPCION_TAREA_FORMULARIO ? 'Respuesta de formulario recibida' : 'Entrada institucional recibida',
+    descripcion: 'El contenido requiere acceso vigente a datos personales.',
+    solicitante_nombre: null,
+    evento_titulo: tarea?.evento_titulo ? 'Actividad vinculada a una entrada' : tarea?.evento_titulo,
+  }
+}
+
+export function tareaCmsSinSeguimientoPersonalAjeno(tarea, correoSesion) {
+  if (!tarea?.seguimiento_personal_por || tarea.seguimiento_personal_por === correoSesion) return tarea
+  return { ...tarea, seguimiento_personal: 0, motivo_seguimiento: '', seguimiento_personal_por: null }
+}
+
+export function datosTareaSinSeguimientoPersonalAjeno(datos, tareaActual, correoSesion) {
+  if (!tareaActual?.seguimiento_personal_por || tareaActual.seguimiento_personal_por === correoSesion) return datos
+  return Object.fromEntries(Object.entries(datos || {}).filter(([campo]) => !['seguimiento_personal', 'motivo_seguimiento', 'seguimiento_personal_por'].includes(campo)))
+}
+
+function tareaCmsVisiblePara(tarea, sesion, accesoRespuestas = puedeVerRespuestasCms(sesion)) {
+  const protegida = accesoRespuestas ? tarea : tareaCmsSinDatosDeFormulario(tarea)
+  return tareaCmsSinSeguimientoPersonalAjeno(protegida, sesion?.correo)
+}
+
+export function eventoCmsSinDatosDeEntrada(evento) {
+  const { entrada_id, ...publico } = evento || {}
+  if (!entrada_id) return publico
+  return {
+    ...publico,
+    titulo: 'Actividad vinculada a una entrada',
+    descripcion: 'El contenido requiere acceso vigente a datos personales.',
+  }
+}
+
+export function notificacionCmsSinDatosDeFormulario(notificacion) {
+  if (!esTareaDerivadaDeEntradaCms(notificacion)) return notificacion
+  return {
+    ...notificacion,
+    titulo: notificacion?.tarea_descripcion === DESCRIPCION_TAREA_FORMULARIO ? 'Respuesta de formulario asignada' : 'Entrada institucional asignada',
+    detalle: 'Abrí la tarea cuando tengas acceso vigente a datos personales.',
+    tarea_titulo: notificacion?.tarea_descripcion === DESCRIPCION_TAREA_FORMULARIO ? 'Respuesta de formulario recibida' : 'Entrada institucional recibida',
+  }
+}
+
+export function actividadCmsSinDatosDeEntradas(fila) {
+  const { tarea_descripcion, entrada_evento_id, ...publica } = fila || {}
+  const recurso = String(fila?.recurso || '')
+  const accion = String(fila?.accion || '')
+  const vinculada = recurso.startsWith('entradas/')
+    || recurso.startsWith('solicitudes-privacidad/')
+    || accion.startsWith('recibir formulario')
+    || Boolean(entrada_evento_id)
+    || esTareaDerivadaDeEntradaCms(fila)
+  return vinculada ? { ...publica, detalle: 'Detalle protegido por acceso a datos personales.' } : publica
 }
 
 async function alcanceCmsDe(base, sesion) {
@@ -249,6 +373,281 @@ function permisosParaDocumento(ruta) {
   return []
 }
 
+const RUTA_PAGINA_WEB_BORRADOR = 'pagina-web/borrador.json'
+const RUTA_PAGINA_WEB_PUBLICADA = 'pagina-web/publicada.json'
+const MAXIMO_MEDIO_WEB = 850 * 1024
+
+function moverFechaWeb(fecha, dias) {
+  const valor = new Date(`${fecha}T00:00:00Z`)
+  valor.setUTCDate(valor.getUTCDate() + dias)
+  return valor.toISOString().slice(0, 10)
+}
+
+function limitesMetricasWeb(dias, hoy) {
+  return {
+    inicioActual: moverFechaWeb(hoy, -(dias - 1)),
+    inicioAnterior: moverFechaWeb(hoy, -(dias * 2 - 1)),
+    finAnterior: moverFechaWeb(hoy, -dias),
+  }
+}
+
+function numeroAgregado(valor) {
+  const numero = Number(valor || 0)
+  return Number.isFinite(numero) && numero >= 0 ? Math.round(numero) : 0
+}
+
+function variacionAgregada(actual, anterior) {
+  if (!anterior) return null
+  return Math.round(((actual - anterior) / anterior) * 100)
+}
+
+export function resumenMetricasWebDesde(diarias = [], paginas = [], acciones = [], dias = 30, hoy = fechaActualCms()) {
+  const periodoDias = [7, 30, 90].includes(Number(dias)) ? Number(dias) : 30
+  const limites = limitesMetricasWeb(periodoDias, hoy)
+  const actuales = diarias.filter((fila) => fila.fecha >= limites.inicioActual && fila.fecha <= hoy)
+  const anteriores = diarias.filter((fila) => fila.fecha >= limites.inicioAnterior && fila.fecha <= limites.finAnterior)
+  const sumar = (filas, clave) => filas.reduce((total, fila) => total + numeroAgregado(fila[clave]), 0)
+  const resumen = {
+    visitas: sumar(actuales, 'visitas'),
+    paginasVistas: sumar(actuales, 'paginas_vistas'),
+    acciones: sumar(actuales, 'acciones'),
+  }
+  const previo = {
+    visitas: sumar(anteriores, 'visitas'),
+    paginasVistas: sumar(anteriores, 'paginas_vistas'),
+    acciones: sumar(anteriores, 'acciones'),
+  }
+  const rutas = paginas
+    .filter((fila) => /^\/(?!\/)[^?#]{0,159}$/.test(String(fila.ruta || '')))
+    .map((fila) => ({ ruta: fila.ruta, vistas: numeroAgregado(fila.vistas) }))
+    .sort((a, b) => b.vistas - a.vistas).slice(0, 5)
+  const eventos = acciones
+    .filter((fila) => /^[a-z0-9][a-z0-9:_-]{0,79}$/.test(String(fila.accion || '')))
+    .map((fila) => ({ accion: fila.accion, cantidad: numeroAgregado(fila.cantidad) }))
+    .sort((a, b) => b.cantidad - a.cantidad).slice(0, 5)
+  return {
+    estado: actuales.length ? 'con_datos' : 'sin_datos',
+    periodoDias,
+    desde: limites.inicioActual,
+    hasta: hoy,
+    actualizadoEn: actuales.map((fila) => fila.actualizado_en).filter(Boolean).sort().at(-1) || null,
+    resumen,
+    variacion: {
+      visitas: variacionAgregada(resumen.visitas, previo.visitas),
+      paginasVistas: variacionAgregada(resumen.paginasVistas, previo.paginasVistas),
+      acciones: variacionAgregada(resumen.acciones, previo.acciones),
+    },
+    serie: actuales.map((fila) => ({ fecha: fila.fecha, visitas: numeroAgregado(fila.visitas) })),
+    paginas: rutas,
+    acciones: eventos,
+    privacidad: { agregadas: true, identificadoresPersonales: false, datosFormularios: false },
+  }
+}
+
+async function metricasPaginaWebCms(contexto) {
+  if (contexto.request.method !== 'GET') return error('Método no permitido.', 405)
+  const solicitados = Number(new URL(contexto.request.url).searchParams.get('dias') || 30)
+  const dias = [7, 30, 90].includes(solicitados) ? solicitados : 30
+  const hoy = fechaActualCms()
+  const limites = limitesMetricasWeb(dias, hoy)
+  const [diarias, paginas, acciones] = await Promise.all([
+    contexto.env.BASE.prepare(`SELECT fecha, visitas, paginas_vistas, acciones, actualizado_en
+      FROM metricas_web_diarias WHERE fecha >= ?1 AND fecha <= ?2 ORDER BY fecha`).bind(limites.inicioAnterior, hoy).all(),
+    contexto.env.BASE.prepare(`SELECT ruta, SUM(vistas) AS vistas FROM metricas_web_paginas_diarias
+      WHERE fecha >= ?1 AND fecha <= ?2 GROUP BY ruta ORDER BY vistas DESC LIMIT 5`).bind(limites.inicioActual, hoy).all(),
+    contexto.env.BASE.prepare(`SELECT accion, SUM(cantidad) AS cantidad FROM metricas_web_acciones_diarias
+      WHERE fecha >= ?1 AND fecha <= ?2 GROUP BY accion ORDER BY cantidad DESC LIMIT 5`).bind(limites.inicioActual, hoy).all(),
+  ])
+  return responder(resumenMetricasWebDesde(diarias.results || [], paginas.results || [], acciones.results || [], dias, hoy))
+}
+
+async function medioPaginaWebPublico(contexto, id) {
+  if (contexto.request.method === 'OPTIONS') return responder(null, 204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS' })
+  if (contexto.request.method !== 'GET' || !/^[a-f0-9-]{36}$/.test(id || '')) return error('No encontramos esa imagen.', 404)
+  const medio = await contexto.env.BASE.prepare('SELECT datos, tipo, bytes FROM medios_pagina_web WHERE id = ?1').bind(id).first()
+  if (!medio) return error('No encontramos esa imagen.', 404)
+  return new Response(bytesFoto(medio.datos), { headers: {
+    'content-type': medio.tipo, 'content-length': String(medio.bytes), 'cache-control': 'public, max-age=31536000, immutable',
+    'access-control-allow-origin': '*', 'x-content-type-options': 'nosniff',
+  } })
+}
+
+async function mediosPaginaWebCms(contexto, sesion) {
+  const { request, env } = contexto
+  const puedeEditar = ['administracion', 'direccion', 'coordinacion'].includes(perfilAccesoDe(sesion))
+  if (request.method === 'GET') {
+    const filas = await env.BASE.prepare('SELECT id, nombre, tipo, ancho, alto, bytes, texto_alternativo, creado_en FROM medios_pagina_web ORDER BY creado_en DESC LIMIT 80').all()
+    const origen = new URL(request.url).origin
+    return responder({ medios: (filas.results || []).map((medio) => ({ ...medio, url: `${origen}/api/pagina-web/medios/${medio.id}` })) })
+  }
+  if (request.method !== 'POST') return error('Método no permitido.', 405)
+  if (!puedeEditar) return error('Tu perfil puede revisar las imágenes, pero no cargarlas.', 403)
+  const tipo = String(request.headers.get('content-type') || '').split(';')[0]
+  if (!['image/webp', 'image/jpeg', 'image/png'].includes(tipo)) return error('Usá una imagen WebP, JPG o PNG.', 400)
+  const datos = await request.arrayBuffer()
+  if (!datos.byteLength) return error('La imagen está vacía.', 400)
+  if (datos.byteLength > MAXIMO_MEDIO_WEB) return error('La imagen supera el máximo de 850 KB.', 413)
+  const ancho = Number(request.headers.get('x-image-width') || 0)
+  const alto = Number(request.headers.get('x-image-height') || 0)
+  if (!Number.isInteger(ancho) || !Number.isInteger(alto) || ancho < 1 || alto < 1 || ancho > 4000 || alto > 4000) return error('Las dimensiones de la imagen no son válidas.', 400)
+  const nombre = decodeURIComponent(String(request.headers.get('x-file-name') || 'imagen-web')).slice(0, 180)
+  const textoAlternativo = decodeURIComponent(String(request.headers.get('x-alt-text') || '')).slice(0, 180)
+  const id = crypto.randomUUID()
+  const url = `${new URL(request.url).origin}/api/pagina-web/medios/${id}`
+  await env.BASE.prepare(`INSERT INTO medios_pagina_web
+    (id, nombre, tipo, ancho, alto, bytes, datos, texto_alternativo, creado_por)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`)
+    .bind(id, nombre, tipo, ancho, alto, datos.byteLength, datos, textoAlternativo, sesion.correo).run()
+  await registrar(env.BASE, sesion, 'cargar imagen para página web', `pagina-web/medios/${id}`, nombre)
+  return responder({ medio: { id, nombre, tipo, ancho, alto, bytes: datos.byteLength, texto_alternativo: textoAlternativo, url } }, 201)
+}
+
+async function leerDocumentoPaginaWeb(base, ruta) {
+  const fila = await base.prepare('SELECT contenido, revision, actualizado_por, actualizado_en FROM documentos WHERE ruta = ?1').bind(ruta).first()
+  if (!fila) return null
+  try { return { ...fila, contenido: JSON.parse(fila.contenido) } } catch { return null }
+}
+
+function sentenciaGuardarPaginaWeb(base, ruta, contenido, revision, correo) {
+  return base.prepare(`INSERT INTO documentos (ruta, contenido, revision, actualizado_por, actualizado_en)
+    VALUES (?1, ?2, ?3, ?4, CURRENT_TIMESTAMP)
+    ON CONFLICT(ruta) DO UPDATE SET contenido = excluded.contenido, revision = excluded.revision,
+      actualizado_por = excluded.actualizado_por, actualizado_en = CURRENT_TIMESTAMP`)
+    .bind(ruta, JSON.stringify(contenido), revision, correo)
+}
+
+async function paginaWebPublica(contexto) {
+  if (contexto.request.method === 'OPTIONS') return responder(null, 204, {
+    'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS',
+  })
+  if (contexto.request.method !== 'GET') return error('Método no permitido.', 405)
+  const publicada = await leerDocumentoPaginaWeb(contexto.env.BASE, RUTA_PAGINA_WEB_PUBLICADA)
+  if (!publicada || publicada.contenido?.editorial?.estado !== 'publicado') return error('La página todavía no tiene una versión publicada.', 404, { 'access-control-allow-origin': '*' })
+  return responder(publicada.contenido, 200, {
+    'access-control-allow-origin': '*', 'cache-control': 'no-store, max-age=0', etag: `"${publicada.revision}"`,
+  })
+}
+
+async function paginaWebCms(contexto, sesion, accion) {
+  const { request, env } = contexto
+  if (!puedeGestionarPaginaWeb(sesion)) return error('Tu perfil no puede abrir la gestión de la página web.', 403)
+  const perfil = perfilAccesoDe(sesion)
+  const puedeEditar = ['administracion', 'direccion', 'coordinacion'].includes(perfil)
+  const puedePublicar = ['administracion', 'direccion'].includes(perfil)
+  if (accion === 'medios') return mediosPaginaWebCms(contexto, sesion)
+  if (accion === 'metricas') {
+    if (!puedeVerMetricasPaginaWeb(sesion)) return error('Tu perfil no puede consultar las métricas de la página web.', 403)
+    return metricasPaginaWebCms(contexto)
+  }
+  if (accion === 'formularios' && request.method === 'GET') {
+    const filas = await env.BASE.prepare(`SELECT f.id, f.titulo, f.descripcion, f.tipo, f.finalidad, f.responsable_datos,
+        f.conservacion_meses, f.requiere_consentimiento, e.nombre AS equipo_nombre
+      FROM formularios_cms f LEFT JOIN equipos e ON e.id = f.equipo_id AND e.activo = 1
+      WHERE f.visibilidad = 'publica' AND f.estado = 'activa'
+      ORDER BY f.titulo COLLATE NOCASE, f.id`).all()
+    const formularios = (filas.results || []).map((formulario) => ({
+      id: formulario.id,
+      titulo: formulario.titulo,
+      descripcion: formulario.descripcion,
+      tipo: formulario.tipo,
+      equipo: formulario.equipo_nombre || '',
+      finalidad: formulario.finalidad,
+      responsableDatos: formulario.responsable_datos,
+      conservacionMeses: Number(formulario.conservacion_meses || 12),
+      requiereConsentimiento: Boolean(formulario.requiere_consentimiento),
+      enlace: `https://gestor.aletea.org/formulario.html?id=${encodeURIComponent(formulario.id)}`,
+    }))
+    return responder({ formularios })
+  }
+  if (!accion && request.method === 'GET') {
+    const [borrador, publicada, historial] = await Promise.all([
+      leerDocumentoPaginaWeb(env.BASE, RUTA_PAGINA_WEB_BORRADOR),
+      leerDocumentoPaginaWeb(env.BASE, RUTA_PAGINA_WEB_PUBLICADA),
+      env.BASE.prepare("SELECT ruta, revision, actualizado_por, actualizado_en FROM documentos WHERE ruta LIKE 'pagina-web/historial/%.json' ORDER BY ruta DESC LIMIT 10").all(),
+    ])
+    return responder({
+      borrador: borrador?.contenido || null, publicado: publicada?.contenido || null,
+      revisionBorrador: Number(borrador?.revision || 0), revisionPublicada: Number(publicada?.revision || 0),
+      historial: historial.results || [], permisos: { editar: puedeEditar, publicar: puedePublicar },
+      destinos: { actual: 'https://prueba.aletea.org', principal: 'https://aletea.org', principalProtegido: true },
+    })
+  }
+  if (accion === 'borrador' && request.method === 'PUT') {
+    if (!puedeEditar) return error('Tu perfil puede revisar la página, pero no modificarla.', 403)
+    let contenido
+    try { contenido = await request.json() } catch { return error('El contenido de la página no es válido.', 400) }
+    contenido = contenidoComoBorrador(contenido)
+    const errores = validarContenidoPaginaWeb(contenido)
+    if (errores.length) return error(errores[0], 400)
+    const actual = await leerDocumentoPaginaWeb(env.BASE, RUTA_PAGINA_WEB_BORRADOR)
+    const esperada = request.headers.get('if-match')?.replaceAll('"', '') ?? null
+    if (String(actual?.revision || 0) !== String(esperada ?? 0)) return error('Otra persona modificó este borrador. Recargá antes de guardar.', 409)
+    const revision = Number(actual?.revision || 0) + 1
+    await sentenciaGuardarPaginaWeb(env.BASE, RUTA_PAGINA_WEB_BORRADOR, contenido, revision, sesion.correo).run()
+    await registrar(env.BASE, sesion, actual ? 'modificar borrador web' : 'crear borrador web', RUTA_PAGINA_WEB_BORRADOR, `revisión ${revision}`)
+    return responder({ revision, borrador: contenido }, 200, { etag: `"${revision}"` })
+  }
+  if (accion === 'publicar' && request.method === 'POST') {
+    if (!puedePublicar) return error('Solo Dirección o Administración puede publicar la página.', 403)
+    let datos
+    try { datos = await request.json() } catch { return error('La solicitud de publicación no es válida.', 400) }
+    const [borrador, publicadaActual] = await Promise.all([
+      leerDocumentoPaginaWeb(env.BASE, RUTA_PAGINA_WEB_BORRADOR), leerDocumentoPaginaWeb(env.BASE, RUTA_PAGINA_WEB_PUBLICADA),
+    ])
+    if (!borrador) return error('Primero guardá un borrador.', 409)
+    if (Number(datos.revisionBorrador) !== Number(borrador.revision)) return error('El borrador cambió antes de publicarse. Recargá y revisalo.', 409)
+    const errores = validarContenidoPaginaWeb(borrador.contenido)
+    if (errores.length) return error(errores[0], 400)
+    const revisionEditorial = Number(publicadaActual?.contenido?.editorial?.revision || 0) + 1
+    const publicada = clonarContenidoPaginaWeb(borrador.contenido)
+    publicada.editorial = { estado: 'publicado', revision: revisionEditorial, actualizadoEn: new Date().toISOString() }
+    const revisionPublicada = Number(publicadaActual?.revision || 0) + 1
+    const revisionBorrador = Number(borrador.revision) + 1
+    const rutaHistorial = `pagina-web/historial/${String(revisionEditorial).padStart(6, '0')}.json`
+    await env.BASE.batch([
+      sentenciaGuardarPaginaWeb(env.BASE, RUTA_PAGINA_WEB_PUBLICADA, publicada, revisionPublicada, sesion.correo),
+      sentenciaGuardarPaginaWeb(env.BASE, RUTA_PAGINA_WEB_BORRADOR, publicada, revisionBorrador, sesion.correo),
+      sentenciaGuardarPaginaWeb(env.BASE, rutaHistorial, publicada, revisionEditorial, sesion.correo),
+    ])
+    let despliegue = { estado: 'pendiente_configuracion' }
+    if (env.STAGING_DEPLOY_WEBHOOK) {
+      try {
+        const respuestaDespliegue = await (env.FETCH_EXTERNO || fetch)(env.STAGING_DEPLOY_WEBHOOK, {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ revision: revisionEditorial, origen: 'gestor.aletea.org' }),
+        })
+        despliegue = respuestaDespliegue.ok ? { estado: 'iniciado' } : { estado: 'fallo', detalle: `respuesta ${respuestaDespliegue.status}` }
+      } catch { despliegue = { estado: 'fallo', detalle: 'no se pudo iniciar la publicación' } }
+    }
+    await registrar(env.BASE, sesion, 'publicar página web de prueba', RUTA_PAGINA_WEB_PUBLICADA, `versión ${revisionEditorial}, despliegue ${despliegue.estado}`)
+    return responder({ publicado: publicada, revisionPublicada, revisionBorrador, despliegue })
+  }
+  return error('No se encontró esa operación de la página web.', 404)
+}
+
+async function imagenRemotaCms(contexto, sesion) {
+  if (contexto.request.method !== 'POST') return error('Método no permitido.', 405)
+  if (!puedeUsarComunicacionVisual(sesion)) return error('No tenés permiso para usar el editor de piezas.', 403)
+  let datos
+  try { datos = await contexto.request.json() } catch { return error('El enlace de la imagen no es válido.', 400) }
+  const destino = urlDescargaGoogleDrive(datos?.url)
+  if (!destino) return error('Usá un enlace público válido de un archivo de Google Drive.', 400)
+  let respuesta
+  try { respuesta = await (contexto.env.FETCH_EXTERNO || fetch)(destino, { redirect: 'follow' }) } catch {
+    return error('No pudimos comunicarnos con Google Drive.', 502)
+  }
+  if (!respuesta.ok) return error('Google Drive no permitió abrir la imagen. Confirmá que sea pública.', 422)
+  const tipo = String(respuesta.headers.get('content-type') || '').split(';')[0].toLowerCase()
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(tipo)) return error('El enlace de Drive no devuelve una imagen JPG, PNG o WebP. Confirmá que el archivo sea público.', 422)
+  const longitud = Number(respuesta.headers.get('content-length') || 0)
+  if (longitud > LIMITE_IMAGEN_REMOTA) return error('La imagen supera el máximo de 8 MB.', 413)
+  let bytes
+  try { bytes = await bytesImagenConLimite(respuesta, LIMITE_IMAGEN_REMOTA) } catch { return error('La imagen supera el máximo de 8 MB.', 413) }
+  return new Response(bytes, { status: 200, headers: {
+    'content-type': tipo, 'cache-control': 'private, no-store', 'x-content-type-options': 'nosniff',
+  } })
+}
+
 function fechaValida(fecha) {
   const texto = String(fecha ?? '')
   if (!/^\d{4}-\d{2}-\d{2}$/.test(texto)) return false
@@ -262,6 +661,10 @@ export function fechaActualCms(instante = new Date()) {
   }).formatToParts(instante)
   const valor = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]))
   return `${valor.year}-${valor.month}-${valor.day}`
+}
+
+export function instanteUtcSql(instante = new Date()) {
+  return instante.toISOString().replace('T', ' ').slice(0, 19)
 }
 
 function personaPublica(persona) {
@@ -294,6 +697,7 @@ function personaOperativa(persona, sesion) {
   const nivel = nivelDatosPersonalesDe(sesion)
   return {
     ...base,
+    ...(esAdmin(sesion) && persona?.finanzas ? { finanzas: persona.finanzas } : {}),
     foto: nivel === 'ninguno' || !privacidad.fotoInterna ? null : persona?.foto ?? null,
     perfil: nivel === 'ninguno' || !privacidad.perfilInterno ? {} : perfilOperativo(persona),
     privacidad: {
@@ -305,6 +709,54 @@ function personaOperativa(persona, sesion) {
       revisadoEl: privacidad.revisadoEl,
     },
   }
+}
+
+function claveNombreFsb(valor) {
+  return String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es')
+}
+
+export function idCuentaFsbVinculable(persona, cuentas = []) {
+  const nombre = claveNombreFsb(persona?.nombre)
+  const grupo = Number(persona?.grupo || 0)
+  if (!nombre) return null
+  const candidatas = cuentas.filter((cuenta) => !cuenta.persona_id
+    && claveNombreFsb(cuenta.nombre) === nombre
+    && (!grupo || !Number(cuenta.grupo) || Number(cuenta.grupo) === grupo))
+  return candidatas.length === 1 ? candidatas[0].id : null
+}
+
+async function sincronizarCuentasFsbConRoster(base, roster, sesion) {
+  const existentes = await base.prepare('SELECT id, persona_id, nombre, grupo FROM cuentas_fsb').all()
+  const cuentas = existentes.results || []
+  const porPersona = new Map(cuentas.filter((cuenta) => cuenta.persona_id).map((cuenta) => [cuenta.persona_id, cuenta]))
+  const vinculadasEnEstaOperacion = new Set()
+  const operaciones = []
+  for (const persona of roster?.participantes ?? []) {
+    const tipo = ['regular', 'beca', 'voluntariado', 'baja'].includes(persona.finanzas?.tipoCuota)
+      ? persona.finanzas.tipoCuota
+      : 'regular'
+    const condicion = persona.activo === false ? 'baja' : tipo
+    const beca = condicion === 'beca' ? Number(persona.finanzas?.becaPorcentaje || 0) : 0
+    const activa = condicion === 'baja' ? 0 : 1
+    const existente = porPersona.get(persona.id)
+    const idHeredado = existente ? null : idCuentaFsbVinculable(persona, cuentas.filter((cuenta) => !vinculadasEnEstaOperacion.has(cuenta.id)))
+    if (idHeredado) vinculadasEnEstaOperacion.add(idHeredado)
+    if (existente) {
+      operaciones.push(base.prepare(`UPDATE cuentas_fsb SET nombre = ?1, grupo = ?2, condicion = ?3,
+        beca_porcentaje = ?4, activa = ?5, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?6`)
+        .bind(persona.nombre, persona.grupo ?? null, condicion, beca, activa, existente.id))
+    } else if (idHeredado) {
+      operaciones.push(base.prepare(`UPDATE cuentas_fsb SET persona_id = ?1, nombre = ?2, grupo = ?3, condicion = ?4,
+        beca_porcentaje = ?5, activa = ?6, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?7`)
+        .bind(persona.id, persona.nombre, persona.grupo ?? null, condicion, beca, activa, idHeredado))
+    } else {
+      operaciones.push(base.prepare(`INSERT INTO cuentas_fsb
+        (id, persona_id, nombre, grupo, condicion, beca_porcentaje, observaciones, activa, creado_por)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', ?7, ?8)`)
+        .bind(crypto.randomUUID(), persona.id, persona.nombre, persona.grupo ?? null, condicion, beca, activa, sesion.correo))
+    }
+  }
+  if (operaciones.length) await base.batch(operaciones)
 }
 
 export function cumpleanosParaAgenda(roster, hoy = new Date(), dias = 45) {
@@ -352,14 +804,14 @@ function datosProtegidosDe(persona) {
   return { contactoEmergencia: String(persona?.contactoEmergencia ?? ''), anioNacimiento: String(perfil.anioNacimiento ?? ''), necesidades: String(perfil.necesidades ?? ''), autorizadoPor: privacidad.autorizadoPor, documentadoEl: privacidad.documentadoEl, revisadoEl: privacidad.revisadoEl, privacidad }
 }
 
-export function combinarProtegidos(actual, solicitado) {
+export function combinarProtegidos(actual, solicitado, { permitirFinanzas = false } = {}) {
   const proteger = (personas = []) => personas.map((persona) => {
     const anterior = personaEnRoster(actual, persona.id)
     if (!anterior) return persona
     const perfil = { ...(persona.perfil ?? {}) }
     const previo = anterior.perfil ?? {}
     ;['anioNacimiento', 'necesidades'].forEach((clave) => { if (clave in previo) perfil[clave] = previo[clave] })
-    return { ...persona, contactoEmergencia: anterior.contactoEmergencia ?? '', privacidad: anterior.privacidad ?? {}, perfil }
+    return { ...persona, finanzas: permitirFinanzas ? (persona.finanzas ?? anterior.finanzas) : anterior.finanzas, contactoEmergencia: anterior.contactoEmergencia ?? '', privacidad: anterior.privacidad ?? {}, perfil }
   })
   return { ...solicitado, participantes: proteger(solicitado?.participantes), voluntarios: proteger(solicitado?.voluntarios) }
 }
@@ -390,7 +842,7 @@ async function ingresar(contexto) {
   const esperaActual = await bloqueoIngreso(contexto.env.BASE, clavesIntento)
   if (esperaActual) return error(`Demasiados intentos. Probá nuevamente en ${esperaActual} segundos.`, 429, { 'retry-after': String(esperaActual) })
   const cuenta = await contexto.env.BASE.prepare(`
-    SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, foto_perfil, sal, hash_contrasena, version_sesion
+    SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, foto_perfil, sal, hash_contrasena, version_sesion
     FROM usuarios WHERE correo = ?1 AND activo = 1
   `).bind(usuario).first()
   const salFicticia = new Uint8Array((await crypto.subtle.digest('SHA-256', CODIFICADOR.encode(`${contexto.env.SESSION_SECRET}:cuenta-inexistente`))).slice(0, 16))
@@ -403,9 +855,9 @@ async function ingresar(contexto) {
   await limpiarFallosIngreso(contexto.env.BASE, clavesIntento)
   const expira = Math.floor(Date.now() / 1000) + DURACION_SESION
   const token = await firmarSesion({ usuario: cuenta.correo, version: cuenta.version_sesion, expira }, contexto.env.SESSION_SECRET)
-  await contexto.env.BASE.prepare('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE correo = ?1').bind(cuenta.correo).run()
+  await contexto.env.BASE.prepare('UPDATE usuarios SET ultimo_acceso = ?2 WHERE correo = ?1').bind(cuenta.correo, instanteUtcSql()).run()
   await registrar(contexto.env.BASE, cuenta, 'ingresar', 'sesion')
-  return responder(exponerCuenta({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol, perfil_acceso: cuenta.perfil_acceso, permisos: cuenta.permisos, nivel_datos_personales: cuenta.nivel_datos_personales, datos_personales_hasta: cuenta.datos_personales_hasta }), 200, {
+  return responder(exponerCuenta({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol, perfil_acceso: cuenta.perfil_acceso, permisos: cuenta.permisos, nivel_datos_personales: cuenta.nivel_datos_personales, datos_personales_hasta: cuenta.datos_personales_hasta, datos_personales_sin_vencimiento: cuenta.datos_personales_sin_vencimiento }), 200, {
     'set-cookie': cookieSesion(token),
   })
 }
@@ -419,7 +871,7 @@ async function usuarios(contexto, sesion) {
   const { request, env } = contexto
   if (request.method === 'GET') {
     const filas = await env.BASE.prepare(
-      'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, foto_perfil, ultimo_acceso FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
+      'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, foto_perfil, ultimo_acceso FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
     ).all()
     return responder({ usuarios: filas.results.map(exponerCuenta) })
   }
@@ -463,21 +915,30 @@ async function usuarios(contexto, sesion) {
     const perfil_acceso = String(datos.perfil_acceso || '').trim()
     const nivelDatos = String(datos.nivel_datos_personales || 'ninguno').trim()
     const hasta = String(datos.datos_personales_hasta || '').trim()
-    const objetivo = await env.BASE.prepare('SELECT rol, perfil_acceso FROM usuarios WHERE correo = ?1 AND activo = 1').bind(correo).first()
+    const decisionVigencia = vigenciaDatosPersonalesDesde({ nivel: nivelDatos, vigencia: datos.vigencia_datos_personales, hasta })
+    const objetivo = await env.BASE.prepare('SELECT rol, perfil_acceso, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1').bind(correo).first()
     if (!objetivo) return error('No encontramos ese acceso.', 404)
     if (!PERFILES_ACCESO.includes(perfil_acceso)) return error('Elegí un perfil de acceso válido.', 400)
     if (!NIVELES_DATOS_PERSONALES.includes(nivelDatos)) return error('Elegí un nivel válido para datos personales.', 400)
-    if (nivelDatos !== 'ninguno' && (!fechaValida(hasta) || hasta < fechaActualCms())) return error('Indicá hasta cuándo necesita este acceso a datos personales.', 400)
+    if (decisionVigencia.error) return error(decisionVigencia.error, 400)
     if (objetivo.rol === 'admin' && perfil_acceso !== 'administracion') return error('No podés bajar desde aquí el último perfil administrativo.', 400)
     if (['coordinacion', 'integrante'].includes(perfil_acceso)) {
       const asignaciones = await env.BASE.prepare('SELECT COUNT(*) AS cantidad FROM responsabilidades_equipo WHERE usuario_correo = ?1 AND activo = 1').bind(correo).first()
       if (!Number(asignaciones?.cantidad || 0)) return error('Asignale al menos un equipo antes de usar este perfil.', 400)
     }
     const rol = perfil_acceso === 'administracion' ? 'admin' : 'coordinacion'
-    await env.BASE.prepare('UPDATE usuarios SET rol = ?1, perfil_acceso = ?2, permisos = ?3, nivel_datos_personales = ?4, datos_personales_hasta = ?5, version_sesion = version_sesion + 1 WHERE correo = ?6')
-      .bind(rol, perfil_acceso, perfil_acceso === 'administracion' ? null : JSON.stringify(PERMISOS_POR_PERFIL[perfil_acceso]), nivelDatos, nivelDatos === 'ninguno' ? null : hasta, correo).run()
-    await registrar(env.BASE, sesion, 'cambiar acceso y datos personales', correo, `${perfil_acceso} · ${nivelDatos}${nivelDatos === 'ninguno' ? '' : ` hasta ${hasta}`}`)
-    return responder({ actualizada: true, perfil_acceso, nivel_datos_personales: nivelDatos, datos_personales_hasta: nivelDatos === 'ninguno' ? null : hasta, permisos: PERMISOS_POR_PERFIL[perfil_acceso] })
+    const { vigencia: vigenciaDatos, hastaGuardado, sinVencimiento } = decisionVigencia
+    await env.BASE.prepare('UPDATE usuarios SET rol = ?1, perfil_acceso = ?2, permisos = ?3, nivel_datos_personales = ?4, datos_personales_hasta = ?5, datos_personales_sin_vencimiento = ?6, version_sesion = version_sesion + 1 WHERE correo = ?7')
+      .bind(rol, perfil_acceso, perfil_acceso === 'administracion' ? null : JSON.stringify(PERMISOS_POR_PERFIL[perfil_acceso]), nivelDatos, hastaGuardado, sinVencimiento, correo).run()
+    const detalleVigencia = nivelDatos === 'ninguno' ? '' : vigenciaDatos === 'indefinida' ? ' sin vencimiento' : ` hasta ${hasta}`
+    await registrar(env.BASE, sesion, 'cambiar acceso y datos personales', correo, `${perfil_acceso} · ${nivelDatos}${detalleVigencia}`)
+    const cuerpo = { actualizada: true, perfil_acceso, nivel_datos_personales: nivelDatos, vigencia_datos_personales: vigenciaDatos, datos_personales_hasta: hastaGuardado, permisos: PERMISOS_POR_PERFIL[perfil_acceso] }
+    if (correo === sesion.correo) {
+      const expira = Math.floor(Date.now() / 1000) + DURACION_SESION
+      const token = await firmarSesion({ usuario: correo, version: Number(objetivo.version_sesion || 0) + 1, expira }, env.SESSION_SECRET)
+      return responder(cuerpo, 200, { 'set-cookie': cookieSesion(token) })
+    }
+    return responder(cuerpo)
   }
   if (request.method === 'DELETE') {
     const correo = String(new URL(request.url).searchParams.get('correo') || '').trim().toLowerCase()
@@ -544,10 +1005,16 @@ async function auditoria(contexto, sesion) {
   const limiteSolicitado = Number(new URL(contexto.request.url).searchParams.get('limite') || 50)
   const limite = Number.isInteger(limiteSolicitado) ? Math.min(Math.max(limiteSolicitado, 10), 100) : 50
   const filas = await contexto.env.BASE.prepare(`SELECT actividad.id, actividad.correo, actividad.accion, actividad.recurso,
-    actividad.detalle, actividad.cuando, COALESCE(usuarios.nombre, actividad.correo) AS actor_nombre
+    actividad.detalle, actividad.cuando, COALESCE(usuarios.nombre, actividad.correo) AS actor_nombre,
+    tareas_cms.descripcion AS tarea_descripcion, entradas_evento.id AS entrada_evento_id
     FROM actividad LEFT JOIN usuarios ON usuarios.correo = actividad.correo
+    LEFT JOIN tareas_cms ON actividad.recurso = 'tareas/' || tareas_cms.id
+    LEFT JOIN entradas_cms entradas_evento ON actividad.recurso = 'eventos/' || entradas_evento.evento_id
     ORDER BY actividad.cuando DESC, actividad.id DESC LIMIT ?1`).bind(limite).all()
-  return responder({ actividad: filas.results })
+  const actividad = puedeVerRespuestasCms(sesion)
+    ? filas.results.map(({ tarea_descripcion, entrada_evento_id, ...fila }) => fila)
+    : filas.results.map(actividadCmsSinDatosDeEntradas)
+  return responder({ actividad })
 }
 
 function rutaDocumento(url) {
@@ -611,7 +1078,7 @@ async function documento(contexto, sesion) {
   }
   if (ruta === 'roster.json' && tienePermiso(sesion, 'personas') && actual) {
     const guardado = JSON.parse((await env.BASE.prepare('SELECT contenido FROM documentos WHERE ruta = ?1').bind(ruta).first()).contenido)
-    contenido = combinarProtegidos(guardado, contenido)
+    contenido = combinarProtegidos(guardado, contenido, { permitirFinanzas: esAdmin(sesion) })
   }
 
   const revision = (actual?.revision ?? 0) + 1
@@ -624,6 +1091,7 @@ async function documento(contexto, sesion) {
       actualizado_por = excluded.actualizado_por,
       actualizado_en = CURRENT_TIMESTAMP
   `).bind(ruta, JSON.stringify(contenido), revision, sesion.correo).run()
+  if (ruta === 'roster.json' && esAdmin(sesion)) await sincronizarCuentasFsbConRoster(env.BASE, contenido, sesion)
   await registrar(env.BASE, sesion, actual ? 'modificar' : 'crear', ruta)
   return responder({ revision }, 200, { etag: `"${revision}"` })
 }
@@ -751,17 +1219,27 @@ const ESTADOS_EVENTO_CMS = ['planificado', 'realizado', 'cancelado']
 const TIPOS_EVENTO_CMS = ['actividad', 'reunion', 'curso', 'publicacion', 'vencimiento', 'pago', 'renovacion', 'tramite', 'certificacion', 'asamblea']
 const TIPOS_ENTRADA_CMS = ['voluntariado', 'inscripcion', 'actividad', 'evento', 'pedido', 'propuesta']
 const ESTADOS_ENTRADA_CMS = ['nueva', 'derivada', 'cerrada']
+const MEDIOS_CUMPLIMIENTO_ENTRADA_CMS = ['contacto', 'tarea', 'actividad', 'alta', 'archivo', 'otro']
 const VISIBILIDADES_FORMULARIO_CMS = ['interna', 'publica']
 const ESTADOS_FORMULARIO_CMS = ['activa', 'cerrada']
+const DESTINOS_RESPUESTA_CMS = ['tarea', 'solicitud', 'actividad', 'alta_persona', 'contacto', 'archivo']
+const MOTIVOS_SEGUIMIENTO_PERSONAL_CMS = ['', 'no_olvidar', 'esperando_respuesta', 'hablar_con_alguien', 'revisar_en_reunion', 'requiere_decision']
 const NIVELES_RIESGO_PROYECTO_CMS = ['bajo', 'medio', 'alto', 'critico']
 const ESTADOS_RIESGO_PROYECTO_CMS = ['abierto', 'mitigado', 'aceptado']
 const FRECUENCIAS_TAREA_RECURRENTE_CMS = ['semanal', 'mensual']
-const FRECUENCIAS_EVENTO_RECURRENTE_CMS = ['semanal', 'quincenal', 'mensual']
+const FRECUENCIAS_EVENTO_RECURRENTE_CMS = ['semanal', 'quincenal', 'mensual', 'mensual_ordinal']
 const FRECUENCIAS_REUNION_EQUIPO_CMS = ['semanal', 'quincenal', 'mensual', 'segun_necesidad']
 const CATEGORIAS_EQUIPO_CMS = ['equipo', 'comision_directiva', 'comision_fiscal', 'comision_electoral', 'comision']
+const TIPOS_UNIDAD_CMS = ['programa', 'formacion', 'canal', 'proceso']
+const ESTADOS_UNIDAD_CMS = ['borrador', 'activa', 'en_pausa', 'archivada']
 const COLOR_EQUIPO = /^#[0-9a-fA-F]{6}$/
 const PRIORIDADES_COMUNICADO_CMS = ['normal', 'urgente']
 const ESTADOS_COMUNICADO_CMS = ['activo', 'cerrado']
+const TIPOS_SOLICITUD_PRIVACIDAD_CMS = ['copia', 'eliminacion']
+const CANALES_SOLICITUD_PRIVACIDAD_CMS = ['correo', 'telefono', 'presencial', 'formulario', 'otro']
+const ESTADOS_SOLICITUD_PRIVACIDAD_CMS = ['recibida', 'identidad_verificada', 'en_revision', 'lista_para_entrega', 'lista_para_decision', 'cerrada', 'rechazada']
+const CONDICIONES_CUENTA_FSB = ['regular', 'beca', 'voluntariado', 'baja']
+const TIPOS_MOVIMIENTO_FSB = ['cargo', 'pago', 'recargo', 'ajuste_cargo', 'ajuste_credito', 'saldo_inicial']
 
 export function responsableSolicitudDe(responsabilidades, equipoId) {
   const orden = { coordinacion: 0, referente: 1, sustitucion: 2, integrante: 3 }
@@ -783,6 +1261,47 @@ export function fechaCmsValida(fecha) {
   return !Number.isNaN(fechaLocal.getTime()) && fechaLocal.toISOString().slice(0, 10) === texto
 }
 
+export function solicitudPrivacidadCmsDesde(datos, actual = {}) {
+  const solicitud = {
+    tipo: datos.tipo ?? actual.tipo ?? 'copia',
+    solicitante_nombre: textoCms(datos.solicitante_nombre ?? actual.solicitante_nombre, 180),
+    contacto: textoCms(datos.contacto ?? actual.contacto, 240),
+    canal: datos.canal ?? actual.canal ?? 'correo',
+    alcance: textoCms(datos.alcance ?? actual.alcance, 1200),
+    responsable_correo: textoCms(datos.responsable_correo ?? actual.responsable_correo, 180).toLowerCase() || null,
+    fecha_objetivo: datos.fecha_objetivo ?? actual.fecha_objetivo ?? null,
+  }
+  if (!TIPOS_SOLICITUD_PRIVACIDAD_CMS.includes(solicitud.tipo)) return { error: 'Elegí si la solicitud pide una copia o una eliminación.' }
+  if (!solicitud.solicitante_nombre || !solicitud.contacto || !solicitud.alcance) return { error: 'Completá la persona, el contacto y qué información solicita.' }
+  if (!CANALES_SOLICITUD_PRIVACIDAD_CMS.includes(solicitud.canal)) return { error: 'Elegí un canal de recepción válido.' }
+  if (!fechaCmsValida(solicitud.fecha_objetivo)) return { error: 'La fecha objetivo debe usar el formato AAAA-MM-DD.' }
+  return { solicitud }
+}
+
+export function avanceSolicitudPrivacidadCms(actual, accion, nota = '') {
+  if (!actual || !ESTADOS_SOLICITUD_PRIVACIDAD_CMS.includes(actual.estado)) return { error: 'La solicitud no tiene un estado válido.' }
+  const textoNota = textoCms(nota, 2000)
+  const esperada = {
+    verificar_identidad: ['recibida'],
+    iniciar_revision: ['identidad_verificada'],
+    preparar_resultado: ['en_revision'],
+    cerrar: actual.tipo === 'copia' ? ['lista_para_entrega'] : ['lista_para_decision'],
+    rechazar: ['recibida', 'identidad_verificada', 'en_revision', 'lista_para_entrega', 'lista_para_decision'],
+  }[accion]
+  if (!esperada?.includes(actual.estado)) return { error: 'Ese paso no corresponde al estado actual de la solicitud.' }
+  if (['verificar_identidad', 'cerrar', 'rechazar'].includes(accion) && textoNota.length < 10) {
+    return { error: accion === 'verificar_identidad' ? 'Explicá brevemente cómo se verificó la identidad.' : 'Agregá una constancia clara antes de cerrar la solicitud.' }
+  }
+  const estado = {
+    verificar_identidad: 'identidad_verificada',
+    iniciar_revision: 'en_revision',
+    preparar_resultado: actual.tipo === 'copia' ? 'lista_para_entrega' : 'lista_para_decision',
+    cerrar: 'cerrada',
+    rechazar: 'rechazada',
+  }[accion]
+  return { estado, nota: textoNota }
+}
+
 export function tareaCmsDesde(datos, actual = {}) {
   const esfuerzoOriginal = datos.esfuerzo_horas ?? actual.esfuerzo_horas ?? null
   const tarea = {
@@ -792,6 +1311,7 @@ export function tareaCmsDesde(datos, actual = {}) {
     estado: datos.estado ?? actual.estado ?? 'pendiente',
     prioridad: datos.prioridad ?? actual.prioridad ?? 'normal',
     equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
     proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
     objetivo: textoCms(datos.objetivo ?? actual.objetivo), pasos: textoCms(datos.pasos ?? actual.pasos),
     recursos: textoCms(datos.recursos ?? actual.recursos), personas_necesarias: textoCms(datos.personas_necesarias ?? actual.personas_necesarias),
@@ -801,6 +1321,9 @@ export function tareaCmsDesde(datos, actual = {}) {
     fecha_limite: datos.fecha_limite ?? actual.fecha_limite ?? null,
     fecha_seguimiento: datos.fecha_seguimiento ?? actual.fecha_seguimiento ?? null,
     esfuerzo_horas: esfuerzoOriginal === '' || esfuerzoOriginal === null ? null : Number(esfuerzoOriginal),
+    seguimiento_personal: datos.seguimiento_personal === undefined ? Number(actual.seguimiento_personal || 0) : (datos.seguimiento_personal ? 1 : 0),
+    motivo_seguimiento: textoCms(datos.motivo_seguimiento ?? actual.motivo_seguimiento, 40),
+    seguimiento_personal_por: datos.seguimiento_personal_por ?? actual.seguimiento_personal_por ?? null,
   }
   if (!tarea.titulo) return { error: 'La tarea necesita un título.' }
   if (!TIPOS_CMS.includes(tarea.tipo) || !ESTADOS_CMS.includes(tarea.estado) || !PRIORIDADES_CMS.includes(tarea.prioridad)) {
@@ -809,6 +1332,8 @@ export function tareaCmsDesde(datos, actual = {}) {
   if (tarea.tipo === 'solicitud' && !tarea.equipo_id) return { error: 'Elegí el equipo al que se dirige la solicitud.' }
   if (!fechaCmsValida(tarea.fecha_limite) || !fechaCmsValida(tarea.fecha_seguimiento)) return { error: 'Las fechas deben usar el formato AAAA-MM-DD.' }
   if (tarea.esfuerzo_horas !== null && (!Number.isFinite(tarea.esfuerzo_horas) || tarea.esfuerzo_horas <= 0 || tarea.esfuerzo_horas > 168)) return { error: 'El esfuerzo estimado debe estar entre 0,25 y 168 horas.' }
+  if (!MOTIVOS_SEGUIMIENTO_PERSONAL_CMS.includes(tarea.motivo_seguimiento)) return { error: 'Elegí un motivo de seguimiento personal válido.' }
+  if (!tarea.seguimiento_personal) { tarea.motivo_seguimiento = ''; tarea.seguimiento_personal_por = null }
   return { tarea }
 }
 
@@ -863,6 +1388,16 @@ export function comentarioTareaCmsDesde(datos) {
   return { comentario: { contenido } }
 }
 
+export function cierreTareaCmsDesde(datos = {}, actual = {}, actorCorreo = '') {
+  const estado = textoCms(datos.estado, 40)
+  const comentario = estado === 'completada' ? textoCms(datos.comentario_cierre, 2000) : ''
+  return {
+    comentario,
+    resolver_aviso: ['completada', 'cancelada'].includes(estado),
+    notificar_a: estado === 'completada' && actual.creado_por && actual.creado_por !== actorCorreo ? actual.creado_por : null,
+  }
+}
+
 export function tareaRecurrenteCmsDesde(datos) {
   const tarea = {
     titulo: textoCms(datos.titulo, 180), descripcion: textoCms(datos.descripcion), prioridad: datos.prioridad ?? 'normal',
@@ -896,6 +1431,7 @@ export function proyectoCmsDesde(datos, actual = {}) {
     objetivo: textoCms(datos.objetivo ?? actual.objetivo),
     programa_id: datos.programa_id ?? actual.programa_id ?? null,
     equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
     responsable_correo: datos.responsable_correo ?? actual.responsable_correo ?? null,
     estado: datos.estado ?? actual.estado ?? 'en_marcha',
     prioridad: datos.prioridad ?? actual.prioridad ?? 'normal',
@@ -938,6 +1474,28 @@ export function programaCmsDesde(datos, actual = {}) {
   if (!programa.nombre) return { error: 'El programa necesita un nombre.' }
   if (!['borrador', 'activo', 'en_pausa', 'cerrado'].includes(programa.estado)) return { error: 'El estado del programa no es válido.' }
   return { programa }
+}
+
+export function unidadOperativaCmsDesde(datos, actual = {}) {
+  const clave = textoCms(datos.clave ?? actual.clave, 80).toLocaleLowerCase('es')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+  const unidad = {
+    clave,
+    nombre: textoCms(datos.nombre ?? actual.nombre, 180),
+    sigla: textoCms(datos.sigla ?? actual.sigla, 30),
+    descripcion: textoCms(datos.descripcion ?? actual.descripcion),
+    tipo: textoCms(datos.tipo ?? actual.tipo, 30) || 'programa',
+    equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_padre_id: datos.unidad_padre_id ?? actual.unidad_padre_id ?? null,
+    color: textoCms(datos.color ?? actual.color, 7) || '#6d3087',
+    orden: Number(datos.orden ?? actual.orden ?? 0),
+    estado: textoCms(datos.estado ?? actual.estado, 30) || 'activa',
+  }
+  if (!unidad.clave || !unidad.nombre || !unidad.equipo_id) return { error: 'Completá la clave, el nombre y el área responsable.' }
+  if (!TIPOS_UNIDAD_CMS.includes(unidad.tipo) || !ESTADOS_UNIDAD_CMS.includes(unidad.estado)) return { error: 'El tipo o estado de la unidad no es válido.' }
+  if (!COLOR_EQUIPO.test(unidad.color)) return { error: 'Elegí un color válido para la unidad.' }
+  if (!Number.isInteger(unidad.orden) || unidad.orden < 0 || unidad.orden > 9999) return { error: 'El orden debe ser un número entero entre 0 y 9999.' }
+  return { unidad }
 }
 
 export function riesgoProyectoCmsDesde(datos, actual = {}) {
@@ -983,15 +1541,90 @@ export function gastoProyectoCmsDesde(datos) {
   return { gasto }
 }
 
+export function cuentaFsbDesde(datos, actual = {}) {
+  const grupoCrudo = datos.grupo ?? actual.grupo ?? null
+  const becaCruda = datos.beca_porcentaje ?? actual.beca_porcentaje ?? 0
+  const cuenta = {
+    persona_id: textoCms(datos.persona_id ?? actual.persona_id, 100) || null,
+    nombre: textoCms(datos.nombre ?? actual.nombre, 180),
+    grupo: grupoCrudo === '' || grupoCrudo === null ? null : Number(grupoCrudo),
+    condicion: textoCms(datos.condicion ?? actual.condicion ?? 'regular', 30),
+    beca_porcentaje: Number(becaCruda),
+    observaciones: textoCms(datos.observaciones ?? actual.observaciones, 1200),
+    activa: datos.activa === undefined ? Number(actual.activa ?? 1) : (datos.activa === false ? 0 : 1),
+  }
+  if (!cuenta.nombre) return { error: 'Ingresá el nombre de la persona o familia.' }
+  if (cuenta.grupo !== null && ![1, 2].includes(cuenta.grupo)) return { error: 'Elegí el grupo 1 o 2.' }
+  if (!CONDICIONES_CUENTA_FSB.includes(cuenta.condicion)) return { error: 'La condición de la cuenta no es válida.' }
+  if (!Number.isFinite(cuenta.beca_porcentaje) || cuenta.beca_porcentaje < 0 || cuenta.beca_porcentaje > 100) return { error: 'La beca debe estar entre 0% y 100%.' }
+  if (cuenta.condicion !== 'beca') cuenta.beca_porcentaje = 0
+  return { cuenta }
+}
+
+export function movimientoFsbDesde(datos) {
+  const tipo = textoCms(datos.tipo, 30)
+  const montoCentavos = importeCentavosFsb(datos.importe ?? datos.monto)
+  const movimiento = {
+    cuenta_id: textoCms(datos.cuenta_id, 100),
+    tipo,
+    concepto: textoCms(datos.concepto, 180),
+    periodo: textoCms(datos.periodo, 7) || null,
+    fecha: textoCms(datos.fecha, 10),
+    vencimiento: textoCms(datos.vencimiento, 10) || null,
+    importe_centavos: montoCentavos === null ? null : montoCentavos * signoMovimientoFsb(tipo),
+    medio_pago: textoCms(datos.medio_pago, 80),
+    comprobante: textoCms(datos.comprobante, 180),
+    notas: textoCms(datos.notas, 1200),
+    clave_operacion: textoCms(datos.clave_operacion, 160) || null,
+  }
+  if (!movimiento.cuenta_id) return { error: 'Elegí una cuenta.' }
+  if (!TIPOS_MOVIMIENTO_FSB.includes(tipo) || !signoMovimientoFsb(tipo)) return { error: 'El tipo de movimiento no es válido.' }
+  if (!movimiento.concepto) return { error: 'Ingresá el concepto del movimiento.' }
+  if (!fechaCmsValida(movimiento.fecha) || (movimiento.vencimiento && !fechaCmsValida(movimiento.vencimiento))) return { error: 'Ingresá fechas válidas.' }
+  if (movimiento.periodo && !/^\d{4}-(0[1-9]|1[0-2])$/.test(movimiento.periodo)) return { error: 'El período debe indicar año y mes.' }
+  if (!montoCentavos || montoCentavos > 100000000) return { error: 'Ingresá un importe mayor a cero y menor a $1.000.000.' }
+  if (movimiento.tipo === 'pago' && !movimiento.medio_pago) return { error: 'Elegí cómo se recibió el pago.' }
+  return { movimiento }
+}
+
+export function configuracionFinanzasFsb(roster = {}, cuentas = [], movimientos = [], hoy = fechaActualCms()) {
+  const vinculadas = new Set(cuentas.map((cuenta) => cuenta.persona_id).filter(Boolean))
+  const participantes = (roster.participantes || []).filter((persona) => persona.activo !== false)
+  return {
+    participantes_sin_cuenta: participantes.filter((persona) => !vinculadas.has(persona.id)).map((persona) => ({ id: persona.id, nombre: persona.nombre })),
+    participantes_sin_grupo: cuentas.filter((cuenta) => cuenta.activa !== 0 && ![1, 2].includes(Number(cuenta.grupo))).map((cuenta) => ({ id: cuenta.id, nombre: cuenta.nombre })),
+    becas_sin_porcentaje: cuentas.filter((cuenta) => cuenta.activa !== 0 && cuenta.condicion === 'beca' && !Number(cuenta.beca_porcentaje)).map((cuenta) => ({ id: cuenta.id, nombre: cuenta.nombre })),
+    mes_actual_generado: movimientos.some((movimiento) => String(movimiento.clave_operacion || '').startsWith(`cuota:${hoy.slice(0, 7)}:`) && !movimiento.anulado_en),
+  }
+}
+
+export function compromisoPagoFsbDesde(datos) {
+  const importeCrudo = datos.importe ?? datos.monto ?? ''
+  const importeCentavos = String(importeCrudo).trim() ? importeCentavosFsb(importeCrudo) : null
+  const compromiso = {
+    cuenta_id: textoCms(datos.cuenta_id, 100),
+    importe_centavos: importeCentavos,
+    fecha_acuerdo: textoCms(datos.fecha_acuerdo, 10),
+    fecha_prevista: textoCms(datos.fecha_prevista, 10),
+    nota: textoCms(datos.nota, 600),
+  }
+  if (!compromiso.cuenta_id) return { error: 'Elegí una cuenta.' }
+  if (!fechaCmsValida(compromiso.fecha_acuerdo) || !fechaCmsValida(compromiso.fecha_prevista) || compromiso.fecha_prevista < compromiso.fecha_acuerdo) return { error: 'La fecha prevista debe ser igual o posterior a la fecha del acuerdo.' }
+  if (importeCentavos !== null && (!importeCentavos || importeCentavos > 100000000)) return { error: 'Ingresá un importe válido menor a $1.000.000 o dejalo vacío.' }
+  return { compromiso }
+}
+
 export function documentoCmsDesde(datos, actual = {}) {
   const documento = {
     titulo: textoCms(datos.titulo ?? actual.titulo, 180), descripcion: textoCms(datos.descripcion ?? actual.descripcion),
     tipo: textoCms(datos.tipo ?? actual.tipo, 20) || 'enlace', url: textoCms(datos.url ?? actual.url, 2000),
     sensibilidad: textoCms(datos.sensibilidad ?? actual.sensibilidad, 20) || 'interno',
-    equipo_id: datos.equipo_id ?? actual.equipo_id ?? null, proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
+    equipo_id: datos.equipo_id ?? actual.equipo_id ?? null, unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
+    proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
   }
+  documento.url = normalizarEnlaceUsuario(documento.url)
   let url
-  try { url = new URL(documento.url) } catch { return { error: 'Ingresá un enlace web válido.' } }
+  try { url = new URL(documento.url) } catch { return { error: MENSAJE_ENLACE_INVALIDO } }
   if (!documento.titulo || !['enlace', 'guia', 'acta', 'plantilla', 'politica'].includes(documento.tipo) || !['compartido', 'interno', 'restringido'].includes(documento.sensibilidad) || !['https:', 'http:'].includes(url.protocol)) return { error: 'Completá título, tipo, visibilidad y un enlace web válido.' }
   return { documento }
 }
@@ -1029,6 +1662,24 @@ export function entradaCmsDesde(datos, actual = {}) {
   if (entrada.tipo === 'pedido' && !entrada.equipo_solicitante_id) return { error: 'Elegí el equipo que realiza el pedido.' }
   if (entrada.tipo === 'propuesta' && (!entrada.equipo_id || !entrada.objetivo)) return { error: 'Una propuesta necesita objetivo y equipo destinatario.' }
   return { entrada }
+}
+
+export function cumplimientoEntradaCmsDesde(datos = {}) {
+  const cumplimiento = {
+    fecha: textoCms(datos.fecha, 10),
+    medio: textoCms(datos.medio, 30),
+    motivo: textoCms(datos.motivo, 1000),
+  }
+  if (!cumplimiento.fecha || !fechaCmsValida(cumplimiento.fecha)) return { error: 'Elegí la fecha en que se resolvió la respuesta.' }
+  if (!MEDIOS_CUMPLIMIENTO_ENTRADA_CMS.includes(cumplimiento.medio)) return { error: 'Elegí cómo se resolvió la respuesta.' }
+  if (cumplimiento.motivo.length < 10) return { error: 'Explicá brevemente por qué la respuesta quedó cumplida.' }
+  return { cumplimiento }
+}
+
+export function reaperturaEntradaCmsDesde(datos = {}) {
+  const motivo = textoCms(datos.motivo, 1000)
+  if (motivo.length < 10) return { error: 'Explicá brevemente por qué se reabre la respuesta.' }
+  return { motivo }
 }
 
 const TIPOS_CAMPO_FORMULARIO_CMS = ['texto', 'texto_largo', 'seleccion', 'casilla', 'fecha']
@@ -1071,9 +1722,15 @@ export function formularioCmsDesde(datos, actual = {}) {
     visibilidad: datos.visibilidad ?? actual.visibilidad ?? 'interna',
     estado: datos.estado ?? actual.estado ?? 'activa',
     equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
     equipo_solicitante_id: datos.equipo_solicitante_id ?? actual.equipo_solicitante_id ?? null,
     prioridad: datos.prioridad ?? actual.prioridad ?? 'normal',
     proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
+    finalidad: textoCms(datos.finalidad ?? actual.finalidad ?? 'Responder la consulta y realizar su seguimiento.', 500),
+    responsable_datos: textoCms(datos.responsable_datos ?? actual.responsable_datos ?? 'Aletea', 180),
+    conservacion_meses: Number(datos.conservacion_meses ?? actual.conservacion_meses ?? 12),
+    requiere_consentimiento: Boolean(datos.requiere_consentimiento ?? actual.requiere_consentimiento ?? true),
+    destino_respuesta: datos.destino_respuesta ?? actual.destino_respuesta ?? 'tarea',
     campos: resultadoCampos.campos,
     campos_json: JSON.stringify(resultadoCampos.campos),
   }
@@ -1082,7 +1739,114 @@ export function formularioCmsDesde(datos, actual = {}) {
   if (formulario.tipo === 'pedido' && !formulario.equipo_id) return { error: 'Elegí el equipo al que se dirige el pedido.' }
   if (formulario.tipo === 'pedido' && !formulario.equipo_solicitante_id) return { error: 'Elegí el equipo que realiza el pedido.' }
   if (formulario.tipo === 'propuesta' && !formulario.equipo_id) return { error: 'Elegí el equipo que evaluará la propuesta.' }
+  if (![6, 12, 24].includes(formulario.conservacion_meses)) return { error: 'Elegí un plazo de conservación válido.' }
+  if (!DESTINOS_RESPUESTA_CMS.includes(formulario.destino_respuesta)) return { error: 'Elegí un destino válido para las respuestas.' }
+  if (formulario.visibilidad === 'publica' && (!formulario.finalidad || !formulario.responsable_datos)) return { error: 'Completá la finalidad y el responsable de los datos antes de publicar el formulario.' }
   return { formulario }
+}
+
+export function formulariosPruebaCms(equipos = {}) {
+  const base = {
+    visibilidad: 'publica', estado: 'activa', prioridad: 'normal', proyecto_id: null,
+    conservacion_meses: 6, requiere_consentimiento: true, destino_respuesta: 'tarea',
+  }
+  const pedido = (equipo) => ({ tipo: 'pedido', equipo_id: equipo, equipo_solicitante_id: equipo, destino_respuesta: 'solicitud' })
+  return [
+    {
+      id: 'prueba-orientacion-familias', ...base, ...pedido(equipos.familias),
+      titulo: '[Prueba] Orientación para familias',
+      descripcion: 'Recorrido real de prueba para verificar la recepción, derivación y seguimiento de una consulta familiar.',
+      finalidad: 'Probar el circuito de orientación familiar con datos ficticios.', responsable_datos: 'Equipo de Familias',
+      campos: [
+        { clave: 'necesidad', etiqueta: '¿Qué necesitás en este momento?', tipo: 'seleccion', requerido: true, opciones: ['Orientación inicial', 'Encontrar una actividad', 'Conocer grupos de familias', 'Consultar por derechos o recursos', 'Otra necesidad'] },
+        { clave: 'departamento', etiqueta: 'Departamento', tipo: 'seleccion', requerido: true, opciones: ['Montevideo', 'Canelones', 'Maldonado', 'Colonia', 'Otro departamento'] },
+        { clave: 'contexto', etiqueta: 'Contanos brevemente el contexto', tipo: 'texto_largo', requerido: true, ayuda: 'Usá únicamente información ficticia.' },
+      ],
+    },
+    {
+      id: 'prueba-participar-actividad', ...base, tipo: 'actividad', equipo_id: equipos.deportes, equipo_solicitante_id: null,
+      titulo: '[Prueba] Participar en una actividad',
+      descripcion: 'Preinscripción real de prueba que queda pendiente de revisión antes de crear una actividad.',
+      finalidad: 'Probar el circuito de preinscripción con datos ficticios.', responsable_datos: 'Equipo de Deportes', destino_respuesta: 'actividad',
+      campos: [
+        { clave: 'actividad', etiqueta: 'Actividad de interés', tipo: 'seleccion', requerido: true, opciones: ['Fútbol sin Barreras, grupo inicial', 'Encuentro virtual para familias', 'Taller de comunicación accesible', 'Movimiento y juego en comunidad'] },
+        { clave: 'consulta', etiqueta: '¿Qué querés hacer?', tipo: 'seleccion', requerido: true, opciones: ['Preinscribirme', 'Sumarme a la lista de espera'] },
+        { clave: 'edad', etiqueta: 'Rango de edad de quien participaría', tipo: 'seleccion', requerido: true, opciones: ['Hasta 6 años', 'De 7 a 12 años', 'De 13 a 17 años', '18 años o más'] },
+        { clave: 'apoyos', etiqueta: '¿Hay algún apoyo que debamos prever?', tipo: 'texto_largo', requerido: false, ayuda: 'Usá una situación inventada.' },
+      ],
+    },
+    {
+      id: 'prueba-consulta-formacion', ...base, ...pedido(equipos.capacitaciones),
+      titulo: '[Prueba] Consultar por formación',
+      descripcion: 'Consulta real de prueba para verificar su llegada al equipo de Capacitaciones.',
+      finalidad: 'Probar el circuito de consultas de formación con datos ficticios.', responsable_datos: 'Equipo de Capacitaciones',
+      campos: [
+        { clave: 'perfil', etiqueta: 'Consultás como', tipo: 'seleccion', requerido: true, opciones: ['Persona', 'Familia', 'Institución'] },
+        { clave: 'tema', etiqueta: 'Tema de interés', tipo: 'seleccion', requerido: true, opciones: ['Introducción a la neurodiversidad', 'Prácticas inclusivas para equipos', 'Herramientas para acompañantes', 'Otra necesidad de formación'] },
+        { clave: 'modalidad', etiqueta: 'Modalidad preferida', tipo: 'seleccion', requerido: true, opciones: ['Presencial', 'Virtual', 'Híbrida', 'Sin preferencia'] },
+      ],
+    },
+    {
+      id: 'prueba-voluntariado', ...base, tipo: 'voluntariado', equipo_id: equipos.administracion, equipo_solicitante_id: null,
+      titulo: '[Prueba] Sumarte como voluntario',
+      descripcion: 'Primer contacto real de prueba para verificar la bandeja y la tarea de seguimiento.',
+      finalidad: 'Probar el circuito de voluntariado con datos ficticios.', responsable_datos: 'Administración',
+      campos: [
+        { clave: 'interes', etiqueta: '¿Dónde te gustaría colaborar?', tipo: 'seleccion', requerido: true, opciones: ['Actividades con familias', 'Deporte y recreación', 'Comunicación', 'Apoyo en eventos', 'Todavía no lo sé'] },
+        { clave: 'disponibilidad', etiqueta: 'Disponibilidad aproximada', tipo: 'seleccion', requerido: true, opciones: ['Una vez por semana', 'Una vez por mes', 'Actividades puntuales', 'A coordinar'] },
+        { clave: 'motivacion', etiqueta: '¿Qué te gustaría aportar o aprender?', tipo: 'texto_largo', requerido: true },
+      ],
+    },
+    {
+      id: 'prueba-consulta-tienda', ...base, ...pedido(equipos.administracion),
+      titulo: '[Prueba] Consultar por un producto',
+      descripcion: 'Consulta real de prueba sobre disponibilidad, reserva o reposición, sin procesar pagos.',
+      finalidad: 'Probar el circuito de consultas de tienda con datos ficticios.', responsable_datos: 'Administración',
+      campos: [
+        { clave: 'producto', etiqueta: 'Producto', tipo: 'seleccion', requerido: true, opciones: ['Remera Aletea', 'Bolsa de tela Aletea', 'Cuaderno de apoyos visuales'] },
+        { clave: 'consulta', etiqueta: '¿Qué querés hacer?', tipo: 'seleccion', requerido: true, opciones: ['Consultar disponibilidad', 'Reservar', 'Recibir aviso de reposición'] },
+        { clave: 'detalle', etiqueta: 'Talle, cantidad u otra aclaración', tipo: 'texto_largo', requerido: false },
+      ],
+    },
+  ]
+}
+
+export async function asegurarFormularioPruebaCms(base, id) {
+  const idsPrueba = new Set(['prueba-orientacion-familias', 'prueba-participar-actividad', 'prueba-consulta-formacion', 'prueba-voluntariado', 'prueba-consulta-tienda'])
+  if (!idsPrueba.has(id)) return false
+  const [filasEquipos, filasUsuarios] = await Promise.all([
+    base.prepare("SELECT id, clave FROM equipos WHERE activo = 1 AND clave IN ('familias', 'deportes', 'capacitaciones', 'administracion')").all(),
+    base.prepare('SELECT correo, perfil_acceso FROM usuarios WHERE activo = 1 ORDER BY creado_en').all(),
+  ])
+  const equipos = Object.fromEntries((filasEquipos.results || []).map((equipo) => [equipo.clave, equipo.id]))
+  const usuarios = filasUsuarios.results || []
+  const creador = usuarios.find((usuario) => usuario.perfil_acceso === 'administracion') || usuarios[0]
+  if (['familias', 'deportes', 'capacitaciones', 'administracion'].some((clave) => !equipos[clave]) || !creador?.correo) return false
+  const plantilla = formulariosPruebaCms(equipos).find((formulario) => formulario.id === id)
+  if (!plantilla) return false
+  const resultado = formularioCmsDesde(plantilla)
+  if (resultado.error) return false
+  const formulario = resultado.formulario
+  await base.prepare(`UPDATE formularios_cms SET
+    titulo = ?2, descripcion = ?3, tipo = ?4, visibilidad = ?5, estado = ?6, equipo_id = ?7, equipo_solicitante_id = ?8,
+    prioridad = ?9, proyecto_id = ?10, campos_json = ?11, finalidad = ?12, responsable_datos = ?13, conservacion_meses = ?14,
+    requiere_consentimiento = ?15, destino_respuesta = ?16, actualizado_en = CURRENT_TIMESTAMP
+    WHERE id = ?1`)
+    .bind(plantilla.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado,
+      formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json,
+      formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0,
+      formulario.destino_respuesta).run()
+  const existente = await base.prepare('SELECT id FROM formularios_cms WHERE id = ?1').bind(plantilla.id).first()
+  if (existente) return true
+  await base.prepare(`INSERT INTO formularios_cms
+    (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json,
+      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, creado_por)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`)
+    .bind(plantilla.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado,
+      formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json,
+      formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0,
+      formulario.destino_respuesta, creador.correo).run()
+  return true
 }
 
 export function respuestaFormularioCmsDesde(datos, formulario) {
@@ -1116,7 +1880,12 @@ export function respuestaFormularioCmsDesde(datos, formulario) {
   }
   resultado.entrada.respuestas = respuestas
   resultado.entrada.respuestas_json = JSON.stringify(respuestas)
+  resultado.entrada.destino_respuesta = formulario.destino_respuesta || 'tarea'
   return resultado
+}
+
+export function consentimientoFormularioPublicoValido(datos, formulario) {
+  return !Boolean(formulario?.requiere_consentimiento) || datos?.consentimiento_privacidad === true
 }
 
 export function responsabilidadCmsDesde(datos) {
@@ -1156,6 +1925,7 @@ export function reunionCmsDesde(datos, actual = {}) {
     titulo: textoCms(datos.titulo ?? actual.titulo, 180),
     objetivo: textoCms(datos.objetivo ?? actual.objetivo),
     equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
     proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
     fecha_hora: datos.fecha_hora ?? actual.fecha_hora ?? '',
     lugar: textoCms(datos.lugar ?? actual.lugar, 180),
@@ -1181,6 +1951,26 @@ export function decisionCmsDesde(datos, actual = {}) {
   return { decision }
 }
 
+export function cierreReunionCmsDesde(datos) {
+  const cierre = {
+    minuta: textoCms(datos.minuta),
+    resumen: textoCms(datos.resumen, 1200),
+    proxima_revision: textoCms(datos.proxima_revision, 10) || null,
+    acuerdos: Array.isArray(datos.acuerdos) ? datos.acuerdos.slice(0, 20) : [],
+  }
+  if (!cierre.minuta || !cierre.resumen) return { error: 'Completá la minuta y el resumen antes de cerrar la reunión.' }
+  if (cierre.proxima_revision && !fechaCmsValida(cierre.proxima_revision)) return { error: 'La próxima revisión debe tener una fecha válida.' }
+  const acuerdos = []
+  for (const fila of cierre.acuerdos) {
+    const decision = decisionCmsDesde(fila)
+    if (decision.error) return decision
+    const fecha_limite = textoCms(fila.fecha_limite, 10) || null
+    if (fecha_limite && !fechaCmsValida(fecha_limite)) return { error: `La fecha de “${decision.decision.titulo}” no es válida.` }
+    acuerdos.push({ ...decision.decision, crear_tarea: Boolean(fila.crear_tarea), fecha_limite })
+  }
+  return { cierre: { ...cierre, acuerdos } }
+}
+
 export function eventoCmsDesde(datos, actual = {}) {
   const evento = {
     titulo: textoCms(datos.titulo ?? actual.titulo, 180),
@@ -1189,6 +1979,7 @@ export function eventoCmsDesde(datos, actual = {}) {
     fecha_fin: datos.fecha_fin ?? actual.fecha_fin ?? null,
     lugar: textoCms(datos.lugar ?? actual.lugar, 180),
     equipo_id: datos.equipo_id ?? actual.equipo_id ?? null,
+    unidad_id: datos.unidad_id ?? actual.unidad_id ?? null,
     proyecto_id: datos.proyecto_id ?? actual.proyecto_id ?? null,
     responsable_correo: datos.responsable_correo ?? actual.responsable_correo ?? null,
     estado: datos.estado ?? actual.estado ?? 'planificado',
@@ -1201,7 +1992,7 @@ export function eventoCmsDesde(datos, actual = {}) {
   return { evento }
 }
 
-function siguienteFechaEventoCms(fecha, frecuencia, diaMensual = null) {
+function siguienteFechaEventoCms(fecha, frecuencia, reglaMensual = {}) {
   const [anio, mes, dia] = String(fecha).split('-').map(Number)
   if (frecuencia === 'semanal' || frecuencia === 'quincenal') {
     const salto = frecuencia === 'quincenal' ? 14 : 7
@@ -1210,7 +2001,13 @@ function siguienteFechaEventoCms(fecha, frecuencia, diaMensual = null) {
   const siguienteMes = mes === 12 ? 1 : mes + 1
   const siguienteAnio = mes === 12 ? anio + 1 : anio
   const ultimoDia = new Date(Date.UTC(siguienteAnio, siguienteMes, 0)).getUTCDate()
-  return `${siguienteAnio}-${String(siguienteMes).padStart(2, '0')}-${String(Math.min(diaMensual ?? dia, ultimoDia)).padStart(2, '0')}`
+  let diaSiguiente = Math.min(reglaMensual.dia ?? dia, ultimoDia)
+  if (frecuencia === 'mensual_ordinal') {
+    const primerDiaSemana = new Date(Date.UTC(siguienteAnio, siguienteMes - 1, 1)).getUTCDay()
+    diaSiguiente = 1 + ((reglaMensual.diaSemana - primerDiaSemana + 7) % 7) + ((reglaMensual.ordinal - 1) * 7)
+    if (diaSiguiente > ultimoDia) diaSiguiente -= 7
+  }
+  return `${siguienteAnio}-${String(siguienteMes).padStart(2, '0')}-${String(diaSiguiente).padStart(2, '0')}`
 }
 
 function minutosEntreFechasCms(inicio, fin) {
@@ -1234,15 +2031,17 @@ export function eventosRecurrentesCmsDesde(datos) {
   const dias = (Date.parse(`${repetirHasta}T00:00:00Z`) - Date.parse(`${fechaInicial}T00:00:00Z`)) / 86400000
   if (dias > 370) return { error: 'Podés planificar hasta un año por vez.' }
   const duracion = minutosEntreFechasCms(resultado.evento.fecha_hora, resultado.evento.fecha_fin)
+  if (duracion !== null && duracion > 1440) return { error: 'En una actividad recurrente, la finalización debe ocurrir dentro de las 24 horas siguientes. La fecha hasta la que se repite se elige por separado.' }
   const hora = resultado.evento.fecha_hora.slice(10)
   const diaMensual = Number(fechaInicial.slice(8, 10))
+  const reglaMensual = { dia: diaMensual, diaSemana: new Date(`${fechaInicial}T00:00:00Z`).getUTCDay(), ordinal: Math.ceil(diaMensual / 7) }
   const serieId = crypto.randomUUID()
   const eventos = []
   let fecha = fechaInicial
   while (fecha <= repetirHasta && eventos.length < 60) {
     const fechaHora = `${fecha}${hora}`
     eventos.push({ ...resultado.evento, fecha_hora: fechaHora, fecha_fin: sumarMinutosCms(fechaHora, duracion), serie_id: serieId, generada_para: fecha })
-    fecha = siguienteFechaEventoCms(fecha, frecuencia, diaMensual)
+    fecha = siguienteFechaEventoCms(fecha, frecuencia, reglaMensual)
   }
   return { eventos, frecuencia, repetir_hasta: repetirHasta }
 }
@@ -1259,12 +2058,13 @@ export function reunionesRecurrentesCmsDesde(datos) {
   if (dias > 370) return { error: 'Podés planificar hasta un año por vez.' }
   const hora = resultado.reunion.fecha_hora.slice(10)
   const diaMensual = Number(fechaInicial.slice(8, 10))
+  const reglaMensual = { dia: diaMensual, diaSemana: new Date(`${fechaInicial}T00:00:00Z`).getUTCDay(), ordinal: Math.ceil(diaMensual / 7) }
   const serieId = crypto.randomUUID()
   const reuniones = []
   let fecha = fechaInicial
   while (fecha <= repetirHasta && reuniones.length < 60) {
     reuniones.push({ ...resultado.reunion, fecha_hora: `${fecha}${hora}`, serie_id: serieId, generada_para: fecha })
-    fecha = siguienteFechaEventoCms(fecha, frecuencia, diaMensual)
+    fecha = siguienteFechaEventoCms(fecha, frecuencia, reglaMensual)
   }
   return { reuniones, frecuencia, repetir_hasta: repetirHasta }
 }
@@ -1293,13 +2093,22 @@ function instanteCms(fechaHora) {
   return Number.isFinite(instante) ? instante : null
 }
 
+function finAgendaCms(evento) {
+  const inicio = instanteCms(evento?.fecha_hora)
+  const fin = instanteCms(evento?.fecha_fin)
+  if (inicio === null || fin === null) return null
+  if (evento?.serie_id && fin - inicio > 86400000) return null
+  return fin
+}
+
 export function conflictoAgendaCms(primero, segundo) {
   if (!primero || !segundo || primero.id === segundo.id || primero.estado !== 'planificado' || segundo.estado !== 'planificado') return null
+  if (primero.serie_id && segundo.serie_id && primero.serie_id === segundo.serie_id) return null
   const inicioPrimero = instanteCms(primero.fecha_hora)
   const inicioSegundo = instanteCms(segundo.fecha_hora)
   if (inicioPrimero === null || inicioSegundo === null) return null
-  const finPrimero = instanteCms(primero.fecha_fin)
-  const finSegundo = instanteCms(segundo.fecha_fin)
+  const finPrimero = finAgendaCms(primero)
+  const finSegundo = finAgendaCms(segundo)
   const seSuperponen = inicioPrimero === inicioSegundo
     || (finPrimero !== null && inicioSegundo >= inicioPrimero && inicioSegundo < finPrimero)
     || (finSegundo !== null && inicioPrimero >= inicioSegundo && inicioPrimero < finSegundo)
@@ -1320,15 +2129,68 @@ export function conflictoAgendaCms(primero, segundo) {
   }
 }
 
+function ocurrenciasAgendaCmsUnicas(eventos) {
+  const unicas = new Map()
+  for (const evento of eventos) {
+    const fechaSerie = String(evento.fecha_hora || '').slice(0, 10) || evento.generada_para
+    const clave = evento.serie_id ? `serie:${evento.serie_id}:${fechaSerie}` : `evento:${evento.id}`
+    const existente = unicas.get(clave)
+    if (existente) {
+      existente.registros_agrupados += 1
+      continue
+    }
+    unicas.set(clave, { ...evento, registros_agrupados: 1 })
+  }
+  return [...unicas.values()]
+}
+
 export function conflictosAgendaCms(eventos) {
+  const ocurrencias = ocurrenciasAgendaCmsUnicas(eventos)
   const conflictos = []
-  for (let indice = 0; indice < eventos.length; indice += 1) {
-    for (let comparado = indice + 1; comparado < eventos.length; comparado += 1) {
-      const conflicto = conflictoAgendaCms(eventos[indice], eventos[comparado])
+  for (let indice = 0; indice < ocurrencias.length; indice += 1) {
+    for (let comparado = indice + 1; comparado < ocurrencias.length; comparado += 1) {
+      const conflicto = conflictoAgendaCms(ocurrencias[indice], ocurrencias[comparado])
       if (conflicto) conflictos.push(conflicto)
     }
   }
   return conflictos
+}
+
+export function gruposConflictosAgendaCms(eventos) {
+  const ocurrencias = ocurrenciasAgendaCmsUnicas(eventos)
+  const conflictos = conflictosAgendaCms(ocurrencias)
+  const eventosPorId = new Map(ocurrencias.map((evento) => [evento.id, evento]))
+  const conexiones = new Map()
+  for (const conflicto of conflictos) {
+    if (!conexiones.has(conflicto.evento_a_id)) conexiones.set(conflicto.evento_a_id, new Set())
+    if (!conexiones.has(conflicto.evento_b_id)) conexiones.set(conflicto.evento_b_id, new Set())
+    conexiones.get(conflicto.evento_a_id).add(conflicto.evento_b_id)
+    conexiones.get(conflicto.evento_b_id).add(conflicto.evento_a_id)
+  }
+  const visitados = new Set()
+  const grupos = []
+  for (const inicio of conexiones.keys()) {
+    if (visitados.has(inicio)) continue
+    const pendientes = [inicio]
+    const ids = new Set()
+    while (pendientes.length) {
+      const id = pendientes.pop()
+      if (visitados.has(id)) continue
+      visitados.add(id)
+      ids.add(id)
+      for (const vecino of conexiones.get(id) || []) if (!visitados.has(vecino)) pendientes.push(vecino)
+    }
+    const componentes = [...ids].map((id) => eventosPorId.get(id)).filter(Boolean)
+      .sort((a, b) => String(a.fecha_hora).localeCompare(String(b.fecha_hora)) || String(a.titulo).localeCompare(String(b.titulo), 'es'))
+    const motivos = new Set(conflictos.filter((conflicto) => ids.has(conflicto.evento_a_id) && ids.has(conflicto.evento_b_id)).flatMap((conflicto) => conflicto.motivos))
+    grupos.push({
+      fecha_hora: componentes[0]?.fecha_hora || '',
+      eventos: componentes.map((evento) => ({ id: evento.id, titulo: evento.titulo, serie_id: evento.serie_id || null, registros_agrupados: evento.registros_agrupados || 1 })),
+      motivos: [...motivos],
+      cantidad: componentes.length,
+    })
+  }
+  return grupos.sort((a, b) => String(a.fecha_hora).localeCompare(String(b.fecha_hora)))
 }
 
 function fechaDePreparacion(fechaHora, diasAntes) {
@@ -1337,10 +2199,15 @@ function fechaDePreparacion(fechaHora, diasAntes) {
   return fecha.toISOString().slice(0, 10)
 }
 
-export async function referenciasCmsValidas(base, { equipo_id, equipo_solicitante_id, proyecto_id, programa_id, responsable_correo, solicitante_correo, evento_id }) {
+export async function referenciasCmsValidas(base, { equipo_id, equipo_solicitante_id, unidad_id, proyecto_id, programa_id, responsable_correo, solicitante_correo, evento_id }) {
   const consultas = []
   if (equipo_id) consultas.push(base.prepare('SELECT id FROM equipos WHERE id = ?1 AND activo = 1').bind(equipo_id).first().then((fila) => fila ? null : 'equipo'))
   if (equipo_solicitante_id) consultas.push(base.prepare('SELECT id FROM equipos WHERE id = ?1 AND activo = 1').bind(equipo_solicitante_id).first().then((fila) => fila ? null : 'equipo solicitante'))
+  if (unidad_id) consultas.push((equipo_id
+    ? base.prepare(`SELECT u.id FROM unidades_operativas_cms u WHERE u.id = ?1 AND u.estado != 'archivada'
+        AND (u.equipo_id = ?2 OR EXISTS (SELECT 1 FROM unidades_vistas_equipo_cms v WHERE v.unidad_id = u.id AND v.equipo_id = ?2))`).bind(unidad_id, equipo_id)
+    : base.prepare("SELECT id FROM unidades_operativas_cms WHERE id = ?1 AND estado != 'archivada'").bind(unidad_id))
+    .first().then((fila) => fila ? null : 'unidad'))
   if (proyecto_id) consultas.push(base.prepare("SELECT id FROM proyectos_cms WHERE id = ?1 AND estado != 'cerrado'").bind(proyecto_id).first().then((fila) => fila ? null : 'proyecto'))
   if (programa_id) consultas.push(base.prepare("SELECT id FROM programas_cms WHERE id = ?1 AND estado != 'cerrado'").bind(programa_id).first().then((fila) => fila ? null : 'programa'))
   if (responsable_correo) consultas.push(base.prepare('SELECT correo FROM usuarios WHERE correo = ?1 AND activo = 1').bind(responsable_correo).first().then((fila) => fila ? null : 'responsable'))
@@ -1361,7 +2228,7 @@ async function responsableAutomaticoDeSolicitud(base, equipoId) {
 }
 
 async function dependenciasPendientesDe(base, tareaId) {
-  const filas = await base.prepare(`SELECT p.id, p.titulo FROM tareas_dependencias_cms d
+  const filas = await base.prepare(`SELECT p.id, p.titulo, p.descripcion FROM tareas_dependencias_cms d
     JOIN tareas_cms p ON p.id = d.depende_de_id
     WHERE d.tarea_id = ?1 AND p.estado NOT IN ('completada', 'cancelada')
     ORDER BY p.actualizado_en DESC`).bind(tareaId).all()
@@ -1404,52 +2271,282 @@ export async function derivarEntradaCms(base, entradaBase, creador, formularioId
   const nombreTarea = {
     voluntariado: 'Revisar voluntariado', inscripcion: 'Revisar inscripción', actividad: 'Revisar propuesta de actividad', evento: 'Revisar propuesta de evento', pedido: 'Atender pedido', propuesta: 'Evaluar propuesta',
   }[entradaBase.tipo]
+  const destino = entradaBase.destino_respuesta || 'tarea'
+  const requiereRevision = ['actividad', 'alta_persona', 'contacto'].includes(destino)
   const tarea = {
-    id: crypto.randomUUID(), titulo: `${nombreTarea}: ${entradaBase.nombre}`,
-    descripcion: formularioId ? 'Creada desde una respuesta de formulario.' : 'Creada desde la bandeja de entradas institucionales.',
-    tipo: entradaBase.tipo === 'pedido' ? 'solicitud' : 'seguimiento', estado: 'pendiente',
+    id: crypto.randomUUID(), titulo: formularioId ? `${nombreTarea}: respuesta recibida` : `${nombreTarea}: ${entradaBase.nombre}`,
+    descripcion: formularioId ? DESCRIPCION_TAREA_FORMULARIO : DESCRIPCION_TAREA_ENTRADA,
+    tipo: destino === 'solicitud' || entradaBase.tipo === 'pedido' ? 'solicitud' : 'seguimiento', estado: 'pendiente',
     prioridad: entradaBase.prioridad, equipo_id: entradaBase.equipo_id,
     proyecto_id: entradaBase.proyecto_id, responsable_correo: responsableCorreo,
     solicitante_correo: entradaBase.tipo === 'pedido' && registrarSolicitante ? creador.correo : null,
   }
-  const insertarTarea = base.prepare(`INSERT INTO tareas_cms
+  if (destino === 'actividad') tarea.titulo = `Revisar antes de agendar: ${entradaBase.nombre}`
+  if (destino === 'alta_persona') tarea.titulo = `Revisar posible alta: ${entradaBase.nombre}`
+  if (destino === 'contacto') tarea.titulo = `Revisar contacto: ${entradaBase.nombre}`
+  const insertarTarea = destino === 'archivo' ? null : base.prepare(`INSERT INTO tareas_cms
     (id, titulo, descripcion, tipo, estado, prioridad, equipo_id, proyecto_id, responsable_correo, solicitante_correo, creado_por)
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`)
     .bind(tarea.id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.proyecto_id, tarea.responsable_correo, tarea.solicitante_correo, creador.correo)
-  const entrada = { id: crypto.randomUUID(), ...entradaBase, estado: 'derivada', tarea_id: tarea.id, formulario_id: formularioId }
+  const entrada = { id: crypto.randomUUID(), ...entradaBase, estado: destino === 'archivo' ? 'nueva' : 'derivada', tarea_id: destino === 'archivo' ? null : tarea.id, formulario_id: formularioId, destino_respuesta: destino, revision_requerida: requiereRevision ? 1 : 0 }
   const insertarEntrada = base.prepare(`INSERT INTO entradas_cms
-    (id, tipo, nombre, contacto, detalle, fecha_propuesta, objetivo, pasos, recursos, personas_necesarias, respuestas_json, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, tarea_id, formulario_id, creado_por)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)`)
-    .bind(entrada.id, entrada.tipo, entrada.nombre, entrada.contacto, entrada.detalle, entrada.fecha_propuesta, entrada.objetivo, entrada.pasos, entrada.recursos, entrada.personas_necesarias, entrada.respuestas_json || '{}', entrada.estado, entrada.equipo_id, entrada.equipo_solicitante_id, entrada.prioridad, entrada.proyecto_id, entrada.tarea_id, entrada.formulario_id, creador.correo)
-  const notificacion = consultaNotificacionAsignacionTareaCms(base, tarea, creador.correo, tarea.tipo === 'solicitud' ? 'solicitud_recibida' : 'asignacion_tarea')
-  await base.batch([insertarTarea, insertarEntrada, ...(notificacion ? [notificacion] : [])])
-  return { entrada, tarea, asignada_automaticamente: Boolean(responsableCorreo) }
+    (id, tipo, nombre, contacto, detalle, fecha_propuesta, objetivo, pasos, recursos, personas_necesarias, respuestas_json, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, tarea_id, formulario_id, creado_por, destino_respuesta, revision_requerida)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)`)
+    .bind(entrada.id, entrada.tipo, entrada.nombre, entrada.contacto, entrada.detalle, entrada.fecha_propuesta, entrada.objetivo, entrada.pasos, entrada.recursos, entrada.personas_necesarias, entrada.respuestas_json || '{}', entrada.estado, entrada.equipo_id, entrada.equipo_solicitante_id, entrada.prioridad, entrada.proyecto_id, entrada.tarea_id, entrada.formulario_id, creador.correo, entrada.destino_respuesta, entrada.revision_requerida)
+  const notificacion = insertarTarea ? consultaNotificacionAsignacionTareaCms(base, tarea, creador.correo, tarea.tipo === 'solicitud' ? 'solicitud_recibida' : 'asignacion_tarea') : null
+  await base.batch([...(insertarTarea ? [insertarTarea] : []), insertarEntrada, ...(notificacion ? [notificacion] : [])])
+  return { entrada, tarea: insertarTarea ? tarea : null, asignada_automaticamente: Boolean(insertarTarea && responsableCorreo) }
 }
 
 async function formularioPublico(contexto, ruta) {
   const { request, env } = contexto
+  const cabeceras = cabecerasFormularioPublico(request)
+  if (request.method === 'OPTIONS') return responder(null, 204, cabeceras)
   const id = ruta.split('/').filter(Boolean)[1]
-  if (!id) return error('No encontramos ese formulario.', 404)
-  const formulario = await env.BASE.prepare(`SELECT id, titulo, descripcion, tipo, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, creado_por, campos_json
+  if (!id) return error('No encontramos ese formulario.', 404, cabeceras)
+  let formulario = await env.BASE.prepare(`SELECT id, titulo, descripcion, tipo, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, creado_por, campos_json, destino_respuesta,
+      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento
     FROM formularios_cms WHERE id = ?1 AND visibilidad = 'publica' AND estado = 'activa'`).bind(id).first()
-  if (!formulario) return error('Este formulario no está disponible.', 404)
-  if (request.method === 'GET') return responder({ formulario }, 200, { 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
-  if (request.method !== 'POST') return error('Método no permitido.', 405)
-  let datos; try { datos = await request.json() } catch { return error('Los datos del formulario no son válidos.', 400) }
+  if (!formulario && await asegurarFormularioPruebaCms(env.BASE, id)) {
+    formulario = await env.BASE.prepare(`SELECT id, titulo, descripcion, tipo, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, creado_por, campos_json, destino_respuesta,
+        finalidad, responsable_datos, conservacion_meses, requiere_consentimiento
+      FROM formularios_cms WHERE id = ?1 AND visibilidad = 'publica' AND estado = 'activa'`).bind(id).first()
+  }
+  if (!formulario) return error('Este formulario no está disponible.', 404, cabeceras)
+  if (request.method === 'GET') return responder({ formulario }, 200, { ...cabeceras, 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
+  if (request.method !== 'POST') return error('Método no permitido.', 405, cabeceras)
+  let datos; try { datos = await request.json() } catch { return error('Los datos del formulario no son válidos.', 400, cabeceras) }
+  if (!consentimientoFormularioPublicoValido(datos, formulario)) return error('Confirmá que leíste cómo se usarán tus datos.', 400, cabeceras)
   const resultado = respuestaFormularioCmsDesde(datos, formulario)
-  if (resultado.error) return error(resultado.error, 400)
+  if (resultado.error) return error(resultado.error, 400, cabeceras)
+  resultado.entrada.respuestas = {
+    ...(resultado.entrada.respuestas || {}),
+    _consentimiento_privacidad: Boolean(formulario.requiere_consentimiento) ? 'Aceptado' : 'No requerido',
+  }
+  resultado.entrada.respuestas_json = JSON.stringify(resultado.entrada.respuestas)
   const ip = request.headers.get('CF-Connecting-IP') || 'sin-direccion'
   const ventana = String(Math.floor(Date.now() / 600000))
   const clave = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${env.SESION_SECRETO || 'formulario'}:${ip}`))
   const limite = [...new Uint8Array(clave)].map((valor) => valor.toString(16).padStart(2, '0')).join('')
-  const permitido = await env.BASE.prepare(`INSERT INTO limites_formularios_publicos_cms (formulario_id, clave, ventana, cantidad)
-    VALUES (?1, ?2, ?3, 1) ON CONFLICT(formulario_id, clave, ventana)
-    DO UPDATE SET cantidad = cantidad + 1, actualizado_en = CURRENT_TIMESTAMP WHERE cantidad < 4`)
-    .bind(formulario.id, limite, ventana).run()
-  if (!Number(permitido.meta?.changes || 0)) return error('Probá nuevamente en unos minutos.', 429)
+  // D1 y MariaDB aceptan este UPSERT sin una clausula WHERE propia de SQLite.
+  // El contador queda clavado en 5: los primeros cuatro intentos avanzan y el
+  // quinto marca el limite sin crecer indefinidamente durante la ventana.
+  if (!await reservarEnvioFormularioPublico(env.BASE, formulario.id, limite, ventana)) {
+    return error('Probá nuevamente en unos minutos.', 429, cabeceras)
+  }
   const derivada = await derivarEntradaCms(env.BASE, resultado.entrada, { correo: formulario.creado_por }, formulario.id, false)
-  await registrar(env.BASE, { correo: formulario.creado_por }, 'recibir formulario público', `formularios/${formulario.id}`, derivada.entrada.nombre)
-  return responder({ recibida: true }, 201)
+  await registrar(env.BASE, { correo: formulario.creado_por }, 'recibir formulario público', `formularios/${formulario.id}`, 'Respuesta recibida')
+  return responder({ recibida: true, referencia: derivada.entrada.id }, 201, cabeceras)
+}
+
+export async function reservarEnvioFormularioPublico(base, formularioId, clave, ventana) {
+  await base.prepare(`INSERT INTO limites_formularios_publicos_cms (formulario_id, clave, ventana, cantidad)
+    VALUES (?1, ?2, ?3, 1) ON CONFLICT(formulario_id, clave, ventana)
+    DO UPDATE SET cantidad = CASE WHEN cantidad < 5 THEN cantidad + 1 ELSE cantidad END,
+      actualizado_en = CURRENT_TIMESTAMP`)
+    .bind(formularioId, clave, ventana).run()
+  const uso = await base.prepare(`SELECT cantidad FROM limites_formularios_publicos_cms
+    WHERE formulario_id = ?1 AND clave = ?2 AND ventana = ?3`)
+    .bind(formularioId, clave, ventana).first()
+  return Number(uso?.cantidad || 0) <= 4
+}
+
+async function finanzasFsbCms(contexto, sesion, partes, alcance) {
+  const { request, env } = contexto
+  const equipo = await env.BASE.prepare("SELECT id FROM equipos WHERE clave = 'finanzas' AND activo = 1").first()
+  if (!equipo) return error('El equipo de Finanzas todavía no está configurado.', 503)
+  if (!puedeAccederFinanzasFsb(sesion, alcance, equipo.id)) {
+    const fichaProtegida = nivelDatosPersonalesDe(sesion) === 'sensible'
+    const equipoFinanzas = Boolean(alcance.global || alcance.equipos?.has?.(equipo.id))
+    const mensaje = !fichaProtegida
+      ? 'Necesitás acceso a ficha protegida. Administración puede habilitarlo hasta una fecha o sin vencimiento.'
+      : 'Tu acceso a ficha protegida está vigente, pero también necesitás pertenecer al equipo de Finanzas.'
+    return responder({
+      error: mensaje,
+      acceso: {
+        puede_ver: false,
+        puede_gestionar: false,
+        requisitos: [
+          {
+            id: 'datos-personales:sensible', tipo: 'datos_personales', titulo: 'Datos personales completos',
+            descripcion: 'Habilita información protegida completa. Cada consulta y cada cambio quedan registrados.',
+            cumplido: fichaProtegida, resolver: { tipo: 'datos_personales', nivel: 'sensible', usuario: 'yo' },
+          },
+          {
+            id: 'equipo:finanzas', tipo: 'equipo', titulo: 'Pertenencia al equipo Finanzas',
+            descripcion: 'La persona debe estar asignada al equipo Finanzas.',
+            cumplido: equipoFinanzas, resolver: { tipo: 'equipo', equipo_id: equipo.id, equipo_clave: 'finanzas', usuario: 'yo' },
+          },
+        ],
+      },
+    }, 403, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
+  }
+  const puedeGestionar = puedeGestionarFinanzasFsb(sesion, alcance, equipo.id)
+  const subrecurso = partes[2] ?? ''
+  if (request.method === 'GET' && !subrecurso) {
+    const [cuentas, movimientos, compromisos, documentoRoster] = await Promise.all([
+      env.BASE.prepare(`SELECT id, persona_id, nombre, grupo, condicion, beca_porcentaje, observaciones, activa, creado_en, actualizado_en
+        FROM cuentas_fsb ORDER BY activa DESC, nombre COLLATE NOCASE`).all(),
+      env.BASE.prepare(`SELECT id, cuenta_id, tipo, concepto, periodo, fecha, vencimiento, importe_centavos, medio_pago,
+          comprobante, notas, clave_operacion, creado_en, anulado_en, anulado_por, motivo_anulacion
+        FROM movimientos_fsb ORDER BY fecha DESC, creado_en DESC LIMIT 5000`).all(),
+      env.BASE.prepare(`SELECT id, cuenta_id, importe_centavos, fecha_acuerdo, fecha_prevista, estado, nota, creado_en,
+          cerrado_en, cerrado_por, motivo_cierre FROM compromisos_pago_fsb ORDER BY fecha_prevista DESC, creado_en DESC LIMIT 2000`).all(),
+      env.BASE.prepare("SELECT contenido FROM documentos WHERE ruta = 'roster.json'").first(),
+    ])
+    let movimientosActuales = movimientos.results
+    let recargosAplicados = 0
+    if (puedeGestionar) {
+      const recargos = prepararRecargosFsb(cuentas.results, movimientosActuales, fechaActualCms())
+      if (recargos.length) {
+        try {
+          await env.BASE.batch(recargos.map((movimiento) => env.BASE.prepare(`INSERT INTO movimientos_fsb
+            (id, cuenta_id, tipo, concepto, periodo, fecha, vencimiento, importe_centavos, medio_pago, comprobante, notas, clave_operacion, creado_por)
+            VALUES (?1, ?2, 'recargo', ?3, ?4, ?5, NULL, ?6, '', '', '', ?7, ?8)`)
+            .bind(crypto.randomUUID(), movimiento.cuenta_id, movimiento.concepto, movimiento.periodo, movimiento.fecha,
+              movimiento.importe_centavos, movimiento.clave_operacion, 'automatizacion')))
+          recargosAplicados = recargos.length
+          await registrar(env.BASE, sesion, 'aplicar recargos FSB', 'recargos-fsb', `${recargosAplicados} recargos automáticos aplicados`)
+        } catch {
+          recargosAplicados = 0
+        }
+        const actualizados = await env.BASE.prepare(`SELECT id, cuenta_id, tipo, concepto, periodo, fecha, vencimiento, importe_centavos, medio_pago,
+          comprobante, notas, clave_operacion, creado_en, anulado_en, anulado_por, motivo_anulacion
+          FROM movimientos_fsb ORDER BY fecha DESC, creado_en DESC LIMIT 5000`).all()
+        movimientosActuales = actualizados.results
+      }
+    }
+    const roster = documentoRoster?.contenido ? JSON.parse(documentoRoster.contenido) : { participantes: [] }
+    return responder({
+      acceso: { puede_ver: true, puede_gestionar: puedeGestionar, privacidad: 'sensible' },
+      configuracion: configuracionFinanzasFsb(roster, cuentas.results, movimientosActuales),
+      recargos_aplicados: recargosAplicados,
+      ...resumenFinanzasFsb(cuentas.results, movimientosActuales, fechaActualCms(), compromisos.results),
+    }, 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
+  }
+  if (!puedeGestionar) return error('Tu acceso permite consultar Finanzas, pero no registrar cambios.', 403)
+  if (!['POST', 'PATCH'].includes(request.method)) return error('Método no permitido.', 405)
+  let datos
+  try { datos = await request.json() } catch { return error('Los datos financieros no son válidos.', 400) }
+
+  if (request.method === 'PATCH' && subrecurso === 'cuentas' && partes[3]) {
+    const actual = await env.BASE.prepare(`SELECT id, persona_id, nombre, grupo, condicion, beca_porcentaje, observaciones, activa
+      FROM cuentas_fsb WHERE id = ?1`).bind(partes[3]).first()
+    if (!actual) return error('No encontramos la cuenta que querés editar.', 404)
+    if (actual.persona_id) return error('Este tipo de cuota se administra desde el perfil de la persona.', 409)
+    const resultado = cuentaFsbDesde(datos, actual)
+    if (resultado.error) return error(resultado.error, 400)
+    const cuenta = { id: actual.id, ...resultado.cuenta }
+    await env.BASE.prepare(`UPDATE cuentas_fsb SET persona_id = ?1, nombre = ?2, grupo = ?3, condicion = ?4,
+      beca_porcentaje = ?5, observaciones = ?6, activa = ?7, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?8`)
+      .bind(cuenta.persona_id, cuenta.nombre, cuenta.grupo, cuenta.condicion, cuenta.beca_porcentaje, cuenta.observaciones, cuenta.activa, cuenta.id).run()
+    await registrar(env.BASE, sesion, 'editar cuenta FSB', `cuentas-fsb/${cuenta.id}`, 'Cuenta financiera actualizada')
+    return responder({ cuenta }, 200, { 'Cache-Control': 'no-store' })
+  }
+
+  if (request.method !== 'POST') return error('Método no permitido.', 405)
+
+  if (subrecurso === 'recordatorios') {
+    const cuentaId = textoCms(datos.cuenta_id, 100)
+    const cuenta = cuentaId ? await env.BASE.prepare('SELECT id FROM cuentas_fsb WHERE id = ?1 AND activa = 1').bind(cuentaId).first() : null
+    if (!cuenta) return error('No encontramos una cuenta activa para preparar el recordatorio.', 404)
+    await registrar(env.BASE, sesion, 'preparar recordatorio manual FSB', `cuentas-fsb/${cuentaId}`, 'Recordatorio manual preparado')
+    return responder({ registrado: true }, 200, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'compromisos' && partes[3] && partes[4] === 'cerrar') {
+    const estado = textoCms(datos.estado, 20)
+    const motivo = textoCms(datos.motivo, 300)
+    if (!['cumplido', 'cancelado'].includes(estado)) return error('Elegí si el compromiso se cumplió o se canceló.', 400)
+    if (estado === 'cancelado' && motivo.length < 5) return error('Explicá brevemente por qué se cancela el compromiso.', 400)
+    const cerrado = await env.BASE.prepare(`UPDATE compromisos_pago_fsb SET estado = ?1, cerrado_por = ?2, cerrado_en = CURRENT_TIMESTAMP, motivo_cierre = ?3
+      WHERE id = ?4 AND estado = 'vigente'`).bind(estado, sesion.correo, motivo, partes[3]).run()
+    if (!Number(cerrado.meta?.changes || 0)) return error('El compromiso no existe o ya estaba cerrado.', 404)
+    await registrar(env.BASE, sesion, 'cerrar compromiso de pago FSB', `compromisos-pago-fsb/${partes[3]}`, estado)
+    return responder({ cerrado: true, estado }, 200, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'compromisos') {
+    const resultado = compromisoPagoFsbDesde(datos)
+    if (resultado.error) return error(resultado.error, 400)
+    const cuenta = await env.BASE.prepare('SELECT id FROM cuentas_fsb WHERE id = ?1 AND activa = 1').bind(resultado.compromiso.cuenta_id).first()
+    if (!cuenta) return error('No encontramos una cuenta activa para registrar el compromiso.', 404)
+    const vigente = await env.BASE.prepare("SELECT id FROM compromisos_pago_fsb WHERE cuenta_id = ?1 AND estado = 'vigente' LIMIT 1").bind(resultado.compromiso.cuenta_id).first()
+    if (vigente) return error('Esta cuenta ya tiene un compromiso vigente. Cerralo antes de registrar otro.', 409)
+    const compromiso = { id: crypto.randomUUID(), ...resultado.compromiso, estado: 'vigente', creado_por: sesion.correo }
+    await env.BASE.prepare(`INSERT INTO compromisos_pago_fsb
+      (id, cuenta_id, importe_centavos, fecha_acuerdo, fecha_prevista, estado, nota, creado_por)
+      VALUES (?1, ?2, ?3, ?4, ?5, 'vigente', ?6, ?7)`)
+      .bind(compromiso.id, compromiso.cuenta_id, compromiso.importe_centavos, compromiso.fecha_acuerdo, compromiso.fecha_prevista, compromiso.nota, compromiso.creado_por).run()
+    await registrar(env.BASE, sesion, 'crear compromiso de pago FSB', `compromisos-pago-fsb/${compromiso.id}`, 'Compromiso registrado')
+    return responder({ compromiso }, 201, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'movimientos' && partes[3] && partes[4] === 'anular') {
+    const motivo = textoCms(datos.motivo, 300)
+    if (motivo.length < 5) return error('Explicá brevemente por qué se anula el movimiento.', 400)
+    const anulada = await env.BASE.prepare(`UPDATE movimientos_fsb SET anulado_en = CURRENT_TIMESTAMP, anulado_por = ?1, motivo_anulacion = ?2
+      WHERE id = ?3 AND anulado_en IS NULL`).bind(sesion.correo, motivo, partes[3]).run()
+    if (!Number(anulada.meta?.changes || 0)) return error('El movimiento no existe o ya estaba anulado.', 404)
+    await registrar(env.BASE, sesion, 'anular movimiento FSB', `movimientos-fsb/${partes[3]}`, 'Movimiento anulado con motivo registrado')
+    return responder({ anulada: true }, 200, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'cuotas') {
+    const [cuentas, movimientos] = await Promise.all([
+      env.BASE.prepare(`SELECT id, nombre, grupo, condicion, beca_porcentaje, activa FROM cuentas_fsb WHERE activa = 1 ORDER BY nombre COLLATE NOCASE`).all(),
+      env.BASE.prepare('SELECT clave_operacion, anulado_en FROM movimientos_fsb WHERE clave_operacion IS NOT NULL').all(),
+    ])
+    const plan = prepararCuotasFsb(cuentas.results, movimientos.results, datos)
+    if (plan.error) return error(plan.error, 400)
+    if (!plan.cuotas.length) return error('No hay cuentas con cuota regular o beca asignadas a los grupos 1 o 2.', 409)
+    if (!plan.nuevas.length) return error('Las cuotas de ese mes ya están generadas para todas las cuentas facturables.', 409)
+    try {
+      await env.BASE.batch(plan.nuevas.map((cuota) => env.BASE.prepare(`INSERT INTO movimientos_fsb
+        (id, cuenta_id, tipo, concepto, periodo, fecha, vencimiento, importe_centavos, medio_pago, comprobante, notas, clave_operacion, creado_por)
+        VALUES (?1, ?2, 'cargo', ?3, ?4, ?5, ?6, ?7, '', '', '', ?8, ?9)`)
+        .bind(crypto.randomUUID(), cuota.cuenta_id, cuota.concepto, cuota.periodo, cuota.fecha, cuota.vencimiento, cuota.importe_centavos, cuota.clave_operacion, sesion.correo)))
+    } catch { return error('Las cuotas cambiaron mientras trabajabas. Actualizá la pantalla antes de intentarlo otra vez.', 409) }
+    await registrar(env.BASE, sesion, 'generar cuotas FSB', 'cuotas-fsb', `${plan.nuevas.length} cuotas generadas para ${datos.periodo}`)
+    return responder({ generadas: plan.nuevas.length, omitidas: plan.cuotas.length - plan.nuevas.length, total_centavos: plan.total_centavos }, 201, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'cuentas') {
+    const resultado = cuentaFsbDesde(datos)
+    if (resultado.error) return error(resultado.error, 400)
+    const cuenta = { id: crypto.randomUUID(), ...resultado.cuenta, creado_por: sesion.correo }
+    await env.BASE.prepare(`INSERT INTO cuentas_fsb
+      (id, persona_id, nombre, grupo, condicion, beca_porcentaje, observaciones, activa, creado_por)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)`)
+      .bind(cuenta.id, cuenta.persona_id, cuenta.nombre, cuenta.grupo, cuenta.condicion, cuenta.beca_porcentaje, cuenta.observaciones, cuenta.activa, cuenta.creado_por).run()
+    await registrar(env.BASE, sesion, 'crear cuenta FSB', `cuentas-fsb/${cuenta.id}`, 'Cuenta financiera creada')
+    return responder({ cuenta }, 201, { 'Cache-Control': 'no-store' })
+  }
+
+  if (subrecurso === 'movimientos') {
+    const resultado = movimientoFsbDesde(datos)
+    if (resultado.error) return error(resultado.error, 400)
+    const cuenta = await env.BASE.prepare('SELECT id FROM cuentas_fsb WHERE id = ?1 AND activa = 1').bind(resultado.movimiento.cuenta_id).first()
+    if (!cuenta) return error('No encontramos una cuenta activa para registrar el movimiento.', 404)
+    if (resultado.movimiento.tipo === 'pago' && datos.permitir_duplicado !== true) {
+      const duplicado = await env.BASE.prepare(`SELECT id FROM movimientos_fsb
+        WHERE cuenta_id = ?1 AND tipo = 'pago' AND importe_centavos = ?2 AND fecha = ?3 AND anulado_en IS NULL LIMIT 1`)
+        .bind(resultado.movimiento.cuenta_id, resultado.movimiento.importe_centavos, resultado.movimiento.fecha).first()
+      if (duplicado) return responder({ error: 'Parece un pago duplicado.', duplicado: { movimiento_id: duplicado.id } }, 409, { 'Cache-Control': 'no-store' })
+    }
+    const movimiento = { id: crypto.randomUUID(), ...resultado.movimiento, creado_por: sesion.correo }
+    await env.BASE.prepare(`INSERT INTO movimientos_fsb
+      (id, cuenta_id, tipo, concepto, periodo, fecha, vencimiento, importe_centavos, medio_pago, comprobante, notas, clave_operacion, creado_por)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`)
+      .bind(movimiento.id, movimiento.cuenta_id, movimiento.tipo, movimiento.concepto, movimiento.periodo, movimiento.fecha,
+        movimiento.vencimiento, movimiento.importe_centavos, movimiento.medio_pago, movimiento.comprobante, movimiento.notas,
+        movimiento.clave_operacion, movimiento.creado_por).run()
+    await registrar(env.BASE, sesion, 'registrar movimiento FSB', `movimientos-fsb/${movimiento.id}`, movimiento.tipo)
+    const saldo = await env.BASE.prepare('SELECT COALESCE(SUM(importe_centavos), 0) AS saldo_centavos FROM movimientos_fsb WHERE cuenta_id = ?1 AND anulado_en IS NULL')
+      .bind(movimiento.cuenta_id).first()
+    return responder({ movimiento, saldo_centavos: Number(saldo?.saldo_centavos || 0) }, 201, { 'Cache-Control': 'no-store' })
+  }
+  return error('No encontramos esa operación financiera.', 404)
 }
 
 async function cms(contexto, sesion, ruta) {
@@ -1459,6 +2556,9 @@ async function cms(contexto, sesion, ruta) {
   const recurso = partes[1] ?? 'tablero'
   const id = partes[2] ?? null
   const alcance = await alcanceCmsDe(env.BASE, sesion)
+
+  if (recurso === 'pagina-web') return paginaWebCms(contexto, sesion, id)
+  if (recurso === 'finanzas-fsb') return finanzasFsbCms(contexto, sesion, partes, alcance)
 
   if (esSoloConsultaCms(sesion) && request.method !== 'GET') {
     return error('El perfil de consulta solo puede leer la agenda y los documentos compartidos.', 403)
@@ -1472,8 +2572,8 @@ async function cms(contexto, sesion, ruta) {
       || (recurso === 'tareas' && id && partes[3] === 'comentarios' && request.method === 'POST'))) {
     return error('El perfil de integrante solo puede actualizar sus propias tareas.', 403)
   }
-  if (!alcance.global && ['equipos', 'responsabilidades'].includes(recurso) && request.method !== 'GET') {
-    return error('Solo Dirección o Administración puede cambiar la estructura de equipos.', 403)
+  if (!alcance.global && ['equipos', 'responsabilidades', 'unidades'].includes(recurso) && request.method !== 'GET') {
+    return error('Solo Dirección o Administración puede cambiar la estructura institucional.', 403)
   }
 
   if (recurso === 'notificaciones' && id === 'resumen' && request.method === 'GET') {
@@ -1488,8 +2588,9 @@ async function cms(contexto, sesion, ruta) {
     const tareaId = textoCms(datos.tarea_id, 100)
     const equipoId = textoCms(datos.equipo_id, 100)
     if (tareaId) {
-      const tarea = await env.BASE.prepare('SELECT id, titulo, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(tareaId).first()
+      const tarea = await env.BASE.prepare('SELECT id, titulo, descripcion, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(tareaId).first()
       if (!tarea || !puedeVerTareaCms(alcance, sesion, tarea)) return error('No encontramos esa tarea.', 404)
+      if (esTareaDerivadaDeEntradaCms(tarea) && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para preparar este aviso.', 403)
       await registrar(env.BASE, sesion, 'copiar aviso manual de tarea', `tareas/${tarea.id}`, tarea.titulo)
       return responder({ registrado: true })
     }
@@ -1502,16 +2603,64 @@ async function cms(contexto, sesion, ruta) {
     return error('Elegí una tarea o un equipo para preparar el aviso.', 400)
   }
 
+  if (recurso === 'solicitudes-privacidad') {
+    if (!esAdmin(sesion)) return error('Solo Administración puede gestionar solicitudes de privacidad.', 403)
+    if (!puedeGestionarSolicitudesPrivacidadCms(sesion)) return error('Necesitás acceso sensible vigente para abrir solicitudes de privacidad.', 403)
+    if (request.method === 'GET' && !id) {
+      const filas = await env.BASE.prepare(`SELECT s.*, u.nombre AS responsable_nombre
+        FROM solicitudes_privacidad_cms s
+        LEFT JOIN usuarios u ON u.correo = s.responsable_correo
+        ORDER BY s.estado IN ('cerrada', 'rechazada'), s.actualizado_en DESC LIMIT 100`).all()
+      return responder({ solicitudes: filas.results })
+    }
+    if (request.method === 'POST' && !id) {
+      let datos
+      try { datos = await request.json() } catch { return error('Los datos de la solicitud no son válidos.', 400) }
+      const resultado = solicitudPrivacidadCmsDesde(datos)
+      if (resultado.error) return error(resultado.error, 400)
+      const referenciaInvalida = await referenciasCmsValidas(env.BASE, { responsable_correo: resultado.solicitud.responsable_correo })
+      if (referenciaInvalida) return error(referenciaInvalida, 400)
+      const solicitud = { id: crypto.randomUUID(), ...resultado.solicitud, estado: 'recibida', creado_por: sesion.correo }
+      await env.BASE.prepare(`INSERT INTO solicitudes_privacidad_cms
+        (id, tipo, solicitante_nombre, contacto, canal, alcance, estado, responsable_correo, fecha_objetivo, creado_por)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)`)
+        .bind(solicitud.id, solicitud.tipo, solicitud.solicitante_nombre, solicitud.contacto, solicitud.canal, solicitud.alcance, solicitud.estado, solicitud.responsable_correo, solicitud.fecha_objetivo, solicitud.creado_por).run()
+      await registrar(env.BASE, sesion, 'registrar solicitud de privacidad', `solicitudes-privacidad/${solicitud.id}`, solicitud.tipo === 'copia' ? 'Solicitud de copia' : 'Solicitud de eliminación')
+      return responder({ solicitud }, 201)
+    }
+    if (request.method === 'PATCH' && id) {
+      const actual = await env.BASE.prepare('SELECT * FROM solicitudes_privacidad_cms WHERE id = ?1').bind(id).first()
+      if (!actual) return error('No encontramos esa solicitud de privacidad.', 404)
+      let datos
+      try { datos = await request.json() } catch { return error('El avance de la solicitud no es válido.', 400) }
+      const avance = avanceSolicitudPrivacidadCms(actual, datos.accion, datos.nota)
+      if (avance.error) return error(avance.error, 400)
+      const ahora = instanteUtcSql()
+      const verificadaEn = datos.accion === 'verificar_identidad' ? ahora : actual.identidad_verificada_en
+      const verificadaPor = datos.accion === 'verificar_identidad' ? sesion.correo : actual.identidad_verificada_por
+      const cerradaEn = ['cerrar', 'rechazar'].includes(datos.accion) ? ahora : actual.cerrada_en
+      const notaRevision = avance.nota || actual.nota_revision || ''
+      const constancia = ['cerrar', 'rechazar'].includes(datos.accion) ? avance.nota : actual.constancia || ''
+      await env.BASE.prepare(`UPDATE solicitudes_privacidad_cms SET estado = ?2, nota_revision = ?3, constancia = ?4,
+        identidad_verificada_en = ?5, identidad_verificada_por = ?6, cerrada_en = ?7, actualizado_en = CURRENT_TIMESTAMP
+        WHERE id = ?1`).bind(id, avance.estado, notaRevision, constancia, verificadaEn, verificadaPor, cerradaEn).run()
+      await registrar(env.BASE, sesion, 'avanzar solicitud de privacidad', `solicitudes-privacidad/${id}`, avance.estado)
+      return responder({ solicitud: { ...actual, estado: avance.estado, nota_revision: notaRevision, constancia, identidad_verificada_en: verificadaEn, identidad_verificada_por: verificadaPor, cerrada_en: cerradaEn } })
+    }
+    return error('Método no permitido.', 405)
+  }
+
   if (recurso === 'tablero' && request.method === 'GET') {
     const [tareas, proyectos, equipos, responsables, responsabilidades, reuniones, decisiones, documentos, entradas, formularios, alianzas, programas, eventos, plantillas, riesgos, hitos, gastos, eventosParaConflictos, notificaciones, recurrencias, automatizaciones, alertasPospuestas, comunicados, revisionSemanal, capacidad, metricasTareas] = await Promise.all([
       env.BASE.prepare(`
-        SELECT t.*, e.nombre AS equipo_nombre, e.color AS equipo_color, p.titulo AS proyecto_titulo, a.titulo AS evento_titulo,
+        SELECT t.*, e.nombre AS equipo_nombre, e.color AS equipo_color, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla, p.titulo AS proyecto_titulo, a.titulo AS evento_titulo,
           u.nombre AS responsable_nombre, s.nombre AS solicitante_nombre,
           (SELECT COUNT(*) FROM comentarios_tarea_cms c WHERE c.tarea_id = t.id) AS comentarios_total,
           (SELECT COUNT(*) FROM tareas_dependencias_cms d JOIN tareas_cms previa ON previa.id = d.depende_de_id
             WHERE d.tarea_id = t.id AND previa.estado NOT IN ('completada', 'cancelada')) AS dependencias_pendientes
         FROM tareas_cms t
         LEFT JOIN equipos e ON e.id = t.equipo_id
+        LEFT JOIN unidades_operativas_cms o ON o.id = t.unidad_id
         LEFT JOIN proyectos_cms p ON p.id = t.proyecto_id
         LEFT JOIN eventos_cms a ON a.id = t.evento_id
         LEFT JOIN usuarios u ON u.correo = t.responsable_correo
@@ -1520,11 +2669,11 @@ async function cms(contexto, sesion, ruta) {
         ORDER BY CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
           t.fecha_limite IS NULL, t.fecha_limite, t.actualizado_en DESC LIMIT 60
       `).all(),
-      env.BASE.prepare(`SELECT p.*, e.nombre AS equipo_nombre, g.nombre AS programa_nombre, u.nombre AS responsable_nombre,
+      env.BASE.prepare(`SELECT p.*, e.nombre AS equipo_nombre, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla, g.nombre AS programa_nombre, u.nombre AS responsable_nombre,
           (SELECT COUNT(*) FROM proyecto_hitos_cms h WHERE h.proyecto_id = p.id AND h.estado != 'cancelado') AS hitos_total,
           (SELECT COUNT(*) FROM proyecto_hitos_cms h WHERE h.proyecto_id = p.id AND h.estado = 'completado') AS hitos_completados,
           (SELECT COALESCE(SUM(g.monto), 0) FROM proyecto_gastos_cms g WHERE g.proyecto_id = p.id) AS presupuesto_ejecutado
-        FROM proyectos_cms p LEFT JOIN equipos e ON e.id = p.equipo_id LEFT JOIN programas_cms g ON g.id = p.programa_id LEFT JOIN usuarios u ON u.correo = p.responsable_correo
+        FROM proyectos_cms p LEFT JOIN equipos e ON e.id = p.equipo_id LEFT JOIN unidades_operativas_cms o ON o.id = p.unidad_id LEFT JOIN programas_cms g ON g.id = p.programa_id LEFT JOIN usuarios u ON u.correo = p.responsable_correo
         WHERE p.estado IN ('borrador', 'en_marcha', 'en_pausa') ORDER BY p.fecha_fin IS NULL, p.fecha_fin, p.actualizado_en DESC`).all(),
       env.BASE.prepare(`SELECT id, clave, nombre, categoria, descripcion, color, decisiones_permitidas, debe_escalar, informa_a, frecuencia_reunion
         FROM equipos WHERE activo = 1 ORDER BY nombre COLLATE NOCASE`).all(),
@@ -1549,11 +2698,14 @@ async function cms(contexto, sesion, ruta) {
       env.BASE.prepare(`SELECT d.*, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS creador_nombre FROM documentos_cms d
         LEFT JOIN equipos e ON e.id = d.equipo_id LEFT JOIN proyectos_cms p ON p.id = d.proyecto_id LEFT JOIN usuarios u ON u.correo = d.creado_por
         ORDER BY d.actualizado_en DESC LIMIT 12`).all(),
-      env.BASE.prepare(`SELECT i.*, e.nombre AS equipo_nombre, es.nombre AS equipo_solicitante_nombre, p.titulo AS proyecto_titulo, t.titulo AS tarea_titulo
+      env.BASE.prepare(`SELECT i.*, e.nombre AS equipo_nombre, es.nombre AS equipo_solicitante_nombre, p.titulo AS proyecto_titulo, t.titulo AS tarea_titulo,
+          f.titulo AS formulario_titulo, u.nombre AS cumplida_por_nombre
         FROM entradas_cms i
         LEFT JOIN equipos e ON e.id = i.equipo_id LEFT JOIN proyectos_cms p ON p.id = i.proyecto_id LEFT JOIN tareas_cms t ON t.id = i.tarea_id
         LEFT JOIN equipos es ON es.id = i.equipo_solicitante_id
-        WHERE i.estado != 'cerrada' ORDER BY i.creado_en DESC LIMIT 24`).all(),
+        LEFT JOIN formularios_cms f ON f.id = i.formulario_id
+        LEFT JOIN usuarios u ON u.correo = i.cumplida_por
+        ORDER BY CASE WHEN i.estado = 'cerrada' THEN 1 ELSE 0 END, COALESCE(i.cumplida_en, i.creado_en) DESC LIMIT 120`).all(),
       env.BASE.prepare(`SELECT f.*, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo,
           (SELECT COUNT(*) FROM entradas_cms i WHERE i.formulario_id = f.id) AS respuestas_total
         FROM formularios_cms f
@@ -1571,6 +2723,7 @@ async function cms(contexto, sesion, ruta) {
         LEFT JOIN usuarios u ON u.correo = p.creado_por
         ORDER BY CASE p.estado WHEN 'activo' THEN 0 WHEN 'en_pausa' THEN 1 WHEN 'borrador' THEN 2 ELSE 3 END, p.nombre COLLATE NOCASE LIMIT 48`).all(),
       env.BASE.prepare(`SELECT e.*, q.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS responsable_nombre,
+          (SELECT i.id FROM entradas_cms i WHERE i.evento_id = e.id LIMIT 1) AS entrada_id,
           (SELECT COUNT(*) FROM tareas_cms t WHERE t.evento_id = e.id AND t.estado != 'cancelada') AS tareas_total,
           (SELECT COUNT(*) FROM tareas_cms t WHERE t.evento_id = e.id AND t.estado = 'completada') AS tareas_completadas,
           (SELECT COUNT(*) FROM tareas_cms t WHERE t.evento_id = e.id AND t.estado NOT IN ('completada', 'cancelada')) AS tareas_pendientes
@@ -1601,11 +2754,12 @@ async function cms(contexto, sesion, ruta) {
       env.BASE.prepare(`SELECT g.*, p.titulo AS proyecto_titulo
         FROM proyecto_gastos_cms g JOIN proyectos_cms p ON p.id = g.proyecto_id
         ORDER BY g.fecha DESC, g.creado_en DESC LIMIT 60`).all(),
-      env.BASE.prepare(`SELECT id, titulo, fecha_hora, fecha_fin, lugar, equipo_id, responsable_correo, estado
-        FROM eventos_cms
-        WHERE estado = 'planificado' AND fecha_hora >= datetime('now', '-1 day')
+      env.BASE.prepare(`SELECT e.id, e.titulo, e.fecha_hora, e.fecha_fin, e.lugar, e.equipo_id, e.responsable_correo, e.estado, e.serie_id, e.generada_para,
+          (SELECT i.id FROM entradas_cms i WHERE i.evento_id = e.id LIMIT 1) AS entrada_id
+        FROM eventos_cms e
+        WHERE e.estado = 'planificado' AND e.fecha_hora >= datetime('now', '-1 day')
         ORDER BY fecha_hora ASC LIMIT 90`).all(),
-      env.BASE.prepare(`SELECT n.*, t.titulo AS tarea_titulo
+      env.BASE.prepare(`SELECT n.*, t.titulo AS tarea_titulo, t.descripcion AS tarea_descripcion
         FROM notificaciones_cms n
         LEFT JOIN tareas_cms t ON t.id = n.tarea_id
         WHERE n.usuario_correo = ?1
@@ -1648,6 +2802,17 @@ async function cms(contexto, sesion, ruta) {
         WHERE creado_en >= datetime('now', '-180 days') OR estado NOT IN ('completada', 'cancelada')
         ORDER BY creado_en DESC LIMIT 240`).all(),
     ])
+    const [unidades, vistasUnidades] = await Promise.all([
+      env.BASE.prepare(`SELECT u.*, e.nombre AS equipo_nombre, p.nombre AS unidad_padre_nombre
+        FROM unidades_operativas_cms u
+        JOIN equipos e ON e.id = u.equipo_id
+        LEFT JOIN unidades_operativas_cms p ON p.id = u.unidad_padre_id
+        WHERE u.estado != 'archivada'
+        ORDER BY e.nombre COLLATE NOCASE, u.orden, u.nombre COLLATE NOCASE`).all(),
+      env.BASE.prepare(`SELECT v.unidad_id, v.equipo_id, v.enfoque, e.nombre AS equipo_nombre
+        FROM unidades_vistas_equipo_cms v JOIN equipos e ON e.id = v.equipo_id
+        ORDER BY v.unidad_id, v.enfoque`).all(),
+    ])
     const deEquipo = (fila) => puedeVerEquipoCms(alcance, fila?.equipo_id)
     const equiposVisibles = alcance.global ? equipos.results : equipos.results.filter(deEquipo)
     const responsabilidadesVisibles = alcance.global ? responsabilidades.results : responsabilidades.results.filter(deEquipo)
@@ -1657,12 +2822,17 @@ async function cms(contexto, sesion, ruta) {
     const capacidadVisible = alcance.global ? capacidad.results : capacidad.results.filter((fila) => correosCapacidadVisibles.has(fila.usuario_correo))
     const documentosVisibles = documentos.results.filter((documento) => puedeVerDocumentoCms(sesion, documento)
       && (alcance.global || documento.sensibilidad === 'compartido' || deEquipo(documento)))
-    const eventosVisibles = alcance.global || alcance.perfil === 'consulta'
+    const eventosPorAlcance = alcance.global || alcance.perfil === 'consulta'
       ? eventos.results : eventos.results.filter(deEquipo)
-    const tareasVisibles = alcance.global ? tareas.results
+    const tareasPorAlcance = alcance.global ? tareas.results
       : alcance.perfil === 'integrante'
         ? tareas.results.filter((fila) => fila.responsable_correo === sesion.correo)
         : alcance.perfil === 'consulta' ? [] : tareas.results.filter(deEquipo)
+    const accesoRespuestas = puedeVerRespuestasCms(sesion)
+    const eventosVisibles = accesoRespuestas
+      ? eventosPorAlcance.map(({ entrada_id, ...evento }) => evento)
+      : eventosPorAlcance.map(eventoCmsSinDatosDeEntrada)
+    const tareasVisibles = tareasPorAlcance.map((tarea) => tareaCmsVisiblePara(tarea, sesion, accesoRespuestas))
     const metricasTareasVisibles = alcance.global ? metricasTareas.results
       : alcance.perfil === 'integrante'
         ? metricasTareas.results.filter((fila) => fila.responsable_correo === sesion.correo)
@@ -1673,10 +2843,19 @@ async function cms(contexto, sesion, ruta) {
     const reunionesVisibles = alcance.global ? reuniones.results : reuniones.results.filter(deEquipo)
     const decisionesVisibles = alcance.global ? decisiones.results : decisiones.results.filter(deEquipo)
     const puedeVerOperacion = alcance.global || alcance.perfil === 'coordinacion'
-    const entradasVisibles = puedeVerOperacion ? entradas.results.filter(deEquipo) : []
+    const entradasVisibles = puedeVerOperacion && accesoRespuestas ? entradas.results.filter(deEquipo) : []
     const formulariosVisibles = puedeVerOperacion ? formularios.results.filter(deEquipo) : []
     const alianzasVisibles = puedeVerOperacion ? alianzas.results.filter((fila) => alcance.global || deEquipo(fila)) : []
     const programasVisibles = puedeVerOperacion ? programas.results.filter((fila) => alcance.global || deEquipo(fila)) : []
+    const vistasPorUnidad = new Map()
+    for (const vista of vistasUnidades.results || []) {
+      if (!vistasPorUnidad.has(vista.unidad_id)) vistasPorUnidad.set(vista.unidad_id, [])
+      vistasPorUnidad.get(vista.unidad_id).push(vista)
+    }
+    const unidadesVisibles = puedeVerOperacion ? (unidades.results || []).filter((unidad) => alcance.global
+      || deEquipo(unidad)
+      || (vistasPorUnidad.get(unidad.id) || []).some((vista) => puedeVerEquipoCms(alcance, vista.equipo_id)))
+      .map((unidad) => ({ ...unidad, vistas: vistasPorUnidad.get(unidad.id) || [] })) : []
     const plantillasVisibles = puedeVerOperacion ? plantillas.results.filter(deEquipo) : []
     const riesgosVisibles = alcance.global ? riesgos.results : riesgos.results.filter((fila) => proyectoIds.has(fila.proyecto_id))
     const hitosVisibles = alcance.global ? hitos.results : hitos.results.filter((fila) => proyectoIds.has(fila.proyecto_id))
@@ -1684,16 +2863,20 @@ async function cms(contexto, sesion, ruta) {
     const recurrenciasVisibles = puedeVerOperacion ? recurrencias.results.filter(deEquipo) : []
     const automatizacionesVisibles = puedeVerOperacion ? automatizaciones.results.filter(deEquipo) : []
     const comunicadosVisibles = alcance.perfil === 'consulta' ? [] : comunicados.results.filter((fila) => alcance.global || !fila.equipo_id || deEquipo(fila))
-    const eventosParaConflictosVisibles = alcance.global || alcance.perfil === 'consulta'
+    const eventosParaConflictosPorAlcance = alcance.global || alcance.perfil === 'consulta'
       ? eventosParaConflictos.results : eventosParaConflictos.results.filter(deEquipo)
+    const eventosParaConflictosVisibles = accesoRespuestas
+      ? eventosParaConflictosPorAlcance.map(({ entrada_id, ...evento }) => evento)
+      : eventosParaConflictosPorAlcance.map(eventoCmsSinDatosDeEntrada)
+    const notificacionesVisibles = accesoRespuestas ? notificaciones.results : notificaciones.results.map(notificacionCmsSinDatosDeFormulario)
     return responder({
-      alcance: { perfil: alcance.perfil, equipos: equiposVisibles.map((fila) => fila.id), puede_gestionar: alcance.global || alcance.perfil === 'coordinacion' },
+      alcance: { perfil: alcance.perfil, global: alcance.global, equipos: equiposVisibles.map((fila) => fila.id), puede_gestionar: alcance.global || alcance.perfil === 'coordinacion', nivel_datos_personales: nivelDatosPersonalesDe(sesion), puede_ver_respuestas: accesoRespuestas },
       tareas: tareasVisibles, proyectos: proyectosVisibles, equipos: equiposVisibles, responsables: responsablesVisibles,
       responsabilidades: responsabilidadesVisibles, reuniones: reunionesVisibles, decisiones: decisionesVisibles,
-      documentos: documentosVisibles, entradas: entradasVisibles, formularios: formulariosVisibles, alianzas: alianzasVisibles, programas: programasVisibles,
+      documentos: documentosVisibles, entradas: entradasVisibles, formularios: formulariosVisibles, alianzas: alianzasVisibles, programas: programasVisibles, unidades: unidadesVisibles,
       eventos: eventosVisibles, plantillas: plantillasVisibles, riesgos: riesgosVisibles, hitos: hitosVisibles,
-      gastos: gastosVisibles, notificaciones: notificaciones.results, recurrencias: recurrenciasVisibles, automatizaciones: automatizacionesVisibles, alertasPospuestas: alertasPospuestas.results, comunicados: comunicadosVisibles, revisionSemanal, capacidad: capacidadVisible, metricasTareas: metricasTareasVisibles,
-      conflictos: conflictosAgendaCms(eventosParaConflictosVisibles).slice(0, 12),
+      gastos: gastosVisibles, notificaciones: notificacionesVisibles, recurrencias: recurrenciasVisibles, automatizaciones: automatizacionesVisibles, alertasPospuestas: alertasPospuestas.results, comunicados: comunicadosVisibles, revisionSemanal, capacidad: capacidadVisible, metricasTareas: metricasTareasVisibles,
+      conflictos: gruposConflictosAgendaCms(eventosParaConflictosVisibles).slice(0, 8),
     })
   }
 
@@ -1844,26 +3027,30 @@ async function cms(contexto, sesion, ruta) {
         LEFT JOIN usuarios u ON u.correo = t.responsable_correo WHERE t.id = ?1`).bind(id).first()
       if (!tarea) return error('No encontramos esa tarea.', 404)
       if (!puedeVerTareaCms(alcance, sesion, tarea)) return error('No tenés acceso a esta tarea.', 403)
+      const contenidoProtegido = !puedeVerRespuestasCms(sesion) && esTareaDerivadaDeEntradaCms(tarea)
       const [dependencias, dependientes, comentarios] = await Promise.all([
-        env.BASE.prepare(`SELECT p.id, p.titulo, p.estado, p.fecha_limite, p.equipo_id, p.responsable_correo, u.nombre AS responsable_nombre
+        env.BASE.prepare(`SELECT p.id, p.titulo, p.descripcion, p.estado, p.fecha_limite, p.equipo_id, p.responsable_correo, u.nombre AS responsable_nombre
           FROM tareas_dependencias_cms d JOIN tareas_cms p ON p.id = d.depende_de_id
           LEFT JOIN usuarios u ON u.correo = p.responsable_correo WHERE d.tarea_id = ?1 ORDER BY p.actualizado_en DESC`).bind(id).all(),
-        env.BASE.prepare(`SELECT t.id, t.titulo, t.estado, t.fecha_limite, t.equipo_id, t.responsable_correo, u.nombre AS responsable_nombre
+        env.BASE.prepare(`SELECT t.id, t.titulo, t.descripcion, t.estado, t.fecha_limite, t.equipo_id, t.responsable_correo, u.nombre AS responsable_nombre
           FROM tareas_dependencias_cms d JOIN tareas_cms t ON t.id = d.tarea_id
           LEFT JOIN usuarios u ON u.correo = t.responsable_correo WHERE d.depende_de_id = ?1 ORDER BY t.actualizado_en DESC`).bind(id).all(),
         env.BASE.prepare(`SELECT c.*, u.nombre AS creador_nombre FROM comentarios_tarea_cms c
           LEFT JOIN usuarios u ON u.correo = c.creado_por WHERE c.tarea_id = ?1 ORDER BY c.creado_en DESC LIMIT 30`).bind(id).all(),
       ])
-      return responder({ tarea,
-        dependencias: dependencias.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila)),
-        dependientes: dependientes.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila)),
-        comentarios: comentarios.results,
+      const proteger = (filas) => filas.map((fila) => tareaCmsVisiblePara(fila, sesion))
+      return responder({ tarea: tareaCmsVisiblePara(tarea, sesion),
+        dependencias: proteger(dependencias.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila))),
+        dependientes: proteger(dependientes.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila))),
+        comentarios: contenidoProtegido ? [] : comentarios.results,
+        contenido_protegido: contenidoProtegido,
       })
     }
     if (id && partes[3] === 'comentarios' && request.method === 'POST') {
-      const existe = await env.BASE.prepare('SELECT titulo, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(id).first()
+      const existe = await env.BASE.prepare('SELECT titulo, descripcion, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(id).first()
       if (!existe) return error('No encontramos esa tarea.', 404)
       if (!puedeGestionarTareaCms(alcance, sesion, existe)) return error('No podés comentar esta tarea.', 403)
+      if (esTareaDerivadaDeEntradaCms(existe) && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para comentar esta tarea.', 403)
       let datos; try { datos = await request.json() } catch { return error('El comentario no es válido.', 400) }
       const resultado = comentarioTareaCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
       const comentario = { id: crypto.randomUUID(), tarea_id: id, ...resultado.comentario, creado_por: sesion.correo }
@@ -1873,9 +3060,10 @@ async function cms(contexto, sesion, ruta) {
       return responder({ comentario }, 201)
     }
     if (id && partes[3] === 'dependencias' && request.method === 'POST') {
-      const tarea = await env.BASE.prepare('SELECT id, titulo, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(id).first()
+      const tarea = await env.BASE.prepare('SELECT id, titulo, descripcion, equipo_id, responsable_correo FROM tareas_cms WHERE id = ?1').bind(id).first()
       if (!tarea) return error('No encontramos esa tarea.', 404)
       if (!puedeGestionarEquipoCms(alcance, tarea.equipo_id)) return error('No podés cambiar las dependencias de esta tarea.', 403)
+      if (esTareaDerivadaDeEntradaCms(tarea) && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para cambiar esta tarea.', 403)
       let datos; try { datos = await request.json() } catch { return error('La dependencia no es válida.', 400) }
       const dependeDeId = textoCms(datos.depende_de_id, 100)
       if (!dependeDeId || dependeDeId === id) return error('Elegí otra tarea como dependencia.', 400)
@@ -1891,9 +3079,10 @@ async function cms(contexto, sesion, ruta) {
       return responder({ creada: true }, 201)
     }
     if (id && partes[3] === 'dependencias' && partes[4] && request.method === 'DELETE') {
-      const tarea = await env.BASE.prepare('SELECT id, equipo_id FROM tareas_cms WHERE id = ?1').bind(id).first()
+      const tarea = await env.BASE.prepare('SELECT id, descripcion, equipo_id FROM tareas_cms WHERE id = ?1').bind(id).first()
       if (!tarea) return error('No encontramos esa tarea.', 404)
       if (!puedeGestionarEquipoCms(alcance, tarea.equipo_id)) return error('No podés cambiar las dependencias de esta tarea.', 403)
+      if (esTareaDerivadaDeEntradaCms(tarea) && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para cambiar esta tarea.', 403)
       const eliminada = await env.BASE.prepare('DELETE FROM tareas_dependencias_cms WHERE tarea_id = ?1 AND depende_de_id = ?2').bind(id, partes[4]).run()
       if (!Number(eliminada.meta?.changes || 0)) return error('No encontramos esa dependencia.', 404)
       await registrar(env.BASE, sesion, 'quitar dependencia CMS', `tareas/${id}`, partes[4])
@@ -1914,7 +3103,8 @@ async function cms(contexto, sesion, ruta) {
         LEFT JOIN usuarios s ON s.correo = t.solicitante_correo
         ORDER BY t.estado IN ('completada', 'cancelada'), t.fecha_limite IS NULL, t.fecha_limite, t.actualizado_en DESC
       `).all()
-      return responder({ tareas: filas.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila)) })
+      const visibles = filas.results.filter((fila) => puedeVerTareaCms(alcance, sesion, fila))
+      return responder({ tareas: visibles.map((tarea) => tareaCmsVisiblePara(tarea, sesion)) })
     }
     if (request.method === 'POST') {
       let datos
@@ -1932,11 +3122,12 @@ async function cms(contexto, sesion, ruta) {
         ...resultado.tarea,
         responsable_correo: resultado.tarea.responsable_correo || responsableAutomatico,
         solicitante_correo: resultado.tarea.tipo === 'solicitud' ? sesion.correo : resultado.tarea.solicitante_correo,
+        seguimiento_personal_por: resultado.tarea.seguimiento_personal ? sesion.correo : null,
       }
       await env.BASE.prepare(`
-        INSERT INTO tareas_cms (id, titulo, descripcion, tipo, estado, prioridad, equipo_id, proyecto_id, evento_id, responsable_correo, solicitante_correo, fecha_limite, fecha_seguimiento, esfuerzo_horas, creado_por, completado_en)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, CASE WHEN ?5 = 'completada' THEN CURRENT_TIMESTAMP ELSE NULL END)
-      `).bind(tarea.id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.proyecto_id, tarea.evento_id, tarea.responsable_correo, tarea.solicitante_correo, tarea.fecha_limite, tarea.fecha_seguimiento, tarea.esfuerzo_horas, sesion.correo).run()
+        INSERT INTO tareas_cms (id, titulo, descripcion, tipo, estado, prioridad, equipo_id, unidad_id, proyecto_id, evento_id, responsable_correo, solicitante_correo, fecha_limite, fecha_seguimiento, esfuerzo_horas, seguimiento_personal, motivo_seguimiento, seguimiento_personal_por, creado_por, completado_en)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, CASE WHEN ?5 = 'completada' THEN CURRENT_TIMESTAMP ELSE NULL END)
+      `).bind(tarea.id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.unidad_id, tarea.proyecto_id, tarea.evento_id, tarea.responsable_correo, tarea.solicitante_correo, tarea.fecha_limite, tarea.fecha_seguimiento, tarea.esfuerzo_horas, tarea.seguimiento_personal, tarea.motivo_seguimiento, tarea.seguimiento_personal_por, sesion.correo).run()
       await notificarAsignacionTareaCms(env.BASE, tarea, sesion.correo, tarea.tipo === 'solicitud' ? 'solicitud_recibida' : 'asignacion_tarea')
       await registrar(env.BASE, sesion, 'crear tarea CMS', `tareas/${tarea.id}`, tarea.titulo)
       return responder({ tarea, asignada_automaticamente: Boolean(responsableAutomatico) }, 201)
@@ -1945,12 +3136,16 @@ async function cms(contexto, sesion, ruta) {
       const actual = await env.BASE.prepare('SELECT * FROM tareas_cms WHERE id = ?1').bind(id).first()
       if (!actual) return error('No encontramos esa tarea.', 404)
       if (!puedeGestionarTareaCms(alcance, sesion, actual)) return error('No podés modificar esta tarea.', 403)
+      if (esTareaDerivadaDeEntradaCms(actual) && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para modificar esta tarea.', 403)
       let datos
       try { datos = await request.json() } catch { return error('Los cambios de la tarea no son válidos.', 400) }
+      const comentarioCierrePedido = datos.comentario_cierre
+      delete datos.comentario_cierre
       if (alcance.perfil === 'integrante' && Object.keys(datos).some((campo) => !['estado', 'fecha_seguimiento'].includes(campo))) {
         return error('Como integrante solo podés actualizar el estado y el seguimiento de tu tarea.', 403)
       }
-      const resultado = tareaCmsDesde(datos, actual)
+      const datosPermitidos = datosTareaSinSeguimientoPersonalAjeno(datos, actual, sesion.correo)
+      const resultado = tareaCmsDesde(datosPermitidos, actual)
       if (resultado.error) return error(resultado.error, 400)
       if (!puedeGestionarTareaCms(alcance, sesion, resultado.tarea)) return error('No podés mover esta tarea a otro equipo.', 403)
       const tarea = {
@@ -1958,25 +3153,51 @@ async function cms(contexto, sesion, ruta) {
         solicitante_correo: resultado.tarea.tipo === 'solicitud'
           ? (actual.solicitante_correo || sesion.correo)
           : resultado.tarea.solicitante_correo,
+        seguimiento_personal_por: resultado.tarea.seguimiento_personal
+          ? (actual.seguimiento_personal_por || sesion.correo)
+          : null,
       }
+      const cierre = cierreTareaCmsDesde({ estado: tarea.estado, comentario_cierre: comentarioCierrePedido }, actual, sesion.correo)
       if (tarea.estado === 'completada') {
         const pendientes = await dependenciasPendientesDe(env.BASE, id)
-        if (pendientes.length) return error(`No podés completar esta tarea hasta cerrar: ${pendientes.map((fila) => fila.titulo).join(', ')}.`, 409)
+        const pendientesVisibles = puedeVerRespuestasCms(sesion) ? pendientes : pendientes.map(tareaCmsSinDatosDeFormulario)
+        if (pendientesVisibles.length) return error(`No podés completar esta tarea hasta cerrar: ${pendientesVisibles.map((fila) => fila.titulo).join(', ')}.`, 409)
       }
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, tarea)
       if (referenciaInvalida) return error(referenciaInvalida, 400)
-      await env.BASE.prepare(`
+      const consultasActualizacion = [env.BASE.prepare(`
         UPDATE tareas_cms SET titulo = ?2, descripcion = ?3, tipo = ?4, estado = ?5, prioridad = ?6,
-          equipo_id = ?7, proyecto_id = ?8, evento_id = ?9, responsable_correo = ?10, solicitante_correo = ?11,
-          fecha_limite = ?12, fecha_seguimiento = ?13, esfuerzo_horas = ?14, actualizado_en = CURRENT_TIMESTAMP,
+          equipo_id = ?7, unidad_id = ?8, proyecto_id = ?9, evento_id = ?10, responsable_correo = ?11, solicitante_correo = ?12,
+          fecha_limite = ?13, fecha_seguimiento = ?14, esfuerzo_horas = ?15, actualizado_en = CURRENT_TIMESTAMP,
+          seguimiento_personal = ?16, motivo_seguimiento = ?17, seguimiento_personal_por = ?18,
           completado_en = CASE WHEN ?5 = 'completada' AND completado_en IS NULL THEN CURRENT_TIMESTAMP WHEN ?5 != 'completada' THEN NULL ELSE completado_en END
         WHERE id = ?1
-      `).bind(id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.proyecto_id, tarea.evento_id, tarea.responsable_correo, tarea.solicitante_correo, tarea.fecha_limite, tarea.fecha_seguimiento, tarea.esfuerzo_horas).run()
+      `).bind(id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.unidad_id, tarea.proyecto_id, tarea.evento_id, tarea.responsable_correo, tarea.solicitante_correo, tarea.fecha_limite, tarea.fecha_seguimiento, tarea.esfuerzo_horas, tarea.seguimiento_personal, tarea.motivo_seguimiento, tarea.seguimiento_personal_por)]
+      if (cierre.comentario) {
+        consultasActualizacion.push(env.BASE.prepare('INSERT INTO comentarios_tarea_cms (id, tarea_id, contenido, creado_por) VALUES (?1, ?2, ?3, ?4)')
+          .bind(crypto.randomUUID(), id, cierre.comentario, sesion.correo))
+      }
+      if (cierre.resolver_aviso) {
+        consultasActualizacion.push(env.BASE.prepare(`UPDATE notificaciones_cms
+          SET leida_en = COALESCE(leida_en, CURRENT_TIMESTAMP), actualizado_en = CURRENT_TIMESTAMP
+          WHERE tarea_id = ?1 AND usuario_correo = ?2 AND leida_en IS NULL`)
+          .bind(id, sesion.correo))
+      }
+      if (cierre.notificar_a) {
+        const detalleCierre = cierre.comentario ? `${tarea.titulo}: ${cierre.comentario}` : tarea.titulo
+        consultasActualizacion.push(env.BASE.prepare(`INSERT INTO notificaciones_cms
+          (id, usuario_correo, tipo, tarea_id, titulo, detalle)
+          VALUES (?1, ?2, 'asignacion_tarea', ?3, 'Tarea completada', ?4)
+          ON CONFLICT(usuario_correo, tipo, tarea_id) DO UPDATE SET
+            titulo = excluded.titulo, detalle = excluded.detalle, leida_en = NULL, actualizado_en = CURRENT_TIMESTAMP`)
+          .bind(crypto.randomUUID(), cierre.notificar_a, id, detalleCierre))
+      }
+      await env.BASE.batch(consultasActualizacion)
       if (tarea.responsable_correo && tarea.responsable_correo !== actual.responsable_correo) {
         await notificarAsignacionTareaCms(env.BASE, { id, ...tarea }, sesion.correo, tarea.tipo === 'solicitud' ? 'solicitud_recibida' : 'asignacion_tarea')
       }
       await registrar(env.BASE, sesion, 'modificar tarea CMS', `tareas/${id}`, tarea.titulo)
-      return responder({ tarea: { id, ...tarea } })
+      return responder({ tarea: tareaCmsVisiblePara({ id, ...tarea }, sesion) })
     }
   }
 
@@ -2058,6 +3279,53 @@ async function cms(contexto, sesion, ruta) {
   }
 
   if (recurso === 'reuniones') {
+    if (id && partes[3] === 'cierre' && request.method === 'POST') {
+      const reunion = await env.BASE.prepare('SELECT * FROM reuniones_cms WHERE id = ?1').bind(id).first()
+      if (!reunion) return error('No encontramos esa reunión.', 404)
+      if (!puedeGestionarEquipoCms(alcance, reunion.equipo_id)) return error('No podés cerrar esta reunión.', 403)
+      if (reunion.cerrada_en) return error('Esta reunión ya fue cerrada. Podés registrar nuevas decisiones desde su tarjeta.', 409)
+      if (reunion.estado === 'cancelada') return error('Una reunión cancelada no se puede cerrar.', 409)
+      let datos
+      try { datos = await request.json() } catch { return error('Los datos del cierre no son válidos.', 400) }
+      const resultado = cierreReunionCmsDesde(datos)
+      if (resultado.error) return error(resultado.error, 400)
+      const cierre = resultado.cierre
+      const consultas = [env.BASE.prepare(`UPDATE reuniones_cms SET estado = 'realizada', minuta = ?2, resumen = ?3,
+        proxima_revision = ?4, cerrada_en = CURRENT_TIMESTAMP, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, cierre.minuta, cierre.resumen, cierre.proxima_revision)]
+      const decisiones = []
+      for (const acuerdo of cierre.acuerdos) {
+        const referenciaInvalida = await referenciasCmsValidas(env.BASE, { responsable_correo: acuerdo.responsable_correo })
+        if (referenciaInvalida) return error(referenciaInvalida, 400)
+        const decision = { id: crypto.randomUUID(), reunion_id: id, ...acuerdo, tarea_id: null }
+        if (acuerdo.crear_tarea) {
+          decision.tarea_id = crypto.randomUUID()
+          const tareaDeDecision = {
+            id: decision.tarea_id,
+            titulo: acuerdo.titulo,
+            descripcion: acuerdo.motivo,
+            tipo: 'tarea',
+            equipo_id: reunion.equipo_id,
+            proyecto_id: reunion.proyecto_id,
+            responsable_correo: acuerdo.responsable_correo,
+          }
+          consultas.push(env.BASE.prepare(`INSERT INTO tareas_cms
+            (id, titulo, descripcion, tipo, estado, prioridad, equipo_id, proyecto_id, responsable_correo, fecha_limite, creado_por)
+            VALUES (?1, ?2, ?3, 'tarea', 'pendiente', 'normal', ?4, ?5, ?6, ?7, ?8)`)
+            .bind(decision.tarea_id, acuerdo.titulo, acuerdo.motivo, reunion.equipo_id, reunion.proyecto_id, acuerdo.responsable_correo, acuerdo.fecha_limite, sesion.correo))
+          const notificacion = consultaNotificacionAsignacionTareaCms(env.BASE, tareaDeDecision, sesion.correo)
+          if (notificacion) consultas.push(notificacion)
+        }
+        consultas.push(env.BASE.prepare(`INSERT INTO decisiones_cms
+          (id, reunion_id, titulo, motivo, responsable_correo, estado, tarea_id, creado_por)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`)
+          .bind(decision.id, id, acuerdo.titulo, acuerdo.motivo, acuerdo.responsable_correo, acuerdo.estado, decision.tarea_id, sesion.correo))
+        decisiones.push(decision)
+      }
+      await env.BASE.batch(consultas)
+      await registrar(env.BASE, sesion, 'cerrar reunión CMS', `reuniones/${id}`, `${reunion.titulo}: ${decisiones.length} acuerdos`)
+      return responder({ reunion: { ...reunion, estado: 'realizada', minuta: cierre.minuta, resumen: cierre.resumen, proxima_revision: cierre.proxima_revision }, decisiones })
+    }
     if (id && partes[3] === 'decisiones' && request.method === 'POST') {
       const reunion = await env.BASE.prepare('SELECT id, equipo_id FROM reuniones_cms WHERE id = ?1').bind(id).first()
       if (!reunion) return error('No encontramos esa reunión.', 404)
@@ -2087,9 +3355,9 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const reuniones = (recurrente ? resultado.reuniones : [resultado.reunion]).map((reunion) => ({ id: crypto.randomUUID(), ...reunion }))
       await env.BASE.batch(reuniones.map((reunion) => env.BASE.prepare(`INSERT INTO reuniones_cms
-        (id, titulo, objetivo, equipo_id, proyecto_id, fecha_hora, lugar, estado, preparacion, minuta, resumen, creado_por, serie_id, generada_para)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`)
-        .bind(reunion.id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen, sesion.correo, reunion.serie_id ?? null, reunion.generada_para ?? null)))
+        (id, titulo, objetivo, equipo_id, unidad_id, proyecto_id, fecha_hora, lugar, estado, preparacion, minuta, resumen, creado_por, serie_id, generada_para)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`)
+        .bind(reunion.id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen, sesion.correo, reunion.serie_id ?? null, reunion.generada_para ?? null)))
       await registrar(env.BASE, sesion, recurrente ? 'crear serie de reuniones CMS' : 'crear reunión CMS', recurrente ? `reuniones/serie/${reuniones[0].serie_id}` : `reuniones/${reuniones[0].id}`, recurrente ? `${reuniones[0].titulo}, ${reuniones.length} fechas` : reuniones[0].titulo)
       return responder(recurrente ? { reuniones, cantidad: reuniones.length } : { reunion: reuniones[0] }, 201)
     }
@@ -2105,9 +3373,9 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const reunion = resultado.reunion
       if (!puedeGestionarEquipoCms(alcance, reunion.equipo_id)) return error('No podés mover esta reunión a otro equipo.', 403)
-      await env.BASE.prepare(`UPDATE reuniones_cms SET titulo = ?2, objetivo = ?3, equipo_id = ?4, proyecto_id = ?5, fecha_hora = ?6,
-        lugar = ?7, estado = ?8, preparacion = ?9, minuta = ?10, resumen = ?11, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen).run()
+      await env.BASE.prepare(`UPDATE reuniones_cms SET titulo = ?2, objetivo = ?3, equipo_id = ?4, unidad_id = ?5, proyecto_id = ?6, fecha_hora = ?7,
+        lugar = ?8, estado = ?9, preparacion = ?10, minuta = ?11, resumen = ?12, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen).run()
       await registrar(env.BASE, sesion, 'modificar reunión CMS', `reuniones/${id}`, reunion.titulo)
       return responder({ reunion: { id, ...reunion } })
     }
@@ -2120,16 +3388,21 @@ async function cms(contexto, sesion, ruta) {
       const [anio, numeroMes] = mes.split('-').map(Number)
       const inicio = `${mes}-01T00:00`
       const fin = new Date(Date.UTC(anio, numeroMes, 1)).toISOString().slice(0, 16)
-      const filas = await env.BASE.prepare(`SELECT e.*, q.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS responsable_nombre
+      const filas = await env.BASE.prepare(`SELECT e.*, q.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS responsable_nombre, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla,
+          (SELECT i.id FROM entradas_cms i WHERE i.evento_id = e.id LIMIT 1) AS entrada_id
         FROM eventos_cms e
         LEFT JOIN equipos q ON q.id = e.equipo_id
         LEFT JOIN proyectos_cms p ON p.id = e.proyecto_id
         LEFT JOIN usuarios u ON u.correo = e.responsable_correo
+        LEFT JOIN unidades_operativas_cms o ON o.id = e.unidad_id
         WHERE e.estado = 'planificado' AND e.fecha_hora >= ?1 AND e.fecha_hora < ?2
         ORDER BY e.fecha_hora ASC`).bind(inicio, fin).all()
       const visibles = alcance.global || alcance.perfil === 'consulta'
         ? filas.results : filas.results.filter((fila) => puedeVerEquipoCms(alcance, fila.equipo_id))
-      return responder({ eventos: visibles })
+      const eventos = puedeVerRespuestasCms(sesion)
+        ? visibles.map(({ entrada_id, ...evento }) => evento)
+        : visibles.map(eventoCmsSinDatosDeEntrada)
+      return responder({ eventos })
     }
     if (request.method === 'POST') {
       let datos
@@ -2143,16 +3416,19 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const eventos = (recurrente ? resultado.eventos : [resultado.evento]).map((evento) => ({ id: crypto.randomUUID(), ...evento }))
       await env.BASE.batch(eventos.map((evento) => env.BASE.prepare(`INSERT INTO eventos_cms
-        (id, titulo, descripcion, fecha_hora, fecha_fin, lugar, equipo_id, proyecto_id, responsable_correo, estado, tipo, creado_por, serie_id, generada_para)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`)
-        .bind(evento.id, evento.titulo, evento.descripcion, evento.fecha_hora, evento.fecha_fin, evento.lugar, evento.equipo_id, evento.proyecto_id, evento.responsable_correo, evento.estado, evento.tipo, sesion.correo, evento.serie_id ?? null, evento.generada_para ?? null)))
+        (id, titulo, descripcion, fecha_hora, fecha_fin, lugar, equipo_id, unidad_id, proyecto_id, responsable_correo, estado, tipo, creado_por, serie_id, generada_para)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`)
+        .bind(evento.id, evento.titulo, evento.descripcion, evento.fecha_hora, evento.fecha_fin, evento.lugar, evento.equipo_id, evento.unidad_id, evento.proyecto_id, evento.responsable_correo, evento.estado, evento.tipo, sesion.correo, evento.serie_id ?? null, evento.generada_para ?? null)))
       await registrar(env.BASE, sesion, recurrente ? 'crear serie de actividades CMS' : 'crear actividad CMS', recurrente ? `eventos/serie/${eventos[0].serie_id}` : `eventos/${eventos[0].id}`, recurrente ? `${eventos[0].titulo}, ${eventos.length} fechas` : eventos[0].titulo)
       return responder(recurrente ? { eventos, cantidad: eventos.length } : { evento: eventos[0] }, 201)
     }
     if (request.method === 'PATCH' && id) {
-      const actual = await env.BASE.prepare('SELECT * FROM eventos_cms WHERE id = ?1').bind(id).first()
+      const actual = await env.BASE.prepare(`SELECT e.*,
+        (SELECT i.id FROM entradas_cms i WHERE i.evento_id = e.id LIMIT 1) AS entrada_id
+        FROM eventos_cms e WHERE e.id = ?1`).bind(id).first()
       if (!actual) return error('No encontramos esa actividad.', 404)
       if (!puedeGestionarEquipoCms(alcance, actual.equipo_id)) return error('No podés modificar esta actividad.', 403)
+      if (actual.entrada_id && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para modificar esta actividad.', 403)
       let datos
       try { datos = await request.json() } catch { return error('Los cambios de la actividad no son válidos.', 400) }
       const resultado = eventoCmsDesde(datos, actual)
@@ -2162,8 +3438,8 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const evento = resultado.evento
       await env.BASE.prepare(`UPDATE eventos_cms SET titulo = ?2, descripcion = ?3, fecha_hora = ?4, fecha_fin = ?5, lugar = ?6,
-        equipo_id = ?7, proyecto_id = ?8, responsable_correo = ?9, estado = ?10, tipo = ?11, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, evento.titulo, evento.descripcion, evento.fecha_hora, evento.fecha_fin, evento.lugar, evento.equipo_id, evento.proyecto_id, evento.responsable_correo, evento.estado, evento.tipo).run()
+        equipo_id = ?7, unidad_id = ?8, proyecto_id = ?9, responsable_correo = ?10, estado = ?11, tipo = ?12, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, evento.titulo, evento.descripcion, evento.fecha_hora, evento.fecha_fin, evento.lugar, evento.equipo_id, evento.unidad_id, evento.proyecto_id, evento.responsable_correo, evento.estado, evento.tipo).run()
       await registrar(env.BASE, sesion, 'modificar actividad CMS', `eventos/${id}`, evento.titulo)
       return responder({ evento: { id, ...evento } })
     }
@@ -2284,7 +3560,9 @@ async function cms(contexto, sesion, ruta) {
       const [tareas, eventos, reuniones, decisiones, documentos, riesgos, hitos, gastos] = await Promise.all([
         env.BASE.prepare(`SELECT t.*, u.nombre AS responsable_nombre FROM tareas_cms t LEFT JOIN usuarios u ON u.correo = t.responsable_correo
           WHERE t.proyecto_id = ?1 ORDER BY t.estado IN ('completada', 'cancelada'), t.fecha_limite IS NULL, t.fecha_limite, t.actualizado_en DESC`).bind(id).all(),
-        env.BASE.prepare(`SELECT e.*, u.nombre AS responsable_nombre FROM eventos_cms e LEFT JOIN usuarios u ON u.correo = e.responsable_correo
+        env.BASE.prepare(`SELECT e.*, u.nombre AS responsable_nombre,
+          (SELECT i.id FROM entradas_cms i WHERE i.evento_id = e.id LIMIT 1) AS entrada_id
+          FROM eventos_cms e LEFT JOIN usuarios u ON u.correo = e.responsable_correo
           WHERE e.proyecto_id = ?1 ORDER BY e.fecha_hora DESC`).bind(id).all(),
         env.BASE.prepare(`SELECT r.*, u.nombre AS creador_nombre FROM reuniones_cms r LEFT JOIN usuarios u ON u.correo = r.creado_por
           WHERE r.proyecto_id = ?1 ORDER BY r.fecha_hora DESC`).bind(id).all(),
@@ -2298,7 +3576,12 @@ async function cms(contexto, sesion, ruta) {
           WHERE h.proyecto_id = ?1 ORDER BY h.estado = 'cancelado', h.fecha_objetivo IS NULL, h.fecha_objetivo, h.actualizado_en DESC`).bind(id).all(),
         env.BASE.prepare('SELECT * FROM proyecto_gastos_cms WHERE proyecto_id = ?1 ORDER BY fecha DESC, creado_en DESC').bind(id).all(),
       ])
-      return responder({ proyecto, tareas: tareas.results, eventos: eventos.results, reuniones: reuniones.results, decisiones: decisiones.results, documentos: documentos.results.filter((documento) => puedeVerDocumentoCms(sesion, documento)), riesgos: riesgos.results, hitos: hitos.results, gastos: gastos.results })
+      const accesoRespuestas = puedeVerRespuestasCms(sesion)
+      const tareasVisibles = tareas.results.map((tarea) => tareaCmsVisiblePara(tarea, sesion, accesoRespuestas))
+      const eventosVisibles = accesoRespuestas
+        ? eventos.results.map(({ entrada_id, ...evento }) => evento)
+        : eventos.results.map(eventoCmsSinDatosDeEntrada)
+      return responder({ proyecto, tareas: tareasVisibles, eventos: eventosVisibles, reuniones: reuniones.results, decisiones: decisiones.results, documentos: documentos.results.filter((documento) => puedeVerDocumentoCms(sesion, documento)), riesgos: riesgos.results, hitos: hitos.results, gastos: gastos.results })
     }
     if (id && partes[3] === 'hitos' && request.method === 'POST') {
       const proyecto = await env.BASE.prepare("SELECT id, equipo_id FROM proyectos_cms WHERE id = ?1 AND estado != 'cerrado'").bind(id).first()
@@ -2368,9 +3651,9 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const proyecto = { id: crypto.randomUUID(), ...resultado.proyecto }
       await env.BASE.prepare(`INSERT INTO proyectos_cms
-        (id, titulo, objetivo, programa_id, equipo_id, responsable_correo, estado, prioridad, fecha_inicio, fecha_fin, presupuesto, notas, creado_por)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`)
-        .bind(proyecto.id, proyecto.titulo, proyecto.objetivo, proyecto.programa_id, proyecto.equipo_id, proyecto.responsable_correo, proyecto.estado, proyecto.prioridad, proyecto.fecha_inicio, proyecto.fecha_fin, proyecto.presupuesto, proyecto.notas, sesion.correo).run()
+        (id, titulo, objetivo, programa_id, equipo_id, unidad_id, responsable_correo, estado, prioridad, fecha_inicio, fecha_fin, presupuesto, notas, creado_por)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)`)
+        .bind(proyecto.id, proyecto.titulo, proyecto.objetivo, proyecto.programa_id, proyecto.equipo_id, proyecto.unidad_id, proyecto.responsable_correo, proyecto.estado, proyecto.prioridad, proyecto.fecha_inicio, proyecto.fecha_fin, proyecto.presupuesto, proyecto.notas, sesion.correo).run()
       await registrar(env.BASE, sesion, 'crear proyecto CMS', `proyectos/${proyecto.id}`, proyecto.titulo)
       return responder({ proyecto }, 201)
     }
@@ -2386,9 +3669,9 @@ async function cms(contexto, sesion, ruta) {
       if (!puedeGestionarEquipoCms(alcance, proyecto.equipo_id)) return error('No podés mover este proyecto a otro equipo.', 403)
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, proyecto)
       if (referenciaInvalida) return error(referenciaInvalida, 400)
-      await env.BASE.prepare(`UPDATE proyectos_cms SET titulo = ?2, objetivo = ?3, programa_id = ?4, equipo_id = ?5, responsable_correo = ?6,
-        estado = ?7, prioridad = ?8, fecha_inicio = ?9, fecha_fin = ?10, presupuesto = ?11, notas = ?12, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, proyecto.titulo, proyecto.objetivo, proyecto.programa_id, proyecto.equipo_id, proyecto.responsable_correo, proyecto.estado, proyecto.prioridad, proyecto.fecha_inicio, proyecto.fecha_fin, proyecto.presupuesto, proyecto.notas).run()
+      await env.BASE.prepare(`UPDATE proyectos_cms SET titulo = ?2, objetivo = ?3, programa_id = ?4, equipo_id = ?5, unidad_id = ?6, responsable_correo = ?7,
+        estado = ?8, prioridad = ?9, fecha_inicio = ?10, fecha_fin = ?11, presupuesto = ?12, notas = ?13, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, proyecto.titulo, proyecto.objetivo, proyecto.programa_id, proyecto.equipo_id, proyecto.unidad_id, proyecto.responsable_correo, proyecto.estado, proyecto.prioridad, proyecto.fecha_inicio, proyecto.fecha_fin, proyecto.presupuesto, proyecto.notas).run()
       await registrar(env.BASE, sesion, 'modificar proyecto CMS', `proyectos/${id}`, proyecto.titulo)
       return responder({ proyecto: { id, ...proyecto } })
     }
@@ -2396,7 +3679,7 @@ async function cms(contexto, sesion, ruta) {
 
   if (recurso === 'documentos') {
     if (request.method === 'GET') {
-      const filas = await env.BASE.prepare(`SELECT d.*, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo FROM documentos_cms d LEFT JOIN equipos e ON e.id = d.equipo_id LEFT JOIN proyectos_cms p ON p.id = d.proyecto_id ORDER BY d.actualizado_en DESC`).all()
+      const filas = await env.BASE.prepare(`SELECT d.*, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla FROM documentos_cms d LEFT JOIN equipos e ON e.id = d.equipo_id LEFT JOIN proyectos_cms p ON p.id = d.proyecto_id LEFT JOIN unidades_operativas_cms o ON o.id = d.unidad_id ORDER BY d.actualizado_en DESC`).all()
       return responder({ documentos: filas.results.filter((documento) => puedeVerDocumentoCms(sesion, documento)
         && (alcance.global || documento.sensibilidad === 'compartido' || puedeVerEquipoCms(alcance, documento.equipo_id))) })
     }
@@ -2407,7 +3690,7 @@ async function cms(contexto, sesion, ruta) {
       if (resultado.documento.sensibilidad === 'restringido' && !esAdmin(sesion)) return error('Solo la administración puede marcar un documento como restringido.', 403)
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, resultado.documento); if (referenciaInvalida) return error(referenciaInvalida, 400)
       const documento = { id: crypto.randomUUID(), ...resultado.documento }
-      await env.BASE.prepare('INSERT INTO documentos_cms (id, titulo, descripcion, tipo, url, sensibilidad, equipo_id, proyecto_id, creado_por) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)').bind(documento.id, documento.titulo, documento.descripcion, documento.tipo, documento.url, documento.sensibilidad, documento.equipo_id, documento.proyecto_id, sesion.correo).run()
+      await env.BASE.prepare('INSERT INTO documentos_cms (id, titulo, descripcion, tipo, url, sensibilidad, equipo_id, unidad_id, proyecto_id, creado_por) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)').bind(documento.id, documento.titulo, documento.descripcion, documento.tipo, documento.url, documento.sensibilidad, documento.equipo_id, documento.unidad_id, documento.proyecto_id, sesion.correo).run()
       await registrar(env.BASE, sesion, 'agregar documento CMS', `documentos/${documento.id}`, documento.titulo)
       return responder({ documento }, 201)
     }
@@ -2472,7 +3755,113 @@ async function cms(contexto, sesion, ruta) {
     }
   }
 
+  if (recurso === 'unidades') {
+    if (request.method === 'GET' && !id) {
+      const filas = await env.BASE.prepare(`SELECT u.*, e.nombre AS equipo_nombre, p.nombre AS unidad_padre_nombre
+        FROM unidades_operativas_cms u JOIN equipos e ON e.id = u.equipo_id
+        LEFT JOIN unidades_operativas_cms p ON p.id = u.unidad_padre_id
+        WHERE u.estado != 'archivada' ORDER BY e.nombre COLLATE NOCASE, u.orden, u.nombre COLLATE NOCASE`).all()
+      return responder({ unidades: alcance.global ? filas.results : filas.results.filter((fila) => puedeVerEquipoCms(alcance, fila.equipo_id)) })
+    }
+    if (request.method === 'PUT' && id && partes[3] === 'vistas') {
+      const unidad = await env.BASE.prepare("SELECT id, equipo_id FROM unidades_operativas_cms WHERE id = ?1 AND estado != 'archivada'").bind(id).first()
+      if (!unidad) return error('No encontramos esa unidad.', 404)
+      let datos; try { datos = await request.json() } catch { return error('Las vistas compartidas no son válidas.', 400) }
+      if (!Array.isArray(datos.vistas)) return error('Enviá una lista de vistas compartidas.', 400)
+      const enfoques = new Set(['operativo', 'financiero', 'comunicacion'])
+      const vistas = []
+      const claves = new Set()
+      for (const fila of datos.vistas) {
+        const equipoId = textoCms(fila?.equipo_id, 100)
+        const enfoque = textoCms(fila?.enfoque, 30)
+        if (!equipoId || !enfoques.has(enfoque)) return error('Cada vista necesita un área y un enfoque válidos.', 400)
+        if (equipoId === unidad.equipo_id) return error('El área responsable ya muestra la unidad y no necesita una vista compartida.', 400)
+        const clave = `${equipoId}:${enfoque}`
+        if (claves.has(clave)) return error('La misma vista compartida está repetida.', 400)
+        claves.add(clave); vistas.push({ equipo_id: equipoId, enfoque })
+      }
+      if (vistas.length) {
+        const equipos = await env.BASE.prepare(`SELECT id FROM equipos WHERE activo = 1 AND id IN (${vistas.map((_, indice) => `?${indice + 1}`).join(', ')})`)
+          .bind(...vistas.map((vista) => vista.equipo_id)).all()
+        if ((equipos.results || []).length !== new Set(vistas.map((vista) => vista.equipo_id)).size) return error('Una de las áreas compartidas ya no está disponible.', 400)
+      }
+      await env.BASE.batch([
+        env.BASE.prepare('DELETE FROM unidades_vistas_equipo_cms WHERE unidad_id = ?1').bind(id),
+        ...vistas.map((vista) => env.BASE.prepare('INSERT INTO unidades_vistas_equipo_cms (unidad_id, equipo_id, enfoque) VALUES (?1, ?2, ?3)').bind(id, vista.equipo_id, vista.enfoque)),
+      ])
+      await registrar(env.BASE, sesion, 'configurar vistas de unidad CMS', `unidades/${id}/vistas`, `${vistas.length} vistas`)
+      return responder({ vistas })
+    }
+    if (request.method === 'POST' && !id) {
+      let datos; try { datos = await request.json() } catch { return error('Los datos de la unidad no son válidos.', 400) }
+      const resultado = unidadOperativaCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
+      const unidad = { id: crypto.randomUUID(), ...resultado.unidad }
+      const equipo = await env.BASE.prepare('SELECT id FROM equipos WHERE id = ?1 AND activo = 1').bind(unidad.equipo_id).first()
+      if (!equipo) return error('El área responsable ya no está disponible.', 400)
+      if (unidad.unidad_padre_id) {
+        const padre = await env.BASE.prepare("SELECT id, equipo_id FROM unidades_operativas_cms WHERE id = ?1 AND estado != 'archivada'").bind(unidad.unidad_padre_id).first()
+        if (!padre || padre.equipo_id !== unidad.equipo_id) return error('La unidad superior debe pertenecer a la misma área.', 400)
+      }
+      try {
+        await env.BASE.prepare(`INSERT INTO unidades_operativas_cms
+          (id, clave, nombre, sigla, descripcion, tipo, equipo_id, unidad_padre_id, color, orden, estado, creado_por)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`)
+          .bind(unidad.id, unidad.clave, unidad.nombre, unidad.sigla, unidad.descripcion, unidad.tipo, unidad.equipo_id, unidad.unidad_padre_id, unidad.color, unidad.orden, unidad.estado, sesion.correo).run()
+      } catch { return error('Ya existe una unidad con esa clave.', 409) }
+      await registrar(env.BASE, sesion, 'crear unidad operativa CMS', `unidades/${unidad.id}`, unidad.nombre)
+      return responder({ unidad }, 201)
+    }
+    if (request.method === 'PATCH' && id) {
+      const actual = await env.BASE.prepare('SELECT * FROM unidades_operativas_cms WHERE id = ?1').bind(id).first()
+      if (!actual) return error('No encontramos esa unidad.', 404)
+      let datos; try { datos = await request.json() } catch { return error('Los cambios de la unidad no son válidos.', 400) }
+      const resultado = unidadOperativaCmsDesde(datos, actual); if (resultado.error) return error(resultado.error, 400)
+      const unidad = resultado.unidad
+      if (unidad.unidad_padre_id === id) return error('Una unidad no puede depender de sí misma.', 400)
+      const equipo = await env.BASE.prepare('SELECT id FROM equipos WHERE id = ?1 AND activo = 1').bind(unidad.equipo_id).first()
+      if (!equipo) return error('El área responsable ya no está disponible.', 400)
+      if (unidad.unidad_padre_id) {
+        const padre = await env.BASE.prepare("SELECT id, equipo_id FROM unidades_operativas_cms WHERE id = ?1 AND estado != 'archivada'").bind(unidad.unidad_padre_id).first()
+        if (!padre || padre.equipo_id !== unidad.equipo_id) return error('La unidad superior debe pertenecer a la misma área.', 400)
+      }
+      try {
+        await env.BASE.prepare(`UPDATE unidades_operativas_cms SET clave = ?2, nombre = ?3, sigla = ?4, descripcion = ?5,
+          tipo = ?6, equipo_id = ?7, unidad_padre_id = ?8, color = ?9, orden = ?10, estado = ?11,
+          actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+          .bind(id, unidad.clave, unidad.nombre, unidad.sigla, unidad.descripcion, unidad.tipo, unidad.equipo_id, unidad.unidad_padre_id, unidad.color, unidad.orden, unidad.estado).run()
+      } catch { return error('Ya existe una unidad con esa clave.', 409) }
+      await registrar(env.BASE, sesion, 'modificar unidad operativa CMS', `unidades/${id}`, unidad.nombre)
+      return responder({ unidad: { id, ...unidad } })
+    }
+  }
+
   if (recurso === 'formularios') {
+    if (request.method === 'POST' && id === 'ejemplos') {
+      if (!alcance.global) return error('Solo Dirección o Administración puede preparar los formularios de prueba.', 403)
+      const filasEquipos = await env.BASE.prepare("SELECT id, clave FROM equipos WHERE activo = 1 AND clave IN ('familias', 'deportes', 'capacitaciones', 'administracion')").all()
+      const equipos = Object.fromEntries((filasEquipos.results || []).map((equipo) => [equipo.clave, equipo.id]))
+      const faltantes = ['familias', 'deportes', 'capacitaciones', 'administracion'].filter((clave) => !equipos[clave])
+      if (faltantes.length) return error(`Faltan equipos institucionales para preparar las pruebas: ${faltantes.join(', ')}.`, 409)
+      const plantillas = formulariosPruebaCms(equipos)
+      const existentes = await env.BASE.prepare(`SELECT id FROM formularios_cms WHERE id IN (${plantillas.map((_, indice) => `?${indice + 1}`).join(', ')})`).bind(...plantillas.map((formulario) => formulario.id)).all()
+      const idsExistentes = new Set((existentes.results || []).map((formulario) => formulario.id))
+      const nuevos = plantillas.filter((formulario) => !idsExistentes.has(formulario.id)).map((plantilla) => {
+        const resultado = formularioCmsDesde(plantilla)
+        if (resultado.error) throw new Error(resultado.error)
+        const formulario = resultado.formulario
+        return env.BASE.prepare(`INSERT INTO formularios_cms
+          (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json,
+            finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, creado_por)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`)
+          .bind(plantilla.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado,
+            formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json,
+            formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0,
+            formulario.destino_respuesta, sesion.correo)
+      })
+      if (nuevos.length) await env.BASE.batch(nuevos)
+      await registrar(env.BASE, sesion, 'preparar formularios de prueba', 'formularios/ejemplos', `${nuevos.length} creados`)
+      return responder({ creados: nuevos.length, disponibles: plantillas.length })
+    }
     if (request.method === 'POST' && !id) {
       let datos; try { datos = await request.json() } catch { return error('Los datos del formulario no son válidos.', 400) }
       const resultado = formularioCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
@@ -2480,9 +3869,10 @@ async function cms(contexto, sesion, ruta) {
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, resultado.formulario); if (referenciaInvalida) return error(referenciaInvalida, 400)
       const formulario = { id: crypto.randomUUID(), ...resultado.formulario }
       await env.BASE.prepare(`INSERT INTO formularios_cms
-        (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json, creado_por)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`)
-        .bind(formulario.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, sesion.correo).run()
+        (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, unidad_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json,
+          finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, creado_por)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`)
+        .bind(formulario.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta, sesion.correo).run()
       await registrar(env.BASE, sesion, 'crear formulario CMS', `formularios/${formulario.id}`, formulario.titulo)
       return responder({ formulario }, 201)
     }
@@ -2496,24 +3886,28 @@ async function cms(contexto, sesion, ruta) {
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, resultado.formulario); if (referenciaInvalida) return error(referenciaInvalida, 400)
       const formulario = resultado.formulario
       await env.BASE.prepare(`UPDATE formularios_cms SET titulo = ?2, descripcion = ?3, tipo = ?4, visibilidad = ?5, estado = ?6,
-        equipo_id = ?7, equipo_solicitante_id = ?8, prioridad = ?9, proyecto_id = ?10, campos_json = ?11, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json).run()
+        equipo_id = ?7, unidad_id = ?8, equipo_solicitante_id = ?9, prioridad = ?10, proyecto_id = ?11, campos_json = ?12,
+        finalidad = ?13, responsable_datos = ?14, conservacion_meses = ?15, requiere_consentimiento = ?16,
+        destino_respuesta = ?17, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta).run()
       await registrar(env.BASE, sesion, 'modificar formulario CMS', `formularios/${id}`, formulario.titulo)
       return responder({ formulario: { id, ...formulario } })
     }
     if (id && partes[3] === 'respuestas' && request.method === 'POST') {
+      if (!puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para registrar una respuesta.', 403)
       const formulario = await env.BASE.prepare('SELECT * FROM formularios_cms WHERE id = ?1 AND estado = ?2').bind(id, 'activa').first()
       if (!formulario) return error('Este formulario no está disponible.', 404)
       if (!puedeGestionarEquipoCms(alcance, formulario.equipo_id)) return error('No podés registrar una respuesta para este formulario.', 403)
       let datos; try { datos = await request.json() } catch { return error('La respuesta no es válida.', 400) }
       const resultado = respuestaFormularioCmsDesde(datos, formulario); if (resultado.error) return error(resultado.error, 400)
       const derivada = await derivarEntradaCms(env.BASE, resultado.entrada, sesion, formulario.id)
-      await registrar(env.BASE, sesion, 'recibir formulario interno', `formularios/${id}`, derivada.entrada.nombre)
+      await registrar(env.BASE, sesion, 'recibir formulario interno', `formularios/${id}`, 'Respuesta recibida')
       return responder(derivada, 201)
     }
   }
 
   if (recurso === 'entradas') {
+    if (request.method !== 'GET' && !puedeVerRespuestasCms(sesion)) return error('Necesitás acceso vigente a datos personales para gestionar entradas.', 403)
     if (request.method === 'POST') {
       let datos; try { datos = await request.json() } catch { return error('Los datos de la entrada no son válidos.', 400) }
       const resultado = entradaCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
@@ -2545,11 +3939,49 @@ async function cms(contexto, sesion, ruta) {
       await registrar(env.BASE, sesion, 'preparar entrada en agenda CMS', `entradas/${id}`, evento.titulo)
       return responder({ evento }, 201)
     }
+    if (id && partes[3] === 'cumplir' && request.method === 'POST') {
+      const actual = await env.BASE.prepare('SELECT * FROM entradas_cms WHERE id = ?1').bind(id).first()
+      if (!actual) return error('No encontramos esa respuesta.', 404)
+      if (!puedeGestionarEquipoCms(alcance, actual.equipo_id)) return error('No podés completar esta respuesta.', 403)
+      if (actual.estado === 'cerrada') return error('Esta respuesta ya figura como cumplida.', 409)
+      let datos; try { datos = await request.json() } catch { return error('Los datos del cumplimiento no son válidos.', 400) }
+      const resultado = cumplimientoEntradaCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
+      const cumplimiento = resultado.cumplimiento
+      await env.BASE.batch([
+        env.BASE.prepare(`UPDATE entradas_cms SET estado = 'cerrada', cumplida_en = ?2, cumplida_por = ?3,
+          cumplida_medio = ?4, cumplida_motivo = ?5, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+          .bind(id, cumplimiento.fecha, sesion.correo, cumplimiento.medio, cumplimiento.motivo),
+        env.BASE.prepare(`INSERT INTO historial_entradas_cms (id, entrada_id, accion, fecha, medio, motivo, actor_correo)
+          VALUES (?1, ?2, 'cumplida', ?3, ?4, ?5, ?6)`)
+          .bind(crypto.randomUUID(), id, cumplimiento.fecha, cumplimiento.medio, cumplimiento.motivo, sesion.correo),
+      ])
+      await registrar(env.BASE, sesion, 'cumplir respuesta de formulario', `entradas/${id}`, `${cumplimiento.medio}: ${cumplimiento.motivo}`)
+      return responder({ entrada: { ...actual, estado: 'cerrada', cumplida_en: cumplimiento.fecha, cumplida_por: sesion.correo, cumplida_medio: cumplimiento.medio, cumplida_motivo: cumplimiento.motivo } })
+    }
+    if (id && partes[3] === 'reabrir' && request.method === 'POST') {
+      const actual = await env.BASE.prepare('SELECT * FROM entradas_cms WHERE id = ?1').bind(id).first()
+      if (!actual) return error('No encontramos esa respuesta.', 404)
+      if (!puedeGestionarEquipoCms(alcance, actual.equipo_id)) return error('No podés reabrir esta respuesta.', 403)
+      if (actual.estado !== 'cerrada') return error('Esta respuesta ya está abierta.', 409)
+      let datos; try { datos = await request.json() } catch { return error('Los datos de reapertura no son válidos.', 400) }
+      const resultado = reaperturaEntradaCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
+      const fecha = fechaActualCms()
+      await env.BASE.batch([
+        env.BASE.prepare(`UPDATE entradas_cms SET estado = 'derivada', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`).bind(id),
+        env.BASE.prepare(`INSERT INTO historial_entradas_cms (id, entrada_id, accion, fecha, medio, motivo, actor_correo)
+          VALUES (?1, ?2, 'reabierta', ?3, '', ?4, ?5)`)
+          .bind(crypto.randomUUID(), id, fecha, resultado.motivo, sesion.correo),
+      ])
+      await registrar(env.BASE, sesion, 'reabrir respuesta de formulario', `entradas/${id}`, resultado.motivo)
+      return responder({ entrada: { ...actual, estado: 'derivada' } })
+    }
     if (id && request.method === 'PATCH') {
       const actual = await env.BASE.prepare('SELECT * FROM entradas_cms WHERE id = ?1').bind(id).first()
       if (!actual) return error('No encontramos esa entrada.', 404)
       if (!puedeGestionarEquipoCms(alcance, actual.equipo_id)) return error('No podés modificar esta entrada.', 403)
       let datos; try { datos = await request.json() } catch { return error('Los cambios de la entrada no son válidos.', 400) }
+      if (datos.estado === 'cerrada') return error('Registrá fecha, resultado y motivo mediante la acción de cumplimiento.', 400)
+      if (actual.estado === 'cerrada') return error('Reabrí la respuesta antes de modificarla.', 409)
       const resultado = entradaCmsDesde(datos, actual); if (resultado.error) return error(resultado.error, 400)
       await env.BASE.prepare('UPDATE entradas_cms SET estado = ?2, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1').bind(id, resultado.entrada.estado).run()
       await registrar(env.BASE, sesion, 'modificar entrada CMS', `entradas/${id}`, actual.nombre)
@@ -2562,14 +3994,19 @@ async function cms(contexto, sesion, ruta) {
 
 export async function onRequest(contexto) {
   const ruta = new URL(contexto.request.url).pathname.replace(/^\/api\/?/, '')
+  if (ruta === 'health' && contexto.request.method === 'GET') {
+    return responder({ ok: true, servicio: 'gestor-aletea' }, 200, { 'cache-control': 'no-store' })
+  }
   if (ruta === 'ingresar' && contexto.request.method === 'POST') return ingresar(contexto)
   if (ruta === 'cerrar' && contexto.request.method === 'POST') return cerrarSesion()
   if (ruta.startsWith('formularios/')) return formularioPublico(contexto, ruta)
+  if (ruta === 'pagina-web/publicada') return paginaWebPublica(contexto)
+  if (ruta.startsWith('pagina-web/medios/')) return medioPaginaWebPublico(contexto, ruta.split('/')[2])
   const sesion = await sesionDe(contexto)
   if (!sesion) return error('No tenés una sesión autorizada.', 401)
 
   if (ruta === 'sesion' && contexto.request.method === 'GET') {
-    await contexto.env.BASE.prepare('UPDATE usuarios SET ultimo_acceso = CURRENT_TIMESTAMP WHERE correo = ?1').bind(sesion.correo).run()
+    await contexto.env.BASE.prepare('UPDATE usuarios SET ultimo_acceso = ?2 WHERE correo = ?1').bind(sesion.correo, instanteUtcSql()).run()
     return responder(sesion)
   }
   if (ruta === 'auditoria' && contexto.request.method === 'GET') return auditoria(contexto, sesion)
@@ -2578,6 +4015,7 @@ export async function onRequest(contexto) {
   if (ruta === 'documento') return documento(contexto, sesion)
   if (ruta === 'listas' && contexto.request.method === 'GET') return listas(contexto, sesion)
   if (ruta === 'foto') return foto(contexto, sesion)
+  if (ruta === 'cms/imagen-remota') return imagenRemotaCms(contexto, sesion)
   if (ruta.startsWith('personas/') && ruta.endsWith('/protegida')) {
     return fichaProtegida(contexto, sesion, ruta.split('/')[1])
   }

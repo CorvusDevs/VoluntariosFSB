@@ -2,8 +2,11 @@
 # superficies conocidas del proyecto y bloquea cualquier archivo nuevo fuera de
 # ellas hasta que se revise de forma explicita.
 .claude/launch.json
+AGENTS.md
 .gitignore
 .push-allowed
+actualizar.html
+app.js
 assets/**
 css/**
 docs/**
@@ -11,11 +14,13 @@ functions/**
 herramientas/**
 index.html
 formulario.html
+preview-*.html
 js/**
 migrations/**
 package-lock.json
 package.json
 sw.js
+servidor-cpanel/**
 test/**
 version.json
 vitest.config.js

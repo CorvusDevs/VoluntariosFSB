@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   rosterVacio, agregarParticipante, agregarVoluntario,
-  editarPersona, desactivarPersona, activos, buscarPersonas, posiblesDuplicados, perfilesIncompletos,
+  editarPersona, desactivarPersona, activos, buscarPersonas, equipoDePersona, finanzasDePersona, posiblesDuplicados, perfilesIncompletos,
 } from '../../js/modelo/roster.js'
 import { edadDesdeAnio, fechaPerfil, perfilDe } from '../../js/modelo/perfil.js'
 
@@ -41,6 +41,20 @@ describe('agregarParticipante', () => {
 
   it('rechaza un grupo que no sea 1 ni 2', () => {
     expect(() => agregarParticipante(rosterVacio(), { nombre: 'X', grupo: 3 })).toThrow(/grupo/i)
+  })
+
+  it('guarda el tipo de cuota y exige porcentaje para una beca', () => {
+    const roster = agregarParticipante(rosterVacio(), { nombre: 'Ana', grupo: 1, finanzas: { tipoCuota: 'beca', becaPorcentaje: 40 } })
+    expect(roster.participantes[0].finanzas).toEqual({ tipoCuota: 'beca', becaPorcentaje: 40 })
+    expect(() => finanzasDePersona({ tipoCuota: 'beca', becaPorcentaje: 0 })).toThrow(/porcentaje/i)
+  })
+
+  it('guarda la entrega de equipo con condición, fecha y talle', () => {
+    const roster = agregarParticipante(rosterVacio(), { nombre: 'Ana', grupo: 1, equipo: { entregado: true, condicion: 'usado', fecha: '2026-08-29', talle: '12' } })
+    expect(roster.participantes[0].equipo).toEqual({ entregado: true, condicion: 'usado', fecha: '2026-08-29', talle: '12' })
+    expect(() => equipoDePersona({ entregado: true, condicion: '', fecha: '2026-08-29', talle: '12' })).toThrow(/nuevo o usado/i)
+    expect(() => equipoDePersona({ entregado: true, condicion: 'nuevo', fecha: '', talle: '12' })).toThrow(/fecha/i)
+    expect(() => equipoDePersona({ entregado: true, condicion: 'nuevo', fecha: '2026-08-29', talle: '' })).toThrow(/talle/i)
   })
 })
 

@@ -1,4 +1,5 @@
-import { elemento, boton, vaciar } from './componentes.js'
+import { elemento, boton, enlaceBoton, vaciar } from './componentes.js'
+import { rutaParaPantalla } from '../rutas-gestor.js'
 import { eventosDe, recordatoriosDe } from '../modelo/agenda.js'
 import { perfilesIncompletos, posiblesDuplicados } from '../modelo/roster.js'
 import { coincide } from '../util/nombres.js'
@@ -7,6 +8,7 @@ import { evitarCortesHora, hoyISO } from '../util/fechas.js'
 const fechaLocal = (fecha) => new Intl.DateTimeFormat('es-UY', { day: 'numeric', month: 'long' }).format(new Date(`${fecha}T00:00:00`))
 
 export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = null, ultimaSincronizacion = null, alIrA, esModuloCMS = false, alVolverCMS = null }) {
+  const enlaceA = (destino, etiqueta, clases = [], contexto = {}) => enlaceBoton(etiqueta, rutaParaPantalla(destino, contexto) || `#${destino}`, () => Object.keys(contexto).length ? alIrA(destino, contexto) : alIrA(destino), clases)
   function dibujarResultados(caja, texto) {
     caja.replaceChildren()
     const consulta = texto.trim()
@@ -20,7 +22,7 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
       ['Vista previa', 'vista-previa', 'Revisar o descargar la planilla'],
     ].filter(([etiqueta, , detalle]) => coincide(`${etiqueta} ${detalle}`, consulta))
     destinos.forEach(([etiqueta, destino, detalle]) => {
-      const resultado = boton(`${etiqueta}: ${detalle}`, () => alIrA(destino))
+      const resultado = enlaceA(destino, `${etiqueta}: ${detalle}`)
       resultado.classList.add('inicio-resultado', 'inicio-resultado-destino')
       caja.appendChild(resultado)
     })
@@ -30,14 +32,14 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
       const vacio = elemento('div', ['estado-vacio', 'inicio-vacio'])
       vacio.append(
         elemento('p', [], 'No encontramos una persona, sección ni fecha con ese nombre.'),
-        boton('Ver Personas', () => alIrA('personas')),
+        enlaceA('personas', 'Ver Personas'),
       )
       caja.appendChild(vacio)
       return
     }
     personas.forEach((persona) => {
       const tipo = persona.id.startsWith('v_') ? 'Voluntario' : `Grupo ${persona.grupo}`
-      const resultado = boton(`${persona.nombre} · ${tipo}`, () => alIrA('personas', { busqueda: persona.nombre }))
+      const resultado = enlaceA('personas', `${persona.nombre} · ${tipo}`, [], { busqueda: persona.nombre })
       resultado.classList.add('inicio-resultado')
       caja.appendChild(resultado)
     })
@@ -72,10 +74,10 @@ export function crearPantallaInicio(raiz, { roster, alertas = [], tendencia = nu
 
   const acciones = elemento('div', ['inicio-acciones'])
   acciones.append(
-    boton('Armar lista', () => alIrA('lista'), ['boton-principal']),
-    boton('Tomar asistencia', () => alIrA('asistencias')),
-    boton('Ver Agenda', () => alIrA('agenda')),
-    boton('Personas', () => alIrA('personas')),
+    enlaceA('lista', 'Armar lista', ['boton-principal']),
+    enlaceA('asistencias', 'Tomar asistencia'),
+    enlaceA('agenda', 'Ver Agenda'),
+    enlaceA('personas', 'Personas'),
   )
   seccion.appendChild(acciones)
 

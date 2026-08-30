@@ -1,9 +1,8 @@
 import { activos } from './roster.js'
 
-// Formato de la imagen con el que arranca una lista nueva. La grilla muestra la
-// cara mucho mas grande, que es lo que la coordinacion necesita para reconocer
-// a cada chico de un vistazo.
-export const FORMATO_POR_DEFECTO = 'grilla'
+// Formato de la imagen con el que arranca una lista nueva. La foto sigue siendo
+// protagonista, pero el nombre queda siempre debajo y no tapa la cara.
+export const FORMATO_POR_DEFECTO = 'retratos-nombre'
 
 // En que esquina de la foto del participante van los medallones de los
 // voluntarios. Solo lo usa el formato "retratos". Abajo a la derecha queda

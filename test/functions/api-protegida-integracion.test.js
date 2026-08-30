@@ -18,6 +18,7 @@ function basePrueba({ nivel = 'sensible', permisos = null } = {}) {
   const fotos = new Map()
   const intentosIngreso = new Map()
   let actualizacionesUltimoAcceso = 0
+  const instantesUltimoAcceso = []
   const base = {
     async batch(consultas) { return Promise.all(consultas.map((consulta) => consulta.run())) },
     prepare(sql) {
@@ -34,7 +35,16 @@ function basePrueba({ nivel = 'sensible', permisos = null } = {}) {
               throw new Error(`Consulta no simulada: ${consulta}`)
             },
             async run() {
-              if (consulta.startsWith('UPDATE usuarios SET ultimo_acceso')) { actualizacionesUltimoAcceso += 1; return { success: true } }
+              if (consulta.startsWith('UPDATE usuarios SET ultimo_acceso')) { actualizacionesUltimoAcceso += 1; instantesUltimoAcceso.push(valores[1]); return { success: true } }
+              if (consulta.startsWith('UPDATE usuarios SET rol =')) {
+                const usuario = usuarios.get(valores[6])
+                usuarios.set(valores[6], {
+                  ...usuario,
+                  rol: valores[0], perfil_acceso: valores[1], permisos: valores[2], nivel_datos_personales: valores[3],
+                  datos_personales_hasta: valores[4], datos_personales_sin_vencimiento: valores[5], version_sesion: Number(usuario.version_sesion || 0) + 1,
+                })
+                return { success: true }
+              }
               if (consulta.startsWith('INSERT INTO intentos_ingreso_cms')) {
                 intentosIngreso.set(valores[0], { tipo: valores[1], intentos: valores[2], ventana_inicio: intentosIngreso.get(valores[0])?.ventana_inicio || new Date().toISOString().replace('T', ' ').slice(0, 19), bloqueado_hasta: valores[3] })
                 return { success: true }
@@ -55,7 +65,7 @@ function basePrueba({ nivel = 'sensible', permisos = null } = {}) {
       }
     },
   }
-  return { usuarios, documentos, actividad, fotos, base, nivel, permisos, actualizacionesUltimoAcceso: () => actualizacionesUltimoAcceso }
+  return { usuarios, documentos, actividad, fotos, base, nivel, permisos, actualizacionesUltimoAcceso: () => actualizacionesUltimoAcceso, instantesUltimoAcceso }
 }
 
 async function prepararSesion(estado) {
@@ -87,6 +97,33 @@ function llamada(estado, ruta, opciones = {}, cookie = '') {
 }
 
 describe('API de fichas protegidas con D1 simulado', () => {
+  it('expone un control de salud público, mínimo y sin cache', async () => {
+    const respuesta = await llamada(basePrueba(), 'health', { method: 'GET' })
+
+    expect(respuesta.status).toBe(200)
+    expect(respuesta.headers.get('cache-control')).toBe('no-store')
+    expect(await respuesta.json()).toEqual({ ok: true, servicio: 'gestor-aletea' })
+  })
+
+  it('renueva la sesión actual al cambiar un permiso propio', async () => {
+    const estado = basePrueba({ nivel: 'ninguno' })
+    const cookieAnterior = await prepararSesion(estado)
+    const respuesta = await llamada(estado, 'usuarios', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        correo: 'coordinacion@aletea.uy', perfil_acceso: 'administracion', nivel_datos_personales: 'sensible',
+        vigencia_datos_personales: 'indefinida', datos_personales_hasta: '',
+      }),
+    }, cookieAnterior)
+
+    expect(respuesta.status).toBe(200)
+    const cookieNueva = respuesta.headers.get('set-cookie')?.split(';')[0]
+    expect(cookieNueva).toBeTruthy()
+    expect(cookieNueva).not.toBe(cookieAnterior)
+    expect((await llamada(estado, 'sesion', { method: 'GET' }, cookieAnterior)).status).toBe(401)
+    expect((await llamada(estado, 'sesion', { method: 'GET' }, cookieNueva)).status).toBe(200)
+  })
+
   it('actualiza el último acceso al recuperar una sesión todavía válida', async () => {
     const estado = basePrueba()
     const cookie = await prepararSesion(estado)
@@ -96,6 +133,8 @@ describe('API de fichas protegidas con D1 simulado', () => {
 
     expect(respuesta.status).toBe(200)
     expect(estado.actualizacionesUltimoAcceso()).toBe(2)
+    expect(estado.instantesUltimoAcceso).toHaveLength(2)
+    estado.instantesUltimoAcceso.forEach((instante) => expect(instante).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/))
   })
 
   it('bloquea temporalmente una cuenta después de cinco intentos fallidos', async () => {
@@ -173,5 +212,15 @@ describe('API de fichas protegidas con D1 simulado', () => {
     expect(ficha.status).toBe(403)
     const foto = await llamada(estado, 'foto?clave=p1.jpg', { method: 'GET' }, cookie)
     expect(foto.status).toBe(403)
+  })
+
+  it('deniega solicitudes de privacidad a Administración sin nivel sensible', async () => {
+    const estado = basePrueba({ nivel: 'operativo', permisos: JSON.stringify(['cms']) })
+    const cookie = await prepararSesion(estado)
+
+    const respuesta = await llamada(estado, 'cms/solicitudes-privacidad', { method: 'GET' }, cookie)
+
+    expect(respuesta.status).toBe(403)
+    expect((await respuesta.json()).error).toContain('acceso sensible vigente')
   })
 })

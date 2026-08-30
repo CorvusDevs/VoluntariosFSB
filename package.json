@@ -3,15 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "app.js",
   "description": "Armado de asignaciones semanales de Futbol sin Barreras (Aletea)",
   "scripts": {
+    "sellar": "bash herramientas/sellar.sh",
     "construir:cloudflare": "node herramientas/preparar-cloudflare.mjs",
+    "auditar:publicacion": "node herramientas/auditar-publicacion.mjs",
+    "preparar:publicacion": "npm run sellar && npm run construir:cloudflare && npm run auditar:publicacion",
+    "empaquetar:cpanel": "bash herramientas/preparar-cpanel.sh",
+    "esquema:cpanel": "node servidor-cpanel/generar-esquema.mjs",
+    "iniciar:cpanel": "node app.js",
+    "migraciones:cpanel": "node servidor-cpanel/migrar.mjs",
+    "importar:cpanel": "node servidor-cpanel/importar-d1.mjs",
     "respaldo:crear": "node herramientas/respaldar-d1.mjs",
     "respaldo:verificar": "node herramientas/verificar-respaldo-d1.mjs",
     "respaldo:preparar-recuperacion": "node herramientas/preparar-recuperacion-d1.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "servir": "python3 -m http.server 8765"
+  },
+  "dependencies": {
+    "mysql2": "^3.14.5"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",

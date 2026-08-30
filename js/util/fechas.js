@@ -46,6 +46,31 @@ export function fechaDesdeUTC(valor) {
   return new Date(texto)
 }
 
+export function valorFechaHoraLocal(valor) {
+  const texto = String(valor ?? '').trim()
+  const coincidencia = texto.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(?:Z)?$/)
+  return coincidencia ? `${coincidencia[1]}T${coincidencia[2]}` : ''
+}
+
+export function valorFechaLocal(valor) {
+  const texto = String(valor ?? '').trim()
+  const coincidencia = texto.match(/^(\d{4}-\d{2}-\d{2})(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?(?:Z)?$/)
+  if (!coincidencia) return ''
+  try {
+    partes(coincidencia[1])
+    return coincidencia[1]
+  } catch {
+    return ''
+  }
+}
+
+// Las fechas de agenda representan la hora de pared que eligió la persona.
+// No son instantes UTC y nunca deben correrse al cambiar de servidor.
+export function fechaDesdeLocal(valor) {
+  const normalizado = valorFechaHoraLocal(valor)
+  return normalizado ? new Date(`${normalizado}:00`) : new Date(NaN)
+}
+
 export function proximoSabado(desdeISO) {
   const base = desdeISO ?? hoyISO()
   const { diaSemana } = partes(base)

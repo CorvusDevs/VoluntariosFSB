@@ -15,10 +15,10 @@
 // Si algo sale mal, abrir la aplicacion con ?sw=off la desregistra y vuelve
 // todo al comportamiento anterior.
 
-const VERSION = '2026-08-22.1624'
+const VERSION = '2026-08-30.0014-e3acec558a'
 const CACHE = `voluntarios-fsb-${VERSION}`
 
-// Tomar el control apenas se instala, sin esperar a que se cierren las pestañas
+// Tomar el control apenas se instala, sin esperar a que se cierren las pestanas
 // viejas. Sin esto una version nueva podia quedar esperando dias.
 self.addEventListener('install', (evento) => {
   evento.waitUntil(self.skipWaiting())

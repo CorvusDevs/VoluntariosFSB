@@ -1,4 +1,5 @@
-import { elemento, boton, vaciar } from './componentes.js'
+import { elemento, boton, enlaceBoton, vaciar } from './componentes.js'
+import { rutaParaPantalla } from '../rutas-gestor.js'
 import { historial, hastaHoy, agruparPorGrupo, VINO, FALTO } from '../modelo/asistencia.js'
 import { aCSV, descargarCSV } from '../reporte/csv.js'
 import { maquetarReporte } from '../imagen/maquetar-reporte.js'
@@ -264,7 +265,7 @@ export function crearPantallaReporte(raiz, { roster, almacen, mes: mesInicial, a
         elemento('p', ['ayuda'], 'Cuando armes una lista, la asistencia va a aparecer acá.'),
       )
       if (alIrALista) {
-        const ir = boton('Ir a Armar lista', alIrALista, ['boton-principal'])
+        const ir = enlaceBoton('Ir a Armar lista', rutaParaPantalla('lista'), alIrALista, ['boton-principal'])
         ir.dataset.accion = 'ir-a-lista'
         vacio.appendChild(ir)
       }

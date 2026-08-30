@@ -14,7 +14,7 @@ describe('formulario público institucional', () => {
     const solicitudes = []
     vi.stubGlobal('fetch', vi.fn(async (url, opciones = {}) => {
       solicitudes.push({ url, opciones })
-      if (!opciones.method) return new Response(JSON.stringify({ formulario: { id: 'propuesta-familias', titulo: 'Propuesta para Familias', descripcion: 'Contanos la idea.', tipo: 'propuesta', campos_json: JSON.stringify([{ clave: 'modalidad', etiqueta: 'Modalidad preferida', tipo: 'seleccion', requerido: true, opciones: ['Presencial', 'Virtual'] }, { clave: 'barrio', etiqueta: 'Barrio', tipo: 'texto', requerido: true, ayuda: 'Solo si elegís presencial.', opciones: [], mostrar_si: { campo: 'modalidad', valor: 'Presencial' } }]) } }), { status: 200 })
+      if (!opciones.method) return new Response(JSON.stringify({ formulario: { id: 'propuesta-familias', titulo: 'Propuesta para Familias', descripcion: 'Contanos la idea.', tipo: 'propuesta', finalidad: 'Evaluar la propuesta y responderla.', responsable_datos: 'Equipo de Familias', conservacion_meses: 12, requiere_consentimiento: 1, campos_json: JSON.stringify([{ clave: 'modalidad', etiqueta: 'Modalidad preferida', tipo: 'seleccion', requerido: true, opciones: ['Presencial', 'Virtual'] }, { clave: 'barrio', etiqueta: 'Barrio', tipo: 'texto', requerido: true, ayuda: 'Solo si elegís presencial.', opciones: [], mostrar_si: { campo: 'modalidad', valor: 'Presencial' } }]) } }), { status: 200 })
       return new Response(JSON.stringify({ recibida: true }), { status: 201 })
     }))
 
@@ -36,6 +36,8 @@ describe('formulario público institucional', () => {
     modalidad.value = 'Virtual'
     modalidad.dispatchEvent(new Event('change', { bubbles: true }))
     expect(document.querySelector('[aria-label="Barrio"]').closest('label').hidden).toBe(true)
+    expect(document.querySelector('.formulario-publico-privacidad').textContent).toContain('Equipo de Familias')
+    document.querySelector('.formulario-publico-consentimiento input').checked = true
     document.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
 
@@ -44,6 +46,7 @@ describe('formulario público institucional', () => {
       nombre: 'Taller accesible', contacto: 'familias@ejemplo.uy', objetivo: 'Acercar recursos',
       pasos: 'Convocar y realizar', recursos: 'Sala y materiales', personas_necesarias: 'Dos facilitadores',
       respuestas: { modalidad: 'Virtual', barrio: '' },
+      consentimiento_privacidad: true,
     })
     expect(document.querySelector('.formulario-publico-estado').textContent).toContain('Recibimos')
   })

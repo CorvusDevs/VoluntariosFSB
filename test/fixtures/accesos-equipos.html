@@ -15,10 +15,15 @@
     import { crearPantallaAccesosCloudflare } from './js/ui/pantalla-accesos-cloudflare.js'
 
     const usuarios = [
-      { correo: 'admin@aletea.org', nombre: 'Administración', rol: 'admin', perfil_acceso: 'administracion' },
+      { correo: 'admin@aletea.org', nombre: 'Administración', rol: 'admin', perfil_acceso: 'administracion', nivel_datos_personales: 'sensible', vigencia_datos_personales: 'indefinida', datos_personales_sin_vencimiento: 1 },
       { correo: 'claudia@aletea.org', nombre: 'Claudia', rol: 'usuario', perfil_acceso: 'coordinacion', nivel_datos_personales: 'ninguno' },
     ]
-    const equipos = [{ id: 'e1', nombre: 'Familias' }, { id: 'e2', nombre: 'Deportes' }, { id: 'e3', nombre: 'Eventos' }]
+    const equipos = [
+      { id: 'e1', clave: 'familias', nombre: 'Familias' },
+      { id: 'e2', clave: 'deportes', nombre: 'Deportes' },
+      { id: 'e3', clave: 'eventos', nombre: 'Eventos' },
+      { id: 'e4', clave: 'finanzas', nombre: 'Finanzas' },
+    ]
     const responsabilidades = [
       { id: 'r1', equipo_id: 'e1', equipo_nombre: 'Familias', usuario_correo: 'claudia@aletea.org', tipo: 'coordinacion' },
       { id: 'r2', equipo_id: 'e3', equipo_nombre: 'Eventos', usuario_correo: 'claudia@aletea.org', tipo: 'referente' },

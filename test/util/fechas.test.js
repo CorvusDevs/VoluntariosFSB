@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { evitarCortesHora, fechaDesdeUTC, formatearFechaLarga, formatearFechaCorta, hoyISO, proximoSabado } from '../../js/util/fechas.js'
+import { evitarCortesHora, fechaDesdeLocal, fechaDesdeUTC, formatearFechaLarga, formatearFechaCorta, hoyISO, proximoSabado, valorFechaHoraLocal, valorFechaLocal } from '../../js/util/fechas.js'
 
 describe('formatearFechaLarga', () => {
   it('devuelve el dia de la semana capitalizado y el mes en minuscula', () => {
@@ -57,6 +57,31 @@ describe('fechaDesdeUTC', () => {
 
   it('conserva fechas ISO que ya declaran su zona', () => {
     expect(fechaDesdeUTC('2026-08-21T21:52:00Z').toISOString()).toBe('2026-08-21T21:52:00.000Z')
+  })
+})
+
+describe('fechas y horas programadas', () => {
+  it('conserva la hora elegida en Uruguay aunque MariaDB use un espacio', () => {
+    expect(valorFechaHoraLocal('2026-08-24 19:42:00')).toBe('2026-08-24T19:42')
+    const fecha = fechaDesdeLocal('2026-08-24 19:42:00')
+    expect(fecha.getHours()).toBe(19)
+    expect(fecha.getMinutes()).toBe(42)
+  })
+
+  it('también acepta el valor de datetime-local enviado por el formulario', () => {
+    expect(valorFechaHoraLocal('2026-08-24T19:42')).toBe('2026-08-24T19:42')
+  })
+})
+
+describe('fechas de MariaDB', () => {
+  it('acepta fechas simples y fechas devueltas a medianoche', () => {
+    expect(valorFechaLocal('2026-09-11')).toBe('2026-09-11')
+    expect(valorFechaLocal('2026-09-11 00:00:00')).toBe('2026-09-11')
+  })
+
+  it('rechaza fechas inexistentes o con otro formato', () => {
+    expect(valorFechaLocal('2026-02-30 00:00:00')).toBe('')
+    expect(valorFechaLocal('11/09/2026')).toBe('')
   })
 })
 

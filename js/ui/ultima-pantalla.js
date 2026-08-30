@@ -1,15 +1,15 @@
+import { puedeGestionarPaginaWeb, puedeUsarComunicacionVisual } from '../acceso/permisos-funciones.js'
+import { PANTALLAS_GESTOR, pantallaDesdeRuta, rutaParaPantalla } from '../rutas-gestor.js'
+
 const CLAVE = 'voluntarios-fsb:ultima-pantalla'
 
-export const PANTALLAS = Object.freeze([
-  'inicio', 'operacion', 'lista', 'vista-previa', 'personas', 'reporte', 'asistencias', 'agenda', 'registro', 'ajustes', 'accesos', 'registro-institucional', 'ayuda', 'cambios',
-  'cms-trabajo', 'cms-agenda', 'cms-areas', 'cms-formularios', 'cms-biblioteca', 'cms-auditoria',
-  'cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion',
-])
+export const PANTALLAS = PANTALLAS_GESTOR
 
 export function rutaCompartidaDesdeHash(hash = '') {
   const valor = String(hash || '').replace(/^#/, '')
   if (!valor) return null
-  const [pantalla, consulta = ''] = valor.split('?')
+  const [ruta, consulta = ''] = valor.split('?')
+  const pantalla = ruta === 'finanzas' ? 'cms-finanzas' : ruta
   if (!PANTALLAS.includes(pantalla)) return null
   const parametros = new URLSearchParams(consulta)
   const contexto = {}
@@ -33,14 +33,25 @@ export function hashParaPantalla(pantalla, contexto = {}) {
     if (contexto.filtroTrabajo) parametros.set('filtro', String(contexto.filtroTrabajo).slice(0, 40))
   }
   const consulta = parametros.toString()
-  return `#${pantalla}${consulta ? `?${consulta}` : ''}`
+  const ruta = pantalla === 'cms-finanzas' ? 'finanzas' : pantalla
+  return `#${ruta}${consulta ? `?${consulta}` : ''}`
 }
 
-export function pantallaPermitida(pantalla, { admin = false, cloudflare = false, permisos = null } = {}) {
+export { rutaParaPantalla }
+
+export function rutaCompartidaDesdeUbicacion({ pathname = '/', search = '', hash = '' } = {}) {
+  return pantallaDesdeRuta(pathname, search) || rutaCompartidaDesdeHash(hash)
+}
+
+export function pantallaPermitida(pantalla, { admin = false, cloudflare = false, permisos = null, perfilAcceso = null } = {}) {
   if (!PANTALLAS.includes(pantalla)) return false
+  const cuenta = { rol: admin ? 'admin' : 'coordinacion', perfil_acceso: perfilAcceso }
   if (pantalla === 'registro') return admin && !cloudflare
   if (['ayuda', 'cambios'].includes(pantalla)) return cloudflare
   if (['accesos', 'registro-institucional'].includes(pantalla)) return admin && cloudflare
+  if (pantalla === 'cms-privacidad') return admin && cloudflare && (!Array.isArray(permisos) || permisos.includes('cms'))
+  if (pantalla === 'cms-pagina-web') return cloudflare && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeGestionarPaginaWeb(cuenta)
+  if (pantalla === 'cms-comunicacion-visual') return cloudflare && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeUsarComunicacionVisual(cuenta)
   if (pantalla === 'ajustes') return admin
   if (pantalla === 'operacion' && !cloudflare) return false
   if (pantalla.startsWith('cms-') && !cloudflare) return false

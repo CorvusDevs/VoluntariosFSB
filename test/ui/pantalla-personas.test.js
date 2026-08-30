@@ -269,6 +269,34 @@ describe('directorio de Personas', () => {
     expect(participante.querySelector('.persona-grupo-1').textContent).toBe('Grupo 1')
   })
 
+  it('permite a administración definir una beca desde el perfil', async () => {
+    document.body.innerHTML = '<div id="admin-finanzas"></div>'
+    raiz = document.getElementById('admin-finanzas')
+    pantalla = crearPantallaPersonas(raiz, { roster: structuredClone(ROSTER), almacen: almacenFalso(), alCambiar: () => {}, esAdmin: true })
+    tarjeta('Gonzalo').querySelector('button').click()
+    const tipoCuota = raiz.querySelector('[aria-label="Tipo de cuota"]')
+    tipoCuota.value = 'beca'; tipoCuota.dispatchEvent(new Event('change', { bubbles: true }))
+    const porcentaje = raiz.querySelector('[aria-label="Porcentaje de descuento de la beca"]')
+    porcentaje.value = '40'
+    ;[...raiz.querySelectorAll('.persona-editor button')].find((boton) => boton.textContent === 'Guardar cambios').click()
+    await esperar()
+    expect(pantalla.roster().participantes.find((persona) => persona.nombre === 'Gonzalo').finanzas).toEqual({ tipoCuota: 'beca', becaPorcentaje: 40 })
+  })
+
+  it('registra la entrega de equipo desde el perfil del participante', async () => {
+    tarjeta('Gonzalo').querySelector('button').click()
+    const editor = raiz.querySelector('.persona-editor')
+    editor.querySelector('.persona-equipo input[role=switch]').click()
+    editor.querySelector('[aria-label="Estado del equipo entregado"]').value = 'nuevo'
+    const fecha = editor.querySelector('[data-perfil="fecha-equipo"]')
+    fecha.value = '2026-08-29'
+    editor.querySelector('[aria-label="Talle del equipo entregado"]').value = 'M'
+    ;[...editor.querySelectorAll('button')].find((boton) => boton.textContent === 'Guardar cambios').click()
+    await esperar()
+    expect(pantalla.roster().participantes.find((persona) => persona.id === 'p1').equipo).toEqual({ entregado: true, condicion: 'nuevo', fecha: '2026-08-29', talle: 'M' })
+    expect(tarjeta('Gonzalo').textContent).toContain('Equipo nuevo, talle M')
+  })
+
   it('filtra por grupo y por personas sin foto', () => {
     const grupo1 = [...raiz.querySelectorAll('.chip')].find((e) => e.textContent === 'Grupo 1')
     grupo1.click()
@@ -308,6 +336,21 @@ describe('directorio de Personas', () => {
     expect(nombresDirectorio()).toContain('Gonzalo')
   })
 
+  it('abre la persona exacta y explica el archivado solicitado desde Finanzas', async () => {
+    crearPantallaPersonas(raiz, {
+      roster: structuredClone(ROSTER), almacen, alCambiar: () => {},
+      personaInicial: 'p1', accionInicial: 'archivar', busquedaInicial: 'Gonzalo',
+    })
+    const aviso = raiz.querySelector('.persona-aviso-archivo')
+    expect(raiz.querySelector('.persona-editor h2').textContent).toContain('Gonzalo')
+    expect(aviso.textContent).toContain('conserva su ficha, pagos e historial')
+    expect(aviso.textContent).toContain('no generará nuevas cuotas')
+    ;[...aviso.querySelectorAll('button')].find((boton) => boton.textContent.includes('Archivar a Gonzalo')).click()
+    await esperar()
+    expect(raiz.textContent).toContain('1 archivada')
+    expect(raiz.textContent).toContain('Deshacer')
+  })
+
   it('muestra un interruptor Nuevo etiquetado y agrupa las acciones del editor', () => {
     tarjeta('Gonzalo').querySelector('button').click()
     const editor = raiz.querySelector('.persona-editor')
@@ -338,6 +381,18 @@ describe('directorio de Personas', () => {
     tarjeta('Gonzalo').querySelector('button').click()
     expect([...raiz.querySelectorAll('.persona-acciones button')].some((e) => e.textContent === 'Descargar tarjeta PNG')).toBe(true)
     expect(raiz.querySelector('.vista-tarjeta-personal')).not.toBeNull()
+  })
+
+  it('permite registrar una fecha de ingreso futura sin relajar las fechas sensibles', async () => {
+    tarjeta('Gonzalo').querySelector('button').click()
+    const editor = raiz.querySelector('.persona-editor')
+    const ingreso = editor.querySelector('[data-perfil="desde"]')
+    expect(ingreso.max).toBe('')
+    ingreso.value = '2099-01-01'
+    ingreso.dispatchEvent(new Event('input', { bubbles: true }))
+    ;[...editor.querySelectorAll('button')].find((boton) => boton.textContent === 'Guardar cambios').click()
+    await esperar()
+    expect(pantalla.roster().participantes.find((persona) => persona.id === 'p1').perfil.desde).toBe('2099-01-01')
   })
 
   it('conserva el borrador y explica el error cuando no se puede guardar un perfil', async () => {

@@ -63,4 +63,13 @@ describe('permisos de Cloudflare', () => {
     const editado = combinarProtegidos(actual, { participantes: [{ id: 'p1', nombre: 'Ana', perfil: { leGusta: 'Música' } }], voluntarios: [] })
     expect(editado.participantes[0]).toMatchObject({ contactoEmergencia: 'María', privacidad: { datosSensibles: true }, perfil: { leGusta: 'Música', necesidades: 'Pausa', anioNacimiento: '2018-08-20' } })
   })
+
+  it('solo permite que administración cambie la configuración financiera del perfil', () => {
+    const actual = { participantes: [{ id: 'p1', nombre: 'Ana', grupo: 1, finanzas: { tipoCuota: 'beca', becaPorcentaje: 40 } }], voluntarios: [] }
+    const solicitado = { participantes: [{ id: 'p1', nombre: 'Ana', grupo: 1, finanzas: { tipoCuota: 'regular', becaPorcentaje: 0 } }], voluntarios: [] }
+    expect(combinarProtegidos(actual, solicitado).participantes[0].finanzas).toEqual({ tipoCuota: 'beca', becaPorcentaje: 40 })
+    expect(combinarProtegidos(actual, solicitado, { permitirFinanzas: true }).participantes[0].finanzas).toEqual({ tipoCuota: 'regular', becaPorcentaje: 0 })
+    expect(rosterParaSesion(actual, { rol: 'admin', nivel_datos_personales: 'operativo' }).participantes[0].finanzas).toEqual({ tipoCuota: 'beca', becaPorcentaje: 40 })
+    expect(rosterParaSesion(actual, { rol: 'coordinacion', permisos: ['personas'], nivel_datos_personales: 'operativo' }).participantes[0]).not.toHaveProperty('finanzas')
+  })
 })

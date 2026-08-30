@@ -1,4 +1,5 @@
-import { elemento, boton, vaciar } from './componentes.js'
+import { elemento, boton, enlaceBoton, vaciar } from './componentes.js'
+import { rutaParaPantalla } from '../rutas-gestor.js'
 import { estadoDeSabado, hastaHoy, VINO, FALTO, NO_ESTABA } from '../modelo/asistencia.js'
 import { formatearFechaLarga, hoyISO } from '../util/fechas.js'
 
@@ -151,7 +152,7 @@ export function crearPantallaAsistencias(raiz, { roster, almacen, alIrALista = n
         elemento('p', ['ayuda'], 'Primero armá y guardá la lista de un sábado.'),
       )
       if (alIrALista) {
-        const ir = boton('Ir a Armar lista', alIrALista, ['boton-principal'])
+        const ir = enlaceBoton('Ir a Armar lista', rutaParaPantalla('lista'), alIrALista, ['boton-principal'])
         ir.dataset.accion = 'ir-a-lista'
         vacio.appendChild(ir)
       }

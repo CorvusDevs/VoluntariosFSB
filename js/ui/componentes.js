@@ -1,3 +1,5 @@
+import { ayudaParaAccion, prepararAyudaContextual } from './ayudas-contextuales.js'
+
 export function escapar(texto) {
   return String(texto ?? '')
     .replace(/&/g, '&amp;')
@@ -24,6 +26,7 @@ export function ficha(persona, opciones = {}) {
   el.setAttribute('aria-pressed', opciones.seleccionada ? 'true' : 'false')
   if (opciones.seleccionada) el.classList.add('seleccionada')
   if (opciones.atenuada) el.classList.add('atenuada')
+  prepararAyudaContextual(el, opciones.ayuda || `Abre la ficha de ${persona.nombre}.`)
 
   el.appendChild(elemento('span', ['ficha-nombre'], persona.nombre))
   if (persona.nuevo) el.appendChild(elemento('span', ['pastilla'], 'nuevo'))
@@ -41,6 +44,23 @@ export function boton(etiqueta, alHacerClic, clases = []) {
   }
   el.appendChild(document.createTextNode(etiqueta))
   el.addEventListener('click', alHacerClic)
+  return el
+}
+
+export function enlaceBoton(etiqueta, href, alNavegar = null, clases = []) {
+  const el = elemento('a', ['boton', ...clases])
+  el.href = href
+  const nombreIcono = iconoParaEtiqueta(etiqueta)
+  if (nombreIcono) {
+    el.classList.add('boton-con-icono')
+    el.appendChild(icono(nombreIcono))
+  }
+  el.appendChild(document.createTextNode(etiqueta))
+  if (alNavegar) el.addEventListener('click', (evento) => {
+    if (evento.defaultPrevented || evento.button !== 0 || evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey) return
+    evento.preventDefault()
+    alNavegar(evento)
+  })
   return el
 }
 
@@ -80,12 +100,14 @@ const TRAZOS = {
 
 function iconoParaEtiqueta(etiqueta) {
   const texto = String(etiqueta).trim()
+  if (texto === 'Contenido') return 'lapiz'
+  if (texto === 'Editor de piezas') return 'vista'
   if (texto === 'Nuevo comunicado') return 'sumar'
   if (texto === 'Publicar comunicado') return 'verificar'
   if (texto === 'Cerrar comunicado') return 'cerrar'
   if (texto === 'Ayuda') return 'vista'
   const exactos = {
-    Inicio: 'casa', Control: 'tablero', 'Centro de control': 'tablero', 'Mi trabajo': 'verificar', Áreas: 'tablero', Formularios: 'planilla', Biblioteca: 'copiar', Cambios: 'copiar', Accesos: 'acceso', 'Registro institucional': 'copiar', Familias: 'personas', Deportes: 'planilla', Comunicación: 'tablero', Capacitaciones: 'personas', Finanzas: 'reporte', Eventos: 'agenda', Administración: 'ajustes', 'Gestor institucional': 'tablero', 'Fútbol sin Barreras': 'planilla', 'Operación FSB': 'planilla', 'Abrir Fútbol sin Barreras': 'planilla', 'Abrir Familias': 'personas', 'Abrir Deportes': 'planilla', 'Abrir Comunicación': 'tablero', 'Abrir Capacitaciones': 'personas', 'Abrir Finanzas': 'reporte', 'Abrir Eventos': 'agenda', 'Abrir Administración': 'ajustes', 'Volver a Aletea': 'volver', Crear: 'sumar', 'Nueva tarea': 'planilla', 'Nueva directriz': 'tablero', 'Nota para ordenar': 'planilla', 'Pedido a un equipo': 'adelante', 'Actividad o evento': 'agenda', Proyecto: 'tablero', 'Entrada para revisar': 'sumar', 'Preparar reunión': 'personas', 'Nuevo equipo': 'personas', 'Nuevo proyecto': 'tablero', 'Nueva alianza': 'personas', 'Registrar alianza': 'personas', 'Guardar alianza': 'verificar', 'Editar alianza': 'lapiz', 'Nueva checklist': 'sumar', 'Usar modelo de actividad': 'planilla', 'Aplicar checklist': 'verificar', 'Guardar checklist': 'verificar', 'Crear equipo': 'personas', 'Crear proyecto': 'tablero', 'Nueva actividad': 'agenda', 'Agendar actividad': 'agenda', 'Editar actividad': 'lapiz', 'Guardar actividad': 'verificar', 'Completar tarea': 'verificar', 'Armar lista': 'planilla', Lista: 'planilla', 'Vista previa': 'vista', Personas: 'personas', 'Ver Personas': 'personas', Reporte: 'reporte', Asistencias: 'verificar', Asistencia: 'verificar', Agenda: 'agenda', 'Ver Agenda': 'agenda', 'Ver agenda': 'agenda', Ajustes: 'ajustes', Ingresar: 'ingresar', 'Entrar con el token': 'ingresar', 'Cerrar sesión': 'salir', 'Volver al ingreso': 'volver', Reintentar: 'reintentar', Cancelar: 'cerrar', Cerrar: 'cerrar', Deshacer: 'volver', Rehacer: 'reintentar', Copiar: 'copiar', 'Rotar el token': 'acceso', 'Dar acceso': 'acceso', 'Guardar permisos': 'verificar', 'Agregar a la agenda': 'sumar', 'Usar la jornada anterior': 'volver', 'Tomar asistencia': 'verificar', 'Agregar persona': 'sumar', 'Agregar foto': 'sumar', 'Cambiar foto': 'lapiz', 'Quitar foto': 'eliminar', 'Listo, ya las anoté': 'verificar', 'Listo, ya la anoté': 'verificar', 'Hoy no viene': 'cerrar', 'Sumar apoyo': 'sumar', 'Elegí quién': 'personas', Editar: 'lapiz', 'Guardar cambios': 'verificar', 'Guardar personalización': 'verificar', 'Agregar': 'sumar', 'Descargar tarjeta PNG': 'descargar', 'Descargar PNG': 'descargar', 'Descargar CSV': 'descargar', 'Eliminar mes': 'eliminar', 'Eliminar día': 'eliminar', 'Eliminar definitivamente': 'eliminar', Continuar: 'adelante', Quitar: 'eliminar',
+    Inicio: 'casa', Control: 'tablero', 'Centro de control': 'tablero', 'Mis tareas': 'verificar', 'Página web': 'vista', 'Comunicación visual': 'vista', Áreas: 'tablero', Formularios: 'planilla', Biblioteca: 'copiar', Cambios: 'copiar', Accesos: 'acceso', 'Registro institucional': 'copiar', Familias: 'personas', Deportes: 'planilla', Comunicación: 'tablero', Capacitaciones: 'personas', Finanzas: 'reporte', Eventos: 'agenda', Administración: 'ajustes', 'Gestor institucional': 'tablero', 'Fútbol sin Barreras': 'planilla', 'Operación FSB': 'planilla', 'Abrir Fútbol sin Barreras': 'planilla', 'Abrir Familias': 'personas', 'Abrir Deportes': 'planilla', 'Abrir Comunicación': 'tablero', 'Abrir Capacitaciones': 'personas', 'Abrir Finanzas': 'reporte', 'Abrir Eventos': 'agenda', 'Abrir Administración': 'ajustes', 'Volver a Aletea': 'volver', Crear: 'sumar', 'Nueva tarea': 'planilla', 'Nueva directriz': 'tablero', 'Nota para ordenar': 'planilla', 'Pedido a un equipo': 'adelante', 'Actividad o evento': 'agenda', Proyecto: 'tablero', 'Entrada para revisar': 'sumar', 'Preparar reunión': 'personas', 'Nuevo equipo': 'personas', 'Nuevo proyecto': 'tablero', 'Nueva alianza': 'personas', 'Registrar alianza': 'personas', 'Guardar alianza': 'verificar', 'Editar alianza': 'lapiz', 'Nueva checklist': 'sumar', 'Usar modelo de actividad': 'planilla', 'Aplicar checklist': 'verificar', 'Guardar checklist': 'verificar', 'Crear equipo': 'personas', 'Crear proyecto': 'tablero', 'Nueva actividad': 'agenda', 'Agendar actividad': 'agenda', 'Editar actividad': 'lapiz', 'Guardar actividad': 'verificar', 'Completar tarea': 'verificar', 'Armar lista': 'planilla', Lista: 'planilla', 'Vista previa': 'vista', Personas: 'personas', 'Ver Personas': 'personas', Reporte: 'reporte', Asistencias: 'verificar', Asistencia: 'verificar', Agenda: 'agenda', 'Ver Agenda': 'agenda', 'Ver agenda': 'agenda', Ajustes: 'ajustes', Ingresar: 'ingresar', 'Entrar con el token': 'ingresar', 'Cerrar sesión': 'salir', 'Volver al ingreso': 'volver', Reintentar: 'reintentar', Cancelar: 'cerrar', Cerrar: 'cerrar', Deshacer: 'volver', Rehacer: 'reintentar', Copiar: 'copiar', 'Rotar el token': 'acceso', 'Dar acceso': 'acceso', 'Guardar permisos': 'verificar', 'Agregar a la agenda': 'sumar', 'Usar la jornada anterior': 'volver', 'Tomar asistencia': 'verificar', 'Agregar persona': 'sumar', 'Agregar foto': 'sumar', 'Cambiar foto': 'lapiz', 'Quitar foto': 'eliminar', 'Listo, ya las anoté': 'verificar', 'Listo, ya la anoté': 'verificar', 'Hoy no viene': 'cerrar', 'Sumar apoyo': 'sumar', 'Elegí quién': 'personas', Editar: 'lapiz', 'Guardar cambios': 'verificar', 'Guardar personalización': 'verificar', 'Agregar': 'sumar', 'Descargar tarjeta PNG': 'descargar', 'Descargar PNG': 'descargar', 'Descargar SVG': 'descargar', 'Descargar CSV': 'descargar', 'Eliminar mes': 'eliminar', 'Eliminar día': 'eliminar', 'Eliminar definitivamente': 'eliminar', Continuar: 'adelante', Quitar: 'eliminar',
   }
   if (['Nuevo programa', 'Crear programa'].includes(texto)) return 'tablero'
   if (texto === 'Guardar programa') return 'verificar'
@@ -136,7 +158,7 @@ export function botonIcono(nombre, etiqueta, alHacerClic) {
   const el = elemento('button', ['boton-icono'])
   el.type = 'button'
   el.setAttribute('aria-label', etiqueta)
-  el.title = etiqueta
+  prepararAyudaContextual(el, ayudaParaAccion(etiqueta))
   el.appendChild(icono(nombre))
   el.addEventListener('click', alHacerClic)
   return el

@@ -1,6 +1,8 @@
 import { crearSelectorFecha } from './ui/selector-fecha.js'
+import { instalarAyudasContextuales } from './ui/ayudas-contextuales.js'
 
 const raiz = document.getElementById('formulario-publico')
+instalarAyudasContextuales(document)
 const id = new URLSearchParams(window.location.search).get('id')
 
 function campo(etiqueta, tipo = 'text', requerido = true, { autocompletar = 'off', limite = 180 } = {}) {
@@ -90,19 +92,41 @@ async function iniciar() {
   const personalizados = camposConfigurables(formulario)
   const empresa = document.createElement('input'); empresa.name = 'empresa'; empresa.tabIndex = -1; empresa.autocomplete = 'off'; empresa.className = 'formulario-publico-trampa'
   const ayuda = Object.assign(document.createElement('p'), { className: 'ayuda', textContent: 'No incluyas información médica, diagnósticos ni otros datos sensibles. El equipo se comunicará contigo para los siguientes pasos.' })
+  const privacidad = elementoPrivacidad(formulario)
   const enviar = Object.assign(document.createElement('button'), { type: 'submit', textContent: 'Enviar respuesta' }); enviar.className = 'boton boton-principal'
   const estado = document.createElement('p'); estado.className = 'formulario-publico-estado'
-  forma.append(nombreCaja, contactoCaja, mensajeCaja, proponeFecha ? fechaPropuestaCaja : document.createDocumentFragment(), esPropuesta ? objetivoCaja : document.createDocumentFragment(), esPropuesta ? pasosCaja : document.createDocumentFragment(), esPropuesta ? recursosCaja : document.createDocumentFragment(), esPropuesta ? personasCaja : document.createDocumentFragment(), ...personalizados.filas.map((fila) => fila.contenedor), empresa, ayuda, enviar, estado)
+  forma.append(nombreCaja, contactoCaja, mensajeCaja, proponeFecha ? fechaPropuestaCaja : document.createDocumentFragment(), esPropuesta ? objetivoCaja : document.createDocumentFragment(), esPropuesta ? pasosCaja : document.createDocumentFragment(), esPropuesta ? recursosCaja : document.createDocumentFragment(), esPropuesta ? personasCaja : document.createDocumentFragment(), ...personalizados.filas.map((fila) => fila.contenedor), empresa, ayuda, privacidad.contenedor, enviar, estado)
   forma.addEventListener('submit', async (evento) => {
     evento.preventDefault(); if (!forma.reportValidity()) return
     enviar.disabled = true; estado.textContent = 'Enviando...'
     try {
-      const envio = await fetch(`/api/formularios/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: nombre.value, contacto: contacto.value, detalle: detalle.value, fecha_propuesta: fechaPropuesta.value || null, objetivo: objetivo.value, pasos: pasos.value, recursos: recursos.value, personas_necesarias: personas.value, respuestas: personalizados.respuestas, empresa: empresa.value }) })
+      const envio = await fetch(`/api/formularios/${encodeURIComponent(id)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ nombre: nombre.value, contacto: contacto.value, detalle: detalle.value, fecha_propuesta: fechaPropuesta.value || null, objetivo: objetivo.value, pasos: pasos.value, recursos: recursos.value, personas_necesarias: personas.value, respuestas: personalizados.respuestas, empresa: empresa.value, consentimiento_privacidad: privacidad.control?.checked === true }) })
       const resultado = await envio.json().catch(() => ({})); if (!envio.ok) throw new Error(resultado.error || 'No se pudo enviar la respuesta.')
       forma.reset(); fechaPropuesta.limpiar(); personalizados.limpiar(); estado.textContent = 'Recibimos tu respuesta. Muchas gracias.'
     } catch (fallo) { estado.textContent = fallo.message; enviar.disabled = false }
   })
   raiz.replaceChildren(cabecera, forma)
+}
+
+function elementoPrivacidad(formulario) {
+  const contenedor = document.createElement('section')
+  contenedor.className = 'formulario-publico-privacidad'
+  const finalidad = formulario.finalidad || 'Responder la consulta y realizar su seguimiento.'
+  const responsable = formulario.responsable_datos || 'Aletea'
+  const meses = Number(formulario.conservacion_meses || 12)
+  contenedor.append(
+    Object.assign(document.createElement('strong'), { textContent: 'Cómo usaremos estos datos' }),
+    Object.assign(document.createElement('p'), { textContent: `${finalidad} Responsable: ${responsable}. Conservación prevista: hasta ${meses} meses.` }),
+  )
+  const enlace = Object.assign(document.createElement('a'), { href: '/privacidad/', textContent: 'Leer el aviso de privacidad' })
+  contenedor.appendChild(enlace)
+  if (!Boolean(formulario.requiere_consentimiento)) return { contenedor, control: null }
+  const etiqueta = document.createElement('label')
+  etiqueta.className = 'formulario-publico-consentimiento'
+  const control = document.createElement('input'); control.type = 'checkbox'; control.required = true
+  etiqueta.append(control, document.createTextNode(' Leí cómo se usarán mis datos y acepto enviarlos para esta finalidad.'))
+  contenedor.appendChild(etiqueta)
+  return { contenedor, control }
 }
 
 iniciar().catch(() => { raiz.textContent = 'No se pudo abrir este formulario. Probá nuevamente más tarde.' })

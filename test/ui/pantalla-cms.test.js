@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { asistirPegadoEnlace, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
+import { agregarRecursoADescripcion, asistirPegadoEnlace, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
 
 // La auditoría conserva una superficie completa para probar todos los flujos.
 // La aplicación real abre esos mismos flujos desde la vista de cada equipo.
@@ -15,6 +15,7 @@ let alertasPospuestasCms
 let alcanceGlobalCms
 let tareaBloqueadaCms
 let vistaMovilCms
+let accesoRespuestasCms
 
 beforeEach(() => {
   document.body.innerHTML = '<div id="raiz"></div>'
@@ -27,6 +28,7 @@ beforeEach(() => {
   alcanceGlobalCms = false
   tareaBloqueadaCms = false
   vistaMovilCms = false
+  accesoRespuestasCms = true
   window.matchMedia = vi.fn(() => ({ matches: vistaMovilCms, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const almacenamientoLocal = new Map()
   Object.defineProperty(window, 'localStorage', { configurable: true, value: {
@@ -36,7 +38,24 @@ beforeEach(() => {
     clear: vi.fn(() => almacenamientoLocal.clear()),
   } })
   Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn(async () => {}) } })
-  globalThis.fetch = vi.fn(async (url) => {
+  globalThis.fetch = vi.fn(async (url, opciones = {}) => {
+    if (url === '/api/cms/finanzas-fsb') return new Response(JSON.stringify({
+      acceso: { puede_ver: true, puede_gestionar: true, privacidad: 'sensible' },
+      total_pendiente_centavos: 805500,
+      total_a_favor_centavos: 500,
+      cuentas_pendientes: 3,
+      cuentas_vencidas: 1,
+      pagos_mes_centavos: 420000,
+      cuentas: [
+        { id: 'cf1', nombre: 'Camila Pérez', grupo: 1, condicion: 'regular', beca_porcentaje: 0, saldo_centavos: 450000, vencido_centavos: 250000, estado_pago: 'vencido', ultimo_pago_fecha: '2026-08-15', ultimo_pago_centavos: 100000, compromiso_activo: { id: 'co1', fecha_prevista: '2026-08-30', importe_centavos: 200000, estado: 'vigente', estado_calculado: 'vigente', nota: 'Transferencia' }, compromisos: [{ id: 'co1', fecha_prevista: '2026-08-30', importe_centavos: 200000, estado: 'vigente', estado_calculado: 'vigente', nota: 'Transferencia' }], movimientos: [
+          { id: 'mf1', cuenta_id: 'cf1', tipo: 'cargo', concepto: 'Cuota agosto', periodo: '2026-08', fecha: '2026-08-01', vencimiento: '2026-08-10', importe_centavos: 550000, medio_pago: '', anulado_en: null },
+          { id: 'mf2', cuenta_id: 'cf1', tipo: 'pago', concepto: 'Pago recibido', periodo: '2026-08', fecha: '2026-08-15', vencimiento: null, importe_centavos: -100000, medio_pago: 'Transferencia', anulado_en: null },
+        ] },
+        { id: 'cf2', nombre: 'Martín Silva', grupo: 2, condicion: 'beca', beca_porcentaje: 50, saldo_centavos: 355500, vencido_centavos: 0, estado_pago: 'pendiente', ultimo_pago_fecha: null, ultimo_pago_centavos: 0, compromisos: [], movimientos: [
+          { id: 'mf3', cuenta_id: 'cf2', tipo: 'cargo', concepto: 'Cuota agosto con beca', periodo: '2026-08', fecha: '2026-08-01', vencimiento: '2026-08-31', importe_centavos: 355500, medio_pago: '', anulado_en: null },
+        ] },
+      ],
+    }), { status: 200 })
     if (url === '/api/cms/proyectos/p1/contexto') return new Response(JSON.stringify({
       proyecto: { id: 'p1', titulo: 'Fútbol sin Barreras' },
       tareas: [{ id: 'tp1', proyecto_id: 'p1', titulo: 'Coordinar transporte', estado: 'pendiente', fecha_limite: '2026-08-22', responsable_nombre: 'Claudia', descripcion: 'Confirmar el traslado.' }],
@@ -47,13 +66,13 @@ beforeEach(() => {
       riesgos: [], hitos: [{ id: 'h1', proyecto_id: 'p1', titulo: 'Confirmar equipos', descripcion: 'Equipos de trabajo definidos.', fecha_objetivo: '2026-08-20', estado: 'en_marcha', responsable_nombre: 'Claudia' }], gastos: [{ id: 'g1', proyecto_id: 'p1', concepto: 'Traslado', monto: 2250, fecha: '2026-08-15', notas: 'Jornada inaugural.' }],
     }), { status: 200 })
     if (url === '/api/cms/tablero') return new Response(JSON.stringify({
-      alcance: { perfil: perfilCms, equipos: [], puede_gestionar: true, global: alcanceGlobalCms },
+      alcance: { perfil: perfilCms, equipos: [], puede_gestionar: true, global: alcanceGlobalCms, nivel_datos_personales: accesoRespuestasCms ? 'operativo' : 'ninguno', puede_ver_respuestas: accesoRespuestasCms },
       tareas: [{ id: 't1', titulo: 'Confirmar la sala', descripcion: 'Llamar antes del jueves.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 2, fecha_limite: '2026-08-18', fecha_seguimiento: '2026-08-15', equipo_id: 'e1', evento_id: 'ev1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', solicitante_correo: 'claudia@aletea.org' }, { id: 'td1', titulo: 'Priorizar accesibilidad en actividades', descripcion: 'Aplicar ajustes razonables en toda actividad nueva.', tipo: 'directriz', estado: 'pendiente', prioridad: 'alta', equipo_nombre: 'Dirección', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }, ...(tareaBloqueadaCms ? [{ id: 'tb1', titulo: 'Confirmar accesibilidad de la jornada', descripcion: 'Esperando confirmación del lugar.', estado: 'bloqueada', prioridad: 'alta', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }] : [])],
       proyectos: [{ id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', prioridad: 'alta', fecha_inicio: '2026-08-01', fecha_fin: '2026-10-01', presupuesto: 15000, presupuesto_ejecutado: 2250, hitos_total: 2, hitos_completados: 1, notas: 'Confirmar transporte.', equipo_id: 'e1', responsable_correo: 'claudia@aletea.org', equipo_nombre: 'Familias', responsable_nombre: 'Claudia' }],
-      equipos: [{ id: 'e1', nombre: 'Familias' }, { id: 'e2', nombre: 'Eventos', categoria: 'comision_directiva' }],
+      equipos: [{ id: 'e1', clave: 'familias', nombre: 'Familias' }, { id: 'e2', clave: 'comision_directiva', nombre: 'Comisión Directiva', categoria: 'comision_directiva' }, { id: 'e3', clave: 'deportes', nombre: 'Deportes' }, { id: 'e4', clave: 'finanzas', nombre: 'Finanzas' }],
       responsables: [{ correo: 'claudia@aletea.org', nombre: 'Claudia' }, { correo: 'marce@aletea.org', nombre: 'Marce' }],
       responsabilidades: [{ id: 're1', equipo_id: 'e1', usuario_correo: 'claudia@aletea.org', usuario_nombre: 'Claudia', tipo: 'coordinacion' }],
-      reuniones: [{ id: 'r1', titulo: 'Coordinación semanal', fecha_hora: '2026-08-21T18:30', estado: 'planificada', equipo_id: 'e1', equipo_nombre: 'Familias', preparacion: 'Revisar necesidades' }],
+      reuniones: [{ id: 'r1', titulo: 'Coordinación semanal', fecha_hora: '2026-08-21 18:30:00', estado: 'planificada', equipo_id: 'e1', equipo_nombre: 'Familias', preparacion: 'Revisar necesidades' }],
       decisiones: [{ id: 'd1', titulo: 'Priorizar accesibilidad', reunion_titulo: 'Coordinación semanal', responsable_nombre: 'Claudia' }],
       documentos: [
         { id: 'doc1', titulo: 'Guía de familias', descripcion: 'Material de bienvenida para las familias.', tipo: 'guia', sensibilidad: 'interno', equipo_nombre: 'Familias', url: 'https://drive.google.com/guia' },
@@ -63,6 +82,10 @@ beforeEach(() => {
       formularios: [{ id: 'f1', titulo: 'Sumate como voluntario', descripcion: 'Para personas interesadas en colaborar.', tipo: 'voluntariado', visibilidad: 'publica', estado: 'activa', respuestas_total: 2 }],
       alianzas: [{ id: 'a1', nombre: 'Red comunitaria', tipo: 'red', estado: 'activa', descripcion: 'Coordinación de propuestas territoriales.', equipo_id: 'e1', equipo_nombre: 'Familias' }],
       programas: [{ id: 'pr1', nombre: 'Familias y comunidad', estado: 'activo', descripcion: 'Espacios para familias del interior.', equipo_id: 'e1', equipo_nombre: 'Familias' }],
+      unidades: [
+        { id: 'uo1', clave: 'gaf', nombre: 'Grupo Apoyo Familias', sigla: 'GAF', descripcion: 'Acompañamiento y apoyo para familias.', tipo: 'programa', estado: 'activa', equipo_id: 'e1', equipo_nombre: 'Familias', color: '#397dba', orden: 10, vistas: [] },
+        { id: 'uo2', clave: 'fsb', nombre: 'Fútbol sin Barreras', sigla: 'FSB', descripcion: 'Actividad deportiva inclusiva.', tipo: 'programa', estado: 'activa', equipo_id: 'e3', equipo_nombre: 'Deportes', color: '#5bc9c3', orden: 10, vistas: [{ equipo_id: 'e4', equipo_nombre: 'Finanzas', enfoque: 'financiero' }] },
+      ],
       eventos: [{ id: 'ev1', titulo: 'Taller de juego', fecha_hora: '2026-08-24T15:00', estado: 'planificado', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_correo: 'claudia@aletea.org', tareas_total: 3, tareas_completadas: 1, tareas_pendientes: 2 }],
       plantillas: [{ id: 'pl1', titulo: 'Preparar jornada', descripcion: 'Pasos habituales.', cantidad_tareas: 3, equipo_nombre: 'Familias' }],
       riesgos: [{ id: 'rg1', proyecto_id: 'p1', proyecto_titulo: 'Fútbol sin Barreras', titulo: 'Confirmación del local', descripcion: 'Confirmar la sala con una semana de anticipación.', nivel: 'alto', estado: 'abierto', responsable_correo: 'claudia@aletea.org', responsable_nombre: 'Claudia', fecha_revision: '2026-08-20' }],
@@ -80,6 +103,7 @@ beforeEach(() => {
       { id: 1, accion: 'crear tarea CMS', detalle: 'Confirmar accesibilidad', recurso: 'tareas/t1', actor_nombre: 'Claudia', cuando: '2026-08-16T14:30:00Z' },
     ] }), { status: 200 })
     if (url === '/api/cms/proyectos') return new Response(JSON.stringify({ proyecto: { id: 'p2', titulo: 'Escuela de familias', equipo_id: 'e1' } }), { status: 201 })
+    if (url === '/api/cms/finanzas-fsb/movimientos' && opciones.method === 'POST') return new Response(JSON.stringify({ movimiento: { id: 'mp1', tipo: 'pago', concepto: 'Pago recibido', importe_centavos: -80000 }, saldo_centavos: 0 }), { status: 201 })
     if (url === '/api/cms/documentos') return new Response(JSON.stringify({ documento: { id: 'doc3', titulo: 'Guía de familias', url: 'https://drive.google.com/guia' } }), { status: 201 })
     return new Response(JSON.stringify({ tarea: { id: 't2' } }), { status: 201 })
   })
@@ -88,10 +112,352 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks())
 
 describe('tablero institucional', () => {
+  it('muestra el seguimiento de pagos como una lista compacta y accionable', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+
+    expect(raiz.textContent).toContain('Participantes y saldos')
+    expect(raiz.textContent).toContain('Camila Pérez')
+    expect(raiz.textContent).toContain('Acciones de cobranza')
+    expect(raiz.textContent).toContain('Generar cuotas')
+    expect(raiz.textContent).toContain('Exportar mes')
+    expect(raiz.querySelectorAll('.cms-finanzas-fila')).toHaveLength(2)
+    raiz.querySelector('.cms-finanzas-acciones .boton-principal').click()
+    expect(raiz.textContent).toContain('Registrar pago o cargo')
+    expect(raiz.querySelector('[aria-label="Participante"]').value).toBe('cf1')
+  })
+
+  it('reemplaza la hoja resumen con un cierre mensual visual y abre la cuenta prioritaria', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+
+    expect(raiz.textContent).toContain('Cobranza de Fútbol sin Barreras')
+    expect(raiz.textContent).toContain('Por cobrar')
+    expect(raiz.textContent).toContain('Cobrado')
+    expect(raiz.textContent).toContain('Pendiente')
+    expect(raiz.querySelector('[aria-label="Mes del cierre"]')).not.toBeNull()
+    expect(raiz.querySelector('.cms-finanzas-cierre-avance').getAttribute('aria-label')).toContain('% cobrado')
+    ;[...raiz.querySelectorAll('.cms-finanzas-fila button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    expect(raiz.textContent).toContain('Estado de cuenta')
+    expect(raiz.querySelector('.cms-finanzas-historial')).not.toBeNull()
+  })
+
+  it('filtra sin perder el foco y recuerda la vista elegida', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-finanzas-filtro-estado')].find((boton) => boton.textContent.includes('Todas')).click()
+
+    const buscar = raiz.querySelector('[aria-label="Buscar participantes"]')
+    buscar.focus()
+    buscar.value = 'beca'
+    buscar.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(document.activeElement).toBe(buscar)
+    expect(raiz.textContent).toContain('1 participante visible')
+    expect([...raiz.querySelectorAll('.cms-finanzas-fila')].filter((fila) => !fila.hidden)).toHaveLength(1)
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Vista compacta')).click()
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(expect.stringContaining('aletea:finanzas-fsb:v1:'), expect.stringContaining('compacta'))
+    expect(raiz.querySelector('.cms-finanzas-fsb').classList.contains('vista-compacta')).toBe(true)
+  })
+
+  it('en celular prioriza las acciones financieras y evita el botón Crear superpuesto', async () => {
+    vistaMovilCms = true
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+
+    expect(raiz.querySelector('.cms-finanzas-acciones')).not.toBeNull()
+    expect(raiz.querySelector('.cms-accion-rapida-movil')).toBeNull()
+  })
+
+  it('abre el historial y prepara una anulación reversible con motivo', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+
+    expect(raiz.textContent).toContain('Cuota agosto')
+    expect(raiz.textContent).toContain('Transferencia')
+    ;[...raiz.querySelectorAll('.cms-finanzas-movimiento button')][0].click()
+    expect(raiz.textContent).toContain('Anular movimiento')
+    expect(raiz.textContent).toContain('seguirá visible en el historial')
+    expect(raiz.querySelector('[aria-label="Motivo de la corrección"]')).not.toBeNull()
+  })
+
+  it('muestra el estado mensual y el compromiso sin alterar los movimientos', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+
+    expect(raiz.textContent).toContain('Resumen mensual')
+    expect(raiz.textContent).toContain('Saldo anterior')
+    expect(raiz.textContent).toContain('Compromisos de pago')
+    expect(raiz.textContent).toContain('Previsto para')
+    expect(raiz.textContent).toContain('Movimientos')
+    expect(raiz.textContent).toContain('Cuota agosto')
+  })
+
+  it('prepara un recordatorio editable y solo lo copia por acción del usuario', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Preparar recordatorio')).click()
+
+    const texto = raiz.querySelector('[aria-label="Texto del recordatorio"]')
+    expect(texto.value).toContain('Hola Camila')
+    expect(texto.value).not.toContain('$')
+    const importe = raiz.querySelector('[aria-label="Incluir importe pendiente"]')
+    importe.checked = true; importe.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(texto.value).toContain('4.500')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Copiar recordatorio')).click()
+    await esperar()
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining('Hola Camila'))
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/finanzas-fsb/recordatorios', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('ofrece un compromiso guiado para una cuenta sin acuerdo vigente', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    const historiales = [...raiz.querySelectorAll('button')].filter((boton) => boton.textContent.includes('Ver detalle'))
+    historiales[1].click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Acordar pago')).click()
+
+    expect(raiz.textContent).toContain('Nuevo compromiso de pago')
+    expect(raiz.textContent).toContain('no modifica el saldo')
+    expect(raiz.querySelector('[aria-label="Fecha prevista de pago"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Importe acordado"]')).not.toBeNull()
+  })
+
+  it('muestra una vista previa de cuotas sin importar la planilla', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Generar cuotas')).click()
+    const grupo1 = raiz.querySelector('[aria-label="Importe del Grupo 1"]')
+    const grupo2 = raiz.querySelector('[aria-label="Importe del Grupo 2"]')
+    expect(grupo2.closest('.cms-campo').hidden).toBe(true)
+    grupo1.value = '2500'; grupo1.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(grupo2.value).toBe('2500')
+
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Revisar participantes e importes').click()
+    expect(raiz.textContent).toContain('2 cuotas, 1 con beca')
+    expect(raiz.textContent).toContain('Camila Pérez')
+    expect(raiz.textContent).toContain('Martín Silva, beca 50%')
+    expect(raiz.textContent).toContain('- 50% =')
+    expect(raiz.textContent).not.toContain('Importar')
+  })
+
+  it('vuelve al asistente y genera la cuota después de corregir una beca excluida', async () => {
+    const respuestaBase = globalThis.fetch
+    let porcentaje = 0
+    globalThis.fetch = vi.fn(async (url, opciones = {}) => {
+      if (url === '/api/cms/finanzas-fsb') return new Response(JSON.stringify({
+        acceso: { puede_ver: true, puede_gestionar: true },
+        cuentas: [{ id: 'fabian', nombre: 'Fabián Camarán', grupo: 1, condicion: 'beca', beca_porcentaje: porcentaje, activa: 1, movimientos: [] }],
+      }), { status: 200 })
+      if (url === '/api/cms/finanzas-fsb/cuentas/fabian' && opciones.method === 'PATCH') {
+        porcentaje = Number(JSON.parse(opciones.body).beca_porcentaje)
+        return new Response(JSON.stringify({ cuenta: { id: 'fabian' } }), { status: 200 })
+      }
+      if (url === '/api/cms/finanzas-fsb/cuotas' && opciones.method === 'POST') return new Response(JSON.stringify({ generadas: 1 }), { status: 201 })
+      return respuestaBase(url, opciones)
+    })
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Generar cuotas')).click()
+    const importe = raiz.querySelector('[aria-label="Importe del Grupo 1"]')
+    importe.value = '800'; importe.dispatchEvent(new Event('input', { bubbles: true }))
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Revisar participantes e importes').click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Corregir tipo de cuota')).click()
+    raiz.querySelector('[aria-label="Porcentaje de beca"]').value = '50'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Guardar cambios')).click()
+    await esperar(); await esperar()
+    expect(raiz.textContent).toContain('Paso 2 de 3')
+    expect(raiz.querySelector('[aria-label="Importe del Grupo 1"]').value).toBe('800')
+    expect(raiz.textContent).toContain('Fabián Camarán, beca 50%')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Confirmar y generar')).click()
+    await esperar(); await esperar()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/finanzas-fsb/cuotas', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('explica por qué no genera cuotas cuando solo hay voluntariado', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => url === '/api/cms/finanzas-fsb'
+      ? new Response(JSON.stringify({ acceso: { puede_ver: true, puede_gestionar: true }, cuentas: [{ id: 'v1', nombre: 'Voluntaria', grupo: 1, condicion: 'voluntariado', activa: 1, movimientos: [] }] }), { status: 200 })
+      : respuestaBase(url, opciones))
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Generar cuotas')).click()
+    const grupo1 = raiz.querySelector('[aria-label="Importe del Grupo 1"]')
+    const grupo2 = raiz.querySelector('[aria-label="Importe del Grupo 2"]')
+    grupo1.value = '800'; grupo1.dispatchEvent(new Event('input', { bubbles: true }))
+    grupo2.value = '800'; grupo2.dispatchEvent(new Event('input', { bubbles: true }))
+
+    expect(raiz.textContent).toContain('No hay participantes con cuota para generar')
+    expect(raiz.textContent).toContain('1 participante está configurado como Voluntariado')
+    expect(raiz.textContent).toContain('Revisar participantes')
+  })
+
+  it('valida el pago y confirma cuando queda guardado', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar pago')).click()
+    const guardar = raiz.querySelector('.cms-finanzas-formulario .boton-principal')
+    guardar.click()
+    expect(raiz.querySelector('.cms-finanzas-estado-movimiento').textContent).toContain('importe mayor a cero')
+
+    raiz.querySelector('[aria-label="Importe en pesos"]').value = '800'
+    raiz.querySelector('[aria-label="Medio de pago"]').value = 'transferencia'
+    guardar.click()
+    await esperar(); await esperar()
+
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/finanzas-fsb/movimientos', expect.objectContaining({ method: 'POST' }))
+    expect(raiz.textContent).toContain('Pago registrado')
+    expect(raiz.textContent).toMatch(/\$\s*800/)
+  })
+
+  it('advierte un pago duplicado y exige confirmarlo explícitamente', async () => {
+    const fetchBase = globalThis.fetch
+    let intentos = 0
+    globalThis.fetch = vi.fn(async (url, opciones = {}) => {
+      if (url === '/api/cms/finanzas-fsb/movimientos' && opciones.method === 'POST') {
+        intentos += 1
+        if (intentos === 1) return new Response(JSON.stringify({ error: 'Parece un pago duplicado.', duplicado: { movimiento_id: 'anterior' } }), { status: 409 })
+        return new Response(JSON.stringify({ movimiento: { id: 'nuevo', tipo: 'pago', concepto: 'Pago recibido', importe_centavos: -80000 }, saldo_centavos: 0 }), { status: 201 })
+      }
+      return fetchBase(url, opciones)
+    })
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Registrar pago').click()
+    raiz.querySelector('[aria-label="Importe en pesos"]').value = '800'
+    raiz.querySelector('[aria-label="Medio de pago"]').value = 'transferencia'
+    const guardar = raiz.querySelector('.cms-finanzas-formulario .boton-principal')
+    guardar.click(); await esperar()
+    expect(raiz.textContent).toContain('mismo participante, importe y fecha')
+    expect(guardar.textContent).toBe('Registrar de todos modos')
+    guardar.click(); await esperar(); await esperar()
+    const cuerpoSegundo = JSON.parse(globalThis.fetch.mock.calls.filter(([url]) => url === '/api/cms/finanzas-fsb/movimientos')[1][1].body)
+    expect(cuerpoSegundo.permitir_duplicado).toBe(true)
+    expect(raiz.textContent).toContain('Pago registrado')
+  })
+
+  it('guía inscripción, equipamiento y recargo sin exponer tipos contables', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-finanzas-fila button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar cargo')).click()
+
+    const accion = raiz.querySelector('[aria-label="Qué querés registrar"]')
+    expect([...accion.options].map((opcion) => opcion.textContent)).toEqual(expect.arrayContaining(['Pago de equipo', 'Inscripción', 'Equipamiento', 'Recargo del 10%']))
+    accion.value = 'recargo'; accion.dispatchEvent(new Event('change', { bubbles: true }))
+    const base = raiz.querySelector('[aria-label="Importe base del recargo"]')
+    base.value = '800'; base.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.querySelector('[aria-label="Importe en pesos"]').value).toBe('80')
+  })
+
+  it('abre el pago de equipo desde la cuenta con participante y concepto listos', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-finanzas-fila button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Registrar pago de equipo').click()
+    expect(raiz.querySelector('[aria-label="Qué querés registrar"]').value).toBe('pago_equipo')
+    expect(raiz.querySelector('[aria-label="Concepto"]').value).toBe('Pago de equipo')
+    expect(raiz.querySelector('.cms-finanzas-formulario .boton-principal').textContent).toBe('Registrar pago')
+  })
+
+  it('permite actualizar grupo, beca y estado de una cuenta existente', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-finanzas-fila button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Editar tipo de cuota')).click()
+
+    expect(raiz.querySelector('[aria-label="Nombre de la persona"]').value).toBe('Camila Pérez')
+    expect(raiz.querySelector('[aria-label="Grupo"]').value).toBe('1')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Guardar cambios')).click()
+    await esperar()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/finanzas-fsb/cuentas/cf1', expect.objectContaining({ method: 'PATCH' }))
+  })
+
+  it('abre el perfil exacto para archivarlo sin borrar el historial financiero', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      if (url !== '/api/cms/finanzas-fsb') return respuestaBase(url, opciones)
+      const respuesta = await respuestaBase(url, opciones)
+      const finanzas = await respuesta.json()
+      finanzas.cuentas[0].persona_id = 'p-camila'
+      return new Response(JSON.stringify(finanzas), { status: 200 })
+    })
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-finanzas-fila button')].find((boton) => boton.textContent.includes('Ver detalle')).click()
+    const archivar = [...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Archivar participante'))
+    expect(archivar.href).toContain('/personas?buscar=Camila+P%C3%A9rez&persona=p-camila&accion=archivar')
+    expect(raiz.textContent).toContain('Conserva su historial y evita nuevas cuotas')
+    archivar.click()
+    expect(alIrA).toHaveBeenCalledWith('personas', { busqueda: 'Camila Pérez', personaId: 'p-camila', accionPersona: 'archivar' })
+  })
+
+  it('no expone saldos cuando la API financiera rechaza el permiso', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => url === '/api/cms/finanzas-fsb'
+      ? new Response(JSON.stringify({ error: 'Necesitás acceso sensible vigente y pertenecer a Finanzas para consultar pagos.' }), { status: 403 })
+      : respuestaBase(url, opciones))
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+
+    expect(raiz.textContent).toContain('Necesitás acceso sensible vigente')
+    expect(raiz.textContent).toContain('Para proteger los datos de pago')
+    expect(raiz.textContent).toContain('Cómo solicitarlo')
+    expect(raiz.textContent).not.toContain('Camila Pérez')
+    expect(raiz.querySelector('.cms-finanzas-fila')).toBeNull()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Cómo solicitarlo')).click()
+    expect(alIrA).toHaveBeenCalledWith('ayuda', { busqueda: 'solicitar Datos personales completos' })
+  })
+
+  it('lleva a Administración directamente a resolver los permisos de Finanzas', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => url === '/api/cms/finanzas-fsb'
+      ? new Response(JSON.stringify({ error: 'Falta pertenecer a Finanzas.', acceso: { requisitos: { ficha_protegida: true, equipo_finanzas: false } } }), { status: 403 })
+      : respuestaBase(url, opciones))
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', perfil_acceso: 'administracion' }, alIrA, area: 'finanzas' })
+    await esperar()
+
+    expect(raiz.textContent).toContain('CumplidoDatos personales completos')
+    expect(raiz.textContent).toContain('FaltaPertenencia al equipo Finanzas')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Resolver este requisito')).click()
+    expect(alIrA).toHaveBeenCalledWith('accesos', expect.objectContaining({ resolucionAcceso: expect.objectContaining({
+      seccion: 'Finanzas', regreso: 'cms-finanzas', requisito: expect.objectContaining({ id: 'equipo:finanzas' }),
+    }) }))
+  })
+
+  it('muestra Áreas cuando MariaDB devuelve la fecha objetivo con hora', async () => {
+    const responder = globalThis.fetch.getMockImplementation()
+    globalThis.fetch.mockImplementation(async (url, opciones) => {
+      const respuesta = await responder(url, opciones)
+      if (url !== '/api/cms/tablero') return respuesta
+      const tablero = await respuesta.json()
+      tablero.proyectos[0].fecha_fin = '2026-10-01 00:00:00'
+      return new Response(JSON.stringify(tablero), { status: 200 })
+    })
+
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'areas' })
+    await esperar()
+
+    expect(raiz.textContent).toContain('Equipos, comisiones y proyectos')
+    expect(raiz.textContent).toContain('Meta 1 oct')
+  })
+
   it('extrae enlaces web desde el texto que copian Drive y otras herramientas', () => {
     expect(enlaceWebDesdeTexto('Registro MEC\nhttps://drive.google.com/file/d/abc/view?usp=sharing')).toBe('https://drive.google.com/file/d/abc/view?usp=sharing')
     expect(enlaceWebDesdeTexto('Abrir (https://canva.com/design/abc).')).toBe('https://canva.com/design/abc')
     expect(enlaceWebDesdeTexto('Registro MEC')).toBe('')
+    expect(enlaceWebDesdeTexto('prueba.aletea.org')).toBe('https://prueba.aletea.org/')
+  })
+
+  it('agrega un material identificado sin duplicar el enlace en las instrucciones', () => {
+    const descripcion = agregarRecursoADescripcion('Descargar los certificados.', 'Canva', 'Abrir https://canva.com/design/certificados.')
+    expect(descripcion).toBe('Descargar los certificados.\nCanva: https://canva.com/design/certificados')
+    expect(agregarRecursoADescripcion(descripcion, 'Canva otra vez', 'https://canva.com/design/certificados')).toBe(descripcion)
+    expect(() => agregarRecursoADescripcion('', 'Canva', 'sin enlace')).toThrow('por ejemplo')
   })
 
   it('protege cualquier campo URL nuevo con normalización de pegado', () => {
@@ -103,6 +469,8 @@ describe('tablero institucional', () => {
     entrada.dispatchEvent(pegado)
     expect(entrada.dataset.pegadoEnlaceAsistido).toBe('true')
     expect(entrada.value).toBe('https://docs.google.com/document/d/abc/view')
+    expect(entrada.selectionStart).toBe(0)
+    expect(entrada.getAttribute('aria-invalid')).toBeNull()
   })
 
   it('vincula un equipo fundacional por su clave estable aunque cambie el nombre visible', () => {
@@ -118,11 +486,11 @@ describe('tablero institucional', () => {
     expect(textoResumenManualEquipo({ nombre: 'Familias' }, [tarea], 'https://aletea.pages.dev/#cms-trabajo')).not.toContain('Dato sensible')
   })
 
-  it('orienta a una persona nueva sin ocultar el trabajo disponible', async () => {
+  it('orienta a una persona nueva sin ocultar las tareas disponibles', async () => {
     window.localStorage.removeItem('aletea:adopcion:v1:persona-nueva@aletea.org')
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Persona nueva', correo: 'persona-nueva@aletea.org' }, alIrA, area: 'trabajo' })
     await esperar(); await esperar()
-    expect(raiz.textContent).toContain('Tu trabajo y tus avisos viven acá')
+    expect(raiz.textContent).toContain('Tus tareas y avisos viven acá')
     expect(raiz.textContent).toContain('no envía mensajes automáticos por WhatsApp')
     expect(raiz.textContent).toContain('Confirmar la sala')
     ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Entendido').click()
@@ -153,7 +521,7 @@ describe('tablero institucional', () => {
   it('muestra carga semanal, explica estimaciones faltantes y permite actualizar la disponibilidad', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
     await esperar(); await esperar()
-    expect(raiz.textContent).toContain('Capacidad de trabajo')
+    expect(raiz.textContent).toContain('Capacidad y carga')
     expect(raiz.textContent).toContain('10 h asignadas')
     expect(raiz.textContent).toContain('1 sin estimar')
     expect(raiz.textContent).toContain('Revisar carga')
@@ -182,12 +550,30 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Confirmar la sala')
     expect(raiz.textContent).toContain('Claudia')
     expect(raiz.textContent).toContain('Seguimiento pendiente')
-    expect(raiz.textContent).toContain('2 equipos activos')
+    expect(raiz.textContent).toContain('4 equipos activos')
     expect(raiz.textContent).toContain('Tu seguimiento')
     expect(raiz.textContent).toContain('Horizonte institucional')
     expect(raiz.textContent).toContain('7 días')
     expect(raiz.textContent).toContain('2 tareas a tu cargo')
     expect(raiz.querySelector('.cms-radar')).not.toBeNull()
+  })
+
+  it('permite colapsar el Radar institucional y recuerda la preferencia', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA })
+    await esperar()
+    const radar = raiz.querySelector('details.cms-radar')
+    const resumen = radar.querySelector('summary')
+    expect(radar.open).toBe(true)
+    expect(resumen.textContent).toContain('Ocultar')
+    resumen.click()
+    await esperar()
+    expect(radar.open).toBe(false)
+    expect(resumen.textContent).toContain('Mostrar')
+    expect(raiz.querySelector('.cms-centro-control').classList.contains('cms-centro-radar-cerrado')).toBe(true)
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(expect.stringContaining('aletea:radar-institucional:v1:'), 'cerrado')
+    resumen.click()
+    await esperar()
+    expect(raiz.querySelector('.cms-centro-control').classList.contains('cms-centro-radar-cerrado')).toBe(false)
   })
 
   it('presenta los siete equipos como destinos en el centro de mando', async () => {
@@ -199,6 +585,68 @@ describe('tablero institucional', () => {
       expect.stringContaining('Administración'),
     ]))
     expect(raiz.querySelector('details.cms-area')).toBeNull()
+    expect(raiz.querySelector('.cms-mapa-gobierno').textContent).toContain('Comisión Directiva')
+  })
+
+  it('muestra unidades propias y vistas transversales sin duplicar su origen', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'finanzas' })
+    await esperar()
+    const unidades = [...raiz.querySelectorAll('.cms-unidad')]
+    expect(unidades).toHaveLength(1)
+    expect(unidades[0].textContent).toContain('Fútbol sin Barreras')
+    expect(unidades[0].textContent).toContain('Vista financiera')
+    expect(unidades[0].querySelector('[aria-label="Abrir Fútbol sin Barreras"]')).not.toBeNull()
+  })
+
+  it('abre una unidad como espacio de trabajo y conserva su filtro al ir a tareas', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
+    await esperar()
+    raiz.querySelector('[aria-label="Abrir Grupo Apoyo Familias"]').click()
+    expect(raiz.querySelector('.cms-captura-unidad-resumen').textContent).toContain('Grupo Apoyo Familias')
+    const tareas = [...raiz.querySelectorAll('.cms-captura-unidad-resumen a')].find((enlace) => enlace.textContent === 'Ver sus tareas')
+    expect(tareas.getAttribute('href')).toContain('/tareas?filtro=todas&unidad=uo1')
+  })
+
+  it('abre Fútbol sin Barreras desde su unidad sin repetir un módulo separado', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'deportes' })
+    await esperar()
+    expect(raiz.querySelector('.cms-modulo-deporte')).toBeNull()
+    raiz.querySelector('[aria-label="Abrir Fútbol sin Barreras"]').click()
+    expect(alIrA).toHaveBeenCalledWith('operacion')
+  })
+
+  it('permite administrar vistas cruzadas sin duplicar la unidad', async () => {
+    alcanceGlobalCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'auditoria' })
+    await esperar()
+    const tarjetaGaf = [...raiz.querySelectorAll('.cms-unidad')].find((tarjeta) => tarjeta.textContent.includes('Grupo Apoyo Familias'))
+    tarjetaGaf.querySelector('[aria-label="Editar Grupo Apoyo Familias"]').click()
+    const area = raiz.querySelector('[aria-label="Área para compartir la unidad"]')
+    area.value = 'e4'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Agregar otra área').click()
+    const vistaFinanzas = raiz.querySelector('[aria-label="Vista compartida en Finanzas"]')
+    expect(vistaFinanzas).not.toBeNull()
+    vistaFinanzas.value = 'financiero'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Guardar unidad').click()
+    await esperar(); await esperar()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/unidades/uo1/vistas', expect.objectContaining({
+      method: 'PUT', body: JSON.stringify({ vistas: [{ equipo_id: 'e4', enfoque: 'financiero' }] }),
+    }))
+  })
+
+  it('muestra una bandeja para clasificar registros anteriores sin asignarlos automáticamente', async () => {
+    alcanceGlobalCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'auditoria' })
+    await esperar()
+    const bandeja = raiz.querySelector('.cms-clasificacion-unidades')
+    expect(bandeja.textContent).toContain('Pendientes de clasificar')
+    expect(bandeja.textContent).toContain('Confirmar la sala')
+    expect(bandeja.textContent).toContain('Clasificar')
+    expect(bandeja.querySelector('[aria-label="Buscar pendientes de clasificar"]')).not.toBeNull()
+    const buscar = bandeja.querySelector('[aria-label="Buscar pendientes de clasificar"]')
+    buscar.value = 'sala'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(bandeja.querySelector('.cms-clasificacion-contador').textContent).toContain('1 de 4')
+    expect(bandeja.textContent).not.toContain('Taller de juego')
   })
 
   it('convierte el inicio móvil en una vista breve de hoy y conserva las acciones prioritarias', async () => {
@@ -208,8 +656,8 @@ describe('tablero institucional', () => {
     expect(raiz.querySelector('.cms-hoy-movil')).not.toBeNull()
     expect(raiz.querySelector('.cms-radar')).toBeNull()
     expect(raiz.textContent).not.toContain('Así se mueve Aletea hoy')
-    raiz.querySelector('.cms-hoy-alerta button').click()
-    expect(alIrA).toHaveBeenCalledWith('cms-agenda', {})
+    raiz.querySelector('.cms-hoy-alerta a').click()
+    expect(alIrA).toHaveBeenCalledWith('cms-agenda')
   })
 
   it('ofrece una creación rápida persistente en móvil sin duplicar las acciones del encabezado', async () => {
@@ -232,6 +680,16 @@ describe('tablero institucional', () => {
     buscar.value = 'taller'
     buscar.dispatchEvent(new Event('input', { bubbles: true }))
     expect(raiz.querySelector('.cms-busqueda-resultados').textContent).toContain('Evento: Taller de juego')
+  })
+
+  it('no abre los recientes solamente por enfocar el buscador', async () => {
+    window.localStorage.setItem('aletea:cms:recientes:v1:cuenta', JSON.stringify(['cms-agenda']))
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'control' })
+    await esperar()
+    const buscar = raiz.querySelector('input[aria-label="Buscar en Aletea"]')
+    buscar.dispatchEvent(new Event('focus'))
+    expect(raiz.querySelector('.cms-busqueda-recientes-control').getAttribute('aria-expanded')).toBe('false')
+    expect(raiz.querySelector('.cms-busqueda-resultados').textContent).not.toContain('Visitado recientemente')
   })
 
   it('pliega las secciones secundarias de Agenda en móvil', async () => {
@@ -355,10 +813,11 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Nueva actividad o evento')
   })
 
-  it('muestra avisos internos y permite marcarlos como leídos', async () => {
+  it('muestra notificaciones internas y permite marcarlas como leídas', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA })
     await esperar()
-    expect(raiz.textContent).toContain('Novedades')
+    expect(raiz.textContent).toContain('Notificaciones')
+    expect(raiz.textContent).not.toContain('avisos nuevos')
     expect(raiz.textContent).toContain('Nueva tarea asignada')
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Marcar como leída')).click()
     await esperar()
@@ -372,6 +831,30 @@ describe('tablero institucional', () => {
     raiz.querySelector('.cms-notificacion button').click()
     await esperar()
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { tareaId: 't1' })
+  })
+
+  it('convierte el contador de notificaciones en un acceso visible y enfocable', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
+    await esperar()
+    const panel = raiz.querySelector('#notificaciones-tareas')
+    panel.scrollIntoView = vi.fn()
+    const acceso = raiz.querySelector('.cms-resumen-personal-accion')
+    expect(acceso.textContent).toContain('1notificaciones nuevas')
+    acceso.click()
+    expect(panel.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+    expect(document.activeElement).toBe(panel)
+  })
+
+  it('mantiene el embudo, la navegación y la lista de formularios en un flujo de ancho completo', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'formularios' })
+    await esperar()
+    const principal = raiz.querySelector('.cms-control-principal')
+    expect([...principal.children].map((hijo) => hijo.className)).toEqual([
+      'cms-embudo-formularios',
+      'cms-navegacion-formularios',
+      'cms-formularios',
+    ])
+    expect(raiz.querySelectorAll('.cms-navegacion-formularios-boton')).toHaveLength(3)
   })
 
   it('muestra comunicados internos y permite iniciar uno nuevo', async () => {
@@ -410,19 +893,19 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Alertas institucionales')
     expect(raiz.textContent).toContain('Riesgo alto: Confirmación del local')
     expect(raiz.textContent).toContain('Conflicto de agenda')
-    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent.includes('Ver riesgos'))).toBe(true)
+    expect([...raiz.querySelectorAll('a')].some((enlace) => enlace.textContent.includes('Ver riesgos'))).toBe(true)
   })
 
   it('lleva cada alerta a su sección y conserva el filtro de trabajo pertinente', async () => {
     tareaBloqueadaCms = true
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Ver riesgos')).click()
-    expect(alIrA).toHaveBeenCalledWith('cms-finanzas', {})
+    ;[...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Ver riesgos')).click()
+    expect(alIrA).toHaveBeenCalledWith('cms-finanzas')
 
     const alertaBloqueada = [...raiz.querySelectorAll('.cms-alerta-institucional')]
       .find((tarjeta) => tarjeta.textContent.includes('Tarea bloqueada'))
-    alertaBloqueada.querySelector('button').click()
+    alertaBloqueada.querySelector('a').click()
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'bloqueadas' })
   })
 
@@ -517,6 +1000,45 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Sumate como voluntario')
   })
 
+  it('busca formularios y permite duplicarlos sin modificar el original', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    const buscar = raiz.querySelector('input[aria-label="Buscar formularios"]')
+    buscar.value = 'voluntario'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.textContent).toContain('Sumate como voluntario')
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Duplicar').click()
+    expect(raiz.querySelector('input[aria-label="Título del formulario"]').value).toBe('Copia de Sumate como voluntario')
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Crear copia').click()
+    await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url, configuracion]) => url === '/api/cms/formularios' && configuracion?.method === 'POST')
+    expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Copia de Sumate como voluntario', tipo: 'voluntariado' })
+  })
+
+  it('busca y ordena respuestas mostrando el próximo paso', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent.includes('Respuestas pendientes')).click()
+    const buscar = raiz.querySelector('input[aria-label="Buscar respuestas"]')
+    buscar.value = 'Camila'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.textContent).toContain('Camila Pérez')
+    expect(raiz.textContent).not.toContain('Taller de juego')
+    expect(raiz.textContent).toContain('Próximo paso: continuar')
+    const orden = raiz.querySelector('select[aria-label="Ordenar respuestas"]')
+    orden.value = 'nombre'; orden.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.querySelector('.cms-entrada strong').textContent).toBe('Camila Pérez')
+  })
+
+  it('permite a Administración preparar los formularios reales de la página de prueba', async () => {
+    alcanceGlobalCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    const preparar = [...raiz.querySelectorAll('button')].find((control) => control.textContent.includes('Preparar pruebas de la página'))
+    expect(preparar).not.toBeUndefined()
+    preparar.click()
+    await esperar()
+    expect(globalThis.fetch.mock.calls.some(([url, opciones]) => url === '/api/cms/formularios/ejemplos' && opciones.method === 'POST')).toBe(true)
+  })
+
   it('muestra y registra alianzas institucionales sin pedir contactos personales', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
@@ -578,8 +1100,15 @@ describe('tablero institucional', () => {
     await esperar()
     expect(raiz.textContent).toContain('Conflictos de agenda')
     expect(raiz.textContent).toContain('Taller de juego y Reunión de familias')
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Ver agenda')).click()
-    expect(alIrA).toHaveBeenCalledWith('agenda')
+    ;[...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Ver agenda')).click()
+    expect(alIrA).toHaveBeenCalledWith('cms-agenda')
+  })
+
+  it('explica que una serie recurrente no se compara consigo misma', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    expect(raiz.textContent).toContain('Las fechas de una misma serie recurrente no se marcan entre sí')
+    expect(raiz.textContent).toContain('2 actividades distintas coinciden')
   })
 
   it('crea y aplica una checklist reutilizable a una actividad', async () => {
@@ -640,7 +1169,7 @@ describe('tablero institucional', () => {
   it('deriva una entrada a una tarea trazable para el equipo', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    expect(raiz.textContent).toContain('Bandeja de entradas')
+    expect(raiz.textContent).toContain('Respuestas por resolver')
     expect(raiz.textContent).toContain('Camila Pérez')
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar entrada')).click()
     raiz.querySelector('input[aria-label="Nombre o referencia de la entrada"]').value = 'Lucía García'
@@ -648,6 +1177,18 @@ describe('tablero institucional', () => {
     await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/entradas')
     expect(JSON.parse(opciones.body)).toMatchObject({ tipo: 'voluntariado', nombre: 'Lucía García', equipo_id: null, prioridad: 'normal' })
+  })
+
+  it('explica el acceso vigente y no muestra respuestas cuando falta', async () => {
+    accesoRespuestasCms = false
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    expect(raiz.textContent).toContain('Respuestas protegidas')
+    expect(raiz.textContent).toContain('acceso vigente a datos personales')
+    expect(raiz.textContent).not.toContain('Camila Pérez')
+    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent.includes('Registrar entrada'))).toBe(false)
+    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent === 'Registrar respuesta')).toBe(false)
+    expect(raiz.textContent).toContain('2 respuestas')
   })
 
   it('no deriva una entrada sin nombre ni un pedido sin sus dos equipos', async () => {
@@ -726,9 +1267,12 @@ describe('tablero institucional', () => {
     expect(JSON.parse(opcionesEdicion.body)).toMatchObject({ estado: 'bloqueada', evento_id: 'ev1', fecha_seguimiento: '2026-08-15', descripcion: 'Llamar antes del jueves.' })
 
     ;[...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Confirmar la sala')).querySelector('button').click()
+    expect(raiz.textContent).toContain('El comentario es opcional')
+    raiz.querySelector('textarea[aria-label="Comentario de cierre opcional"]').value = 'La sala quedó confirmada y avisamos al equipo.'
+    ;[...raiz.querySelectorAll('form button')].find((boton) => boton.textContent === 'Completar tarea').click()
     await esperar()
     const llamadas = globalThis.fetch.mock.calls.filter(([url]) => url === '/api/cms/tareas/t1')
-    expect(JSON.parse(llamadas.at(-1)[1].body)).toEqual({ estado: 'completada' })
+    expect(JSON.parse(llamadas.at(-1)[1].body)).toEqual({ estado: 'completada', comentario_cierre: 'La sala quedó confirmada y avisamos al equipo.' })
   })
 
   it('crea un proyecto con equipo y responsable elegibles', async () => {
@@ -758,15 +1302,42 @@ describe('tablero institucional', () => {
     expect(raiz.querySelector('select[aria-label="Equipo del proyecto"]').value).toBe('e1')
   })
 
+  it('muestra y permite editar los proyectos del equipo desde Familias', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
+    await esperar()
+    const panel = [...raiz.querySelectorAll('.cms-flujo-proyectos')].find((seccion) => seccion.textContent.includes('Proyectos de Familias'))
+    expect(panel).not.toBeUndefined()
+    expect(panel.textContent).toContain('Fútbol sin Barreras')
+    ;[...panel.querySelectorAll('button')].find((control) => control.textContent === 'Editar proyecto').click()
+    expect(raiz.querySelector('input[aria-label="Nombre del proyecto"]').value).toBe('Fútbol sin Barreras')
+    expect(raiz.querySelector('select[aria-label="Equipo del proyecto"]').value).toBe('e1')
+  })
+
   it('conserva los enlaces de materiales al editar una tarea', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Confirmar la sala')).querySelectorAll('button')[1].click()
-    raiz.querySelector('textarea[aria-label="Descripción de la tarea"]').value = 'Material https://canva.com/diseno'
+    expect(raiz.textContent).toContain('Instrucciones y materiales')
+    raiz.querySelector('textarea[aria-label="Descripción de la tarea"]').value = 'Descargar los certificados.'
+    raiz.querySelector('input[aria-label="Nombre del material"]').value = 'Certificados en Canva'
+    raiz.querySelector('input[aria-label="Enlace de Canva, Drive u otro material"]').value = 'https://canva.com/diseno'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar enlace a la tarea')).click()
+    expect(raiz.querySelector('[role="status"]').textContent).toContain('Enlace agregado')
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
     const llamada = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/tareas/t1')
-    expect(JSON.parse(llamada[1].body).descripcion).toContain('https://canva.com/diseno')
+    expect(JSON.parse(llamada[1].body).descripcion).toBe('Descargar los certificados.\nCertificados en Canva: https://canva.com/diseno')
+  })
+
+  it('completa https al agregar un material con un dominio simple', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Confirmar la sala')).querySelectorAll('button')[1].click()
+    raiz.querySelector('textarea[aria-label="Descripción de la tarea"]').value = 'Revisar el sitio.'
+    raiz.querySelector('input[aria-label="Nombre del material"]').value = 'Sitio de prueba'
+    raiz.querySelector('input[aria-label="Enlace de Canva, Drive u otro material"]').value = 'prueba.aletea.org'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar enlace a la tarea')).click()
+    expect(raiz.querySelector('textarea[aria-label="Descripción de la tarea"]').value).toContain('https://prueba.aletea.org/')
   })
 
   it('muestra hitos y presupuesto ejecutado, y permite registrar ambos', async () => {
@@ -807,17 +1378,28 @@ describe('tablero institucional', () => {
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Guía de familias', url: 'https://drive.google.com/guia', tipo: 'enlace' })
   })
 
+  it('normaliza el dominio simple antes de guardar un documento', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
+    raiz.querySelector('input[aria-label="Título del recurso"]').value = 'Sitio de prueba'
+    raiz.querySelector('input[aria-label="Enlace del recurso"]').value = 'prueba.aletea.org'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/documentos')
+    expect(JSON.parse(opciones.body).url).toBe('https://prueba.aletea.org/')
+  })
+
   it('acepta texto copiado desde Google Drive y confirma el enlace reconocido', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
     const entrada = raiz.querySelector('input[aria-label="Enlace del recurso"]')
     const pegado = new Event('paste', { bubbles: true, cancelable: true })
-    Object.defineProperty(pegado, 'clipboardData', { value: { getData: () => 'Registro MEC\nhttps://drive.google.com/file/d/abc/view?usp=sharing' } })
+    Object.defineProperty(pegado, 'clipboardData', { value: { getData: () => 'Formulario de inscripciones\nhttps://docs.google.com/spreadsheets/d/1euOvZjE1Sd4CgNvmZckarDWPWmadLRKfrrf30b--gOs?usp=drive_fs' } })
     entrada.dispatchEvent(pegado)
     expect(pegado.defaultPrevented).toBe(true)
-    expect(entrada.value).toBe('https://drive.google.com/file/d/abc/view?usp=sharing')
+    expect(entrada.value).toBe('https://docs.google.com/spreadsheets/d/1euOvZjE1Sd4CgNvmZckarDWPWmadLRKfrrf30b--gOs?usp=drive_fs')
+    expect(entrada.selectionStart).toBe(0)
     expect(entrada.dataset.pegadoEnlaceAsistido).toBe('true')
-    expect(raiz.textContent).toContain('Enlace de Google Drive reconocido.')
+    expect(raiz.textContent).toContain('Enlace completo de Google listo para guardar.')
   })
 
   it('ofrece pegar el enlace y explica la alternativa si el navegador bloquea el portapapeles', async () => {
@@ -911,13 +1493,26 @@ describe('tablero institucional', () => {
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'todas' })
   })
 
+  it('muestra y permite limpiar las secciones visitadas recientemente', async () => {
+    window.localStorage.setItem('aletea:cms:recientes:v1:ale@aletea.org', JSON.stringify(['cms-trabajo']))
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    expect(raiz.textContent).not.toContain('Visitado recientemente')
+    raiz.querySelector('button.cms-busqueda-recientes-control').click()
+    expect(raiz.textContent).toContain('Visitado recientemente')
+    expect(raiz.querySelector('.cms-busqueda-reciente').textContent).toBe('Mis tareas')
+    ;[...raiz.querySelectorAll('.cms-busqueda-recientes-encabezado button')].find((control) => control.textContent === 'Limpiar').click()
+    expect(raiz.textContent).not.toContain('Visitado recientemente')
+    expect(window.localStorage.removeItem).toHaveBeenCalledWith('aletea:cms:recientes:v1:ale@aletea.org')
+  })
+
   it('expone el flujo de proyecto, el embudo de formularios y el acceso protegido a personas por área', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
     await esperar()
     expect(raiz.textContent).toContain('Contexto protegido por permisos')
     expect(raiz.textContent).toContain('Embudo de formularios')
-    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent.includes('Abrir operación y personas')).click()
-    expect(alIrA).toHaveBeenCalledWith('operacion', {})
+    ;[...raiz.querySelectorAll('a')].find((control) => control.textContent.includes('Abrir operación y personas')).click()
+    expect(alIrA).toHaveBeenCalledWith('operacion')
 
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'biblioteca' })
     await esperar()
@@ -993,7 +1588,7 @@ describe('tablero institucional', () => {
   it('abre Fútbol sin Barreras como programa del CMS', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Abrir Fútbol sin Barreras')).click()
+    ;[...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Abrir Fútbol sin Barreras')).click()
     expect(alIrA).toHaveBeenCalledWith('operacion')
   })
 
@@ -1084,10 +1679,27 @@ describe('tablero institucional', () => {
     expect(JSON.parse(opciones.body)).toMatchObject({ frecuencia_reunion: 'mensual', repetir_hasta: '2026-12-31' })
   })
 
+  it('ofrece repetir una reunión por posición mensual y envía la regla elegida', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva reunión')).click()
+    raiz.querySelector('input[aria-label="Título de la reunión"]').value = 'Consejo Asesor'
+    raiz.querySelector('[data-selector-cms="fecha-hora"]').value = '2026-09-10T19:00'
+    const frecuencia = raiz.querySelector('select[aria-label="Repetición de la reunión"]')
+    expect([...frecuencia.options].map((opcion) => opcion.textContent)).toContain('La misma semana y día, por ejemplo segundo jueves')
+    frecuencia.value = 'mensual_ordinal'; frecuencia.dispatchEvent(new Event('change', { bubbles: true }))
+    const hasta = [...raiz.querySelectorAll('[data-selector-cms="fecha"]')].find((control) => control.closest('.selector-fecha')?.textContent.includes('Repetir reunión hasta'))
+    hasta.value = '2026-12-31'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/reuniones')
+    expect(JSON.parse(opciones.body)).toMatchObject({ frecuencia_reunion: 'mensual_ordinal', repetir_hasta: '2026-12-31' })
+  })
+
   it('guarda la preparación, la minuta y el cierre de una reunión', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Editar reunión')).click()
+    expect(raiz.querySelector('[data-selector-cms="fecha-hora"]').value).toBe('2026-08-21T18:30')
     raiz.querySelector('textarea[aria-label="Minuta de la reunión"]').value = 'Se acordó confirmar la sala antes del viernes.'
     raiz.querySelector('textarea[aria-label="Resumen de la reunión"]').value = 'Acuerdo de sala'
     raiz.querySelector('select[aria-label="Estado de la reunión"]').value = 'realizada'
@@ -1095,14 +1707,14 @@ describe('tablero institucional', () => {
     await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/reuniones/r1')
     expect(opciones.method).toBe('PATCH')
-    expect(JSON.parse(opciones.body)).toMatchObject({ estado: 'realizada', minuta: 'Se acordó confirmar la sala antes del viernes.', resumen: 'Acuerdo de sala' })
+    expect(JSON.parse(opciones.body)).toMatchObject({ fecha_hora: '2026-08-21T18:30', estado: 'realizada', minuta: 'Se acordó confirmar la sala antes del viernes.', resumen: 'Acuerdo de sala' })
   })
 
   it('guarda comentarios y dependencias desde el contexto de una tarea', async () => {
     const respuestaBase = globalThis.fetch
     globalThis.fetch = vi.fn(async (url, opciones) => {
       if (url === '/api/cms/tareas/t1/contexto') return new Response(JSON.stringify({
-        tarea: { id: 't1', titulo: 'Confirmar la sala' }, dependencias: [], dependientes: [], comentarios: [],
+        tarea: { id: 't1', titulo: 'Confirmar la sala', descripcion: 'Abrí Canva: https://canva.com/design/certificados', responsable_correo: 'claudia@aletea.org', responsable_nombre: 'Claudia', fecha_limite: '2026-08-31' }, dependencias: [], dependientes: [], comentarios: [],
       }), { status: 200 })
       return respuestaBase(url, opciones)
     })
@@ -1110,6 +1722,9 @@ describe('tablero institucional', () => {
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Abrir tarea')).click()
     await esperar(); await esperar()
+    expect(raiz.textContent).toContain('Qué hay que hacer')
+    expect(raiz.querySelector('.cms-tarea-contexto-descripcion a').href).toBe('https://canva.com/design/certificados')
+    expect(raiz.textContent).toContain('Responsable: Claudia')
     raiz.querySelector('select[aria-label="Agregar dependencia"]').value = 'td1'
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Agregar dependencia').click()
     await esperar()
@@ -1121,6 +1736,25 @@ describe('tablero institucional', () => {
     await esperar()
     const [, comentario] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/tareas/t1/comentarios')
     expect(JSON.parse(comentario.body)).toEqual({ contenido: 'La sala quedó reservada.' })
+  })
+
+  it('explica el acceso vigente sin mostrar controles de una tarea protegida', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      if (url === '/api/cms/tareas/t1/contexto') return new Response(JSON.stringify({
+        tarea: { id: 't1', titulo: 'Respuesta de formulario recibida', descripcion: 'El contenido requiere acceso vigente a datos personales.' },
+        dependencias: [], dependientes: [], comentarios: [], contenido_protegido: true,
+      }), { status: 200 })
+      return respuestaBase(url, opciones)
+    })
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Abrir tarea')).click()
+    await esperar(); await esperar()
+    expect(raiz.textContent).toContain('Contenido protegido')
+    expect(raiz.textContent).toContain('Datos personales básicos')
+    expect(raiz.querySelector('textarea[aria-label="Nuevo comentario"]')).toBeNull()
+    expect(raiz.querySelector('select[aria-label="Agregar dependencia"]')).toBeNull()
   })
 
   it('permite quitar una dependencia sin tocar otras tareas', async () => {
@@ -1164,7 +1798,7 @@ describe('tablero institucional', () => {
     expect(JSON.parse(alianza.body)).toMatchObject({ estado: 'en_pausa', contacto_institucional: 'https://red.example.org', equipo_id: 'e1' })
   })
 
-  it('deriva una respuesta de formulario y cierra entradas y comunicados', async () => {
+  it('deriva una respuesta de formulario y registra su cumplimiento con contexto', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Registrar respuesta').click()
@@ -1178,9 +1812,15 @@ describe('tablero institucional', () => {
 
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Cerrar entrada').click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Registrar cumplimiento').click()
+    raiz.querySelector('input[aria-label="Fecha de cumplimiento"]').value = '2026-08-29'
+    raiz.querySelector('select[aria-label="Cómo se resolvió"]').value = 'contacto'
+    raiz.querySelector('textarea[aria-label="Por qué quedó cumplido"]').value = 'Se respondió por correo y no quedan acciones pendientes.'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/entradas/en1', expect.objectContaining({ method: 'PATCH' }))
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/entradas/en1/cumplir', expect.objectContaining({ method: 'POST' }))
+    const [, cumplimiento] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/entradas/en1/cumplir')
+    expect(JSON.parse(cumplimiento.body)).toEqual({ fecha: '2026-08-29', medio: 'contacto', motivo: 'Se respondió por correo y no quedan acciones pendientes.' })
 
     alcanceGlobalCms = true
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
@@ -1211,14 +1851,85 @@ describe('tablero institucional', () => {
     expect(globalThis.fetch.mock.calls.some(([url]) => url === '/api/cms/formularios/fp1/respuestas')).toBe(false)
   })
 
-  it('lleva los accesos rápidos a Mi trabajo, decisiones y los equipos correspondientes', async () => {
+  it('lleva los accesos rápidos a Mis tareas, decisiones y los equipos correspondientes', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'control' })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Abrir Mi trabajo')).click()
+    ;[...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Abrir Mis tareas')).click()
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo')
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Abrir decisiones y reuniones')).click()
+    ;[...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Abrir decisiones y reuniones')).click()
     expect(alIrA).toHaveBeenCalledWith('cms-agenda')
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.startsWith('Familias')).click()
+    ;[...raiz.querySelectorAll('a, button')].find((control) => control.textContent.startsWith('Familias')).click()
     expect(alIrA).toHaveBeenCalledWith('cms-familias')
+  })
+
+  it('explica el acceso sensible antes de cargar solicitudes de privacidad', async () => {
+    perfilCms = 'administracion'
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'privacidad' })
+    await esperar(); await esperar()
+    expect(raiz.textContent).toContain('Acceso sensible requerido')
+    expect(globalThis.fetch.mock.calls.some(([url]) => url === '/api/cms/solicitudes-privacidad')).toBe(false)
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Resolver este requisito').click()
+    expect(alIrA).toHaveBeenCalledWith('accesos', expect.objectContaining({ resolucionAcceso: expect.objectContaining({
+      seccion: 'Solicitudes de privacidad', requisito: expect.objectContaining({ id: 'datos-personales:sensible' }),
+    }) }))
+  })
+
+  it('muestra un avance visual y verifica identidad antes de revisar una solicitud', async () => {
+    perfilCms = 'administracion'
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      if (url === '/api/cms/tablero') {
+        const respuesta = await respuestaBase(url, opciones)
+        const tablero = await respuesta.json()
+        tablero.alcance.nivel_datos_personales = 'sensible'
+        return new Response(JSON.stringify(tablero), { status: 200 })
+      }
+      if (url === '/api/cms/solicitudes-privacidad' && !opciones?.method) return new Response(JSON.stringify({ solicitudes: [{
+        id: 'sp1', tipo: 'eliminacion', solicitante_nombre: 'Camila Pérez', contacto: 'camila@example.org', alcance: 'Respuestas de formularios', estado: 'recibida', responsable_nombre: 'Claudia', fecha_objetivo: '2026-09-10',
+      }] }), { status: 200 })
+      if (url === '/api/cms/solicitudes-privacidad/sp1') return new Response(JSON.stringify({ solicitud: { id: 'sp1', estado: 'identidad_verificada' } }), { status: 200 })
+      return respuestaBase(url, opciones)
+    })
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'privacidad' })
+    await esperar(); await esperar(); await esperar()
+    expect(raiz.textContent).toContain('Camila Pérez')
+    expect(raiz.textContent).toContain('Recibida')
+    expect(raiz.textContent).toContain('Cualquier exportación o eliminación real')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Continuar').click()
+    raiz.querySelector('textarea[aria-label="Nota o constancia de la solicitud"]').value = 'Confirmada por el correo institucional registrado.'
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Verificar identidad').click()
+    await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/solicitudes-privacidad/sp1')
+    expect(JSON.parse(opciones.body)).toEqual({ accion: 'verificar_identidad', nota: 'Confirmada por el correo institucional registrado.' })
+  })
+
+  it('propone un destino y un equipo desde Captura rápida sin guardar automáticamente', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
+    const consulta = raiz.querySelector('input[aria-label="¿Qué necesitás registrar?"]')
+    consulta.value = 'Necesitamos organizar una actividad de Familias'
+    consulta.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.querySelector('.cms-captura-sugerencia').textContent).toContain('Preparar actividad en Familias')
+    expect(globalThis.fetch.mock.calls.filter(([url]) => url !== '/api/cms/tablero')).toHaveLength(0)
+    ;[...raiz.querySelectorAll('.cms-captura-sugerencia button')].find((boton) => boton.textContent === 'Preparar actividad').click()
+    expect(raiz.querySelector('input[aria-label="Título de la actividad"]').value).toBe('Necesitamos organizar una actividad de Familias')
+    expect(raiz.querySelector('select[aria-label="Equipo de la actividad"]').value).toBe('e1')
+    expect(raiz.querySelector('select[aria-label="Responsable de la actividad"]').value).toBe('claudia@aletea.org')
+  })
+
+  it('ofrece el cierre guiado y los destinos revisables de formularios', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Cerrar reunión').click()
+    expect(raiz.textContent).toContain('Podés cerrar la reunión solo con su minuta y resumen')
+    expect(raiz.querySelectorAll('.cms-checklist-item')).toHaveLength(0)
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Agregar un acuerdo').click()
+    expect(raiz.querySelectorAll('.cms-checklist-item')).toHaveLength(1)
+    expect(raiz.textContent).toContain('Cerrar reunión y guardar acuerdos')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Cancelar').click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Nuevo formulario').click()
+    expect(raiz.querySelector('select[aria-label="Qué hacer con cada respuesta"]')).not.toBeNull()
+    expect(raiz.textContent).toContain('Nunca modifican fichas sensibles automáticamente')
   })
 })

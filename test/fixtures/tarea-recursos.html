@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="/">
+  <title>Prueba de instrucciones y materiales</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+  <main id="raiz"></main>
+  <script type="module">
+    import { crearPantallaCMS } from '../../js/ui/pantalla-cms.js'
+
+    const tarea = {
+      id: 't1', titulo: 'Emisión de certificados San Francisco de Asís',
+      descripcion: 'Objetivo: preparar y enviar los certificados.\n\nPasos:\n1. Descargar los certificados.\n2. Revisar los nombres.\n3. Enviarlos por correo.\n\nCertificados en Canva: https://canva.com/design/certificados\nCorreo de entrega: liceo@ejemplo.uy',
+      estado: 'pendiente', prioridad: 'normal', fecha_limite: '2026-08-31',
+      equipo_id: 'e1', equipo_nombre: 'Capacitaciones', responsable_correo: 'magdalena@aletea.org', responsable_nombre: 'Magdalena Martínez',
+    }
+    const tablero = {
+      alcance: { perfil: 'coordinacion', puede_gestionar: true, equipos: ['e1'] },
+      tareas: [tarea], equipos: [{ id: 'e1', nombre: 'Capacitaciones', clave: 'capacitaciones' }],
+      responsables: [{ correo: 'magdalena@aletea.org', nombre: 'Magdalena Martínez' }],
+      proyectos: [{ id: 'p1', titulo: 'Talleres para centros educativos', equipo_id: 'e1' }],
+      eventos: [], notificaciones: [], responsabilidades: [], reuniones: [], decisiones: [], documentos: [], entradas: [], formularios: [], alianzas: [], programas: [], plantillas: [], riesgos: [], hitos: [], gastos: [], recurrencias: [], automatizaciones: [], alertasPospuestas: [], comunicados: [], conflictos: [], capacidad: [], metricasTareas: [],
+    }
+    window.fetch = async (url) => {
+      if (String(url).endsWith('/api/cms/tablero')) return new Response(JSON.stringify(tablero))
+      if (String(url).endsWith('/api/cms/tareas/t1/contexto')) return new Response(JSON.stringify({ tarea, dependencias: [], dependientes: [], comentarios: [] }))
+      return new Response(JSON.stringify({ tarea }), { status: 200 })
+    }
+    crearPantallaCMS(document.querySelector('#raiz'), { sesion: { usuario: 'claudia@aletea.org', nombre: 'Claudia' }, area: 'trabajo', alIrA: () => {} })
+  </script>
+</body>
+</html>

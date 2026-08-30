@@ -63,28 +63,65 @@ export function hayQueActualizar(publicada, actual = VERSION) {
 
 // La barra solo aparece cuando de verdad hay una version distinta, asi que ver
 // aparecer una es en si mismo la respuesta a "ya llego el cambio?".
-export function barraDeActualizacion(alActualizar) {
+export function barraDeActualizacion(alActualizar, versionObjetivo = '') {
   const caja = elemento('div', ['aviso-version'])
   caja.setAttribute('role', 'status')
-  caja.appendChild(elemento('span', [], 'Hay una versión nueva de la aplicación.'))
+  const mensaje = elemento('span', [], 'Hay una versión nueva del gestor. Los cambios de contenido de la página web no activan este aviso.')
+  mensaje.setAttribute('aria-live', 'polite')
+  caja.appendChild(mensaje)
   const boton = elemento('button', ['boton'], 'Actualizar')
   boton.type = 'button'
   boton.dataset.accion = 'actualizar-version'
-  boton.addEventListener('click', alActualizar)
+  boton.addEventListener('click', async () => {
+    if (caja.dataset.estado === 'actualizando') return
+    caja.dataset.estado = 'actualizando'
+    boton.disabled = true
+    boton.textContent = 'Actualizando...'
+    mensaje.textContent = 'Preparando la versión nueva. La página se recargará automáticamente.'
+    try {
+      await alActualizar(versionObjetivo)
+    } catch {
+      caja.dataset.estado = 'error'
+      boton.disabled = false
+      boton.textContent = 'Intentar de nuevo'
+      mensaje.textContent = 'No pudimos completar la actualización. Revisá la conexión e intentá nuevamente.'
+    }
+  })
   caja.appendChild(boton)
   return caja
 }
 
+// Una recarga comun no alcanza cuando una pestana sigue bajo el trabajador
+// anterior: ese trabajador puede devolver otra vez sus modulos guardados. Antes
+// de recargar eliminamos esas copias y pedimos una comprobacion inmediata del
+// trabajador. Si alguna API no esta disponible, la recarga sigue funcionando.
+export async function recargarVersion({
+  almacen = typeof caches !== 'undefined' ? caches : null,
+  navegador = typeof navigator !== 'undefined' ? navigator : null,
+  versionObjetivo = VERSION,
+  recargar = () => location.assign(`actualizar.html?v=${encodeURIComponent(versionObjetivo)}&t=${Date.now()}`),
+} = {}) {
+  try {
+    const nombres = await almacen?.keys?.() || []
+    await Promise.all(nombres.map((nombre) => almacen.delete(nombre)))
+  } catch { /* La cache no puede impedir la recarga. */ }
+  try {
+    const registro = await navegador?.serviceWorker?.getRegistration?.()
+    await registro?.update?.()
+  } catch { /* Sin conexion, la recarga conserva el comportamiento anterior. */ }
+  recargar()
+}
+
 // Mira al entrar y cada vez que se vuelve a la pestaña, que es cuando alguien
 // acaba de recargar esperando ver un cambio.
-export function vigilarVersion(raiz, { pedir = fetch, recargar = () => location.reload() } = {}) {
+export function vigilarVersion(raiz, { pedir = fetch, recargar = (versionObjetivo) => recargarVersion({ versionObjetivo }) } = {}) {
   let avisada = false
   async function mirar() {
     if (avisada) return
     const publicada = await versionPublicada(pedir)
     if (!hayQueActualizar(publicada)) return
     avisada = true
-    raiz.prepend(barraDeActualizacion(recargar))
+    raiz.prepend(barraDeActualizacion(recargar, publicada))
   }
   mirar()
   document.addEventListener('visibilitychange', () => {

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Requisitos de acceso</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+  <style>
+    body { margin: 0; background: #FBF9FC; }
+    main { width: min(1120px, calc(100% - 32px)); margin: 32px auto; display: grid; gap: 24px; }
+    .muestra { display: grid; gap: 12px; }
+  </style>
+</head>
+<body>
+  <main>
+    <section class="muestra">
+      <h1>Permisos guiados</h1>
+      <div id="panel"></div>
+    </section>
+    <div id="accesos"></div>
+  </main>
+  <script type="module">
+    import { requisitoDatosPersonales, requisitoEquipo } from '../../js/acceso/requisitos-acceso.js'
+    import { crearPanelRequisitosAcceso } from '../../js/ui/panel-requisitos-acceso.js'
+    import { crearPantallaAccesosCloudflare } from '../../js/ui/pantalla-accesos-cloudflare.js'
+
+    const requisito = requisitoDatosPersonales('ninguno', 'sensible')
+    document.querySelector('#panel').appendChild(crearPanelRequisitosAcceso({
+      requisitos: [requisito, requisitoEquipo({ id: 'e-fin', clave: 'finanzas', nombre: 'Finanzas', cumplido: true })],
+      titulo: 'Para proteger esta sección necesitás completar estos accesos',
+      descripcion: 'Cada requisito se confirma por separado.',
+      seccion: 'Sección protegida', regreso: 'cms-futura',
+      sesion: { correo: 'admin@aletea.org', perfil_acceso: 'administracion' },
+    }))
+
+    window.fetch = async (url, opciones = {}) => {
+      if (url === '/api/usuarios' && !opciones.method) return new Response(JSON.stringify({ usuarios: [
+        { correo: 'admin@aletea.org', nombre: 'Ale', rol: 'admin', perfil_acceso: 'administracion', nivel_datos_personales: 'ninguno' },
+        { correo: 'coord@aletea.org', nombre: 'Coordinación', rol: 'usuario', perfil_acceso: 'coordinacion', nivel_datos_personales: 'ninguno' },
+      ] }))
+      if (url === '/api/cms/equipos') return new Response(JSON.stringify({ equipos: [{ id: 'e-fin', clave: 'finanzas', nombre: 'Finanzas' }] }))
+      if (url === '/api/cms/responsabilidades') return new Response(JSON.stringify({ responsabilidades: [] }))
+      return new Response(JSON.stringify({ actualizada: true }))
+    }
+    crearPantallaAccesosCloudflare(document.querySelector('#accesos'), {
+      sesion: { correo: 'admin@aletea.org' },
+      solicitudInicial: { seccion: 'Sección protegida', regreso: 'cms-futura', requisito },
+    })
+  </script>
+</body>
+</html>

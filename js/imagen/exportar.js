@@ -3,6 +3,10 @@ export function nombreDeArchivo(lista, grupo = null) {
   return grupo ? `${base}-grupo-${grupo}.png` : `${base}.png`
 }
 
+export function nombreDeArchivoHorizontal(lista) {
+  return `futbol-sin-barreras-${lista.fecha}-horizontal.png`
+}
+
 export function medidorDesde(ctx) {
   return (texto, fuente) => {
     ctx.font = fuente

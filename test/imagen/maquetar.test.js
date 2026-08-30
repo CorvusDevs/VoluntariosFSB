@@ -519,6 +519,22 @@ describe('formato de grilla', () => {
   })
 })
 
+describe('cantidad de columnas solicitada por una salida especial', () => {
+  it('permite cuatro columnas sin cambiar el valor por defecto general', () => {
+    const lista = structuredClone(LISTA)
+    lista.opcionesImagen = {
+      ...lista.opcionesImagen,
+      formato: 'retratos-nombre',
+      columnasPorFila: 4,
+    }
+    const plano = maquetar(lista, ROSTER, opciones)
+    const retratos = plano.ordenes.filter((o) => o.tipo === 'rect' && o.fila)
+    expect(retratos.length).toBeGreaterThan(0)
+    expect(new Set(retratos.map((o) => o.x)).size).toBeLessThanOrEqual(4)
+    expect(plano.ancho).toBeLessThan(ANCHO)
+  })
+})
+
 describe('aire entre el rotulo del grupo y las fotos', () => {
   // Se reporto que en la grilla las fotos tocaban el titulo. Pasaba solo ahi,
   // porque la foto arranca justo arriba de la celda, mientras que los otros dos

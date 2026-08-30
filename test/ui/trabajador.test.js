@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { registrarTrabajador, pidieronApagarlo } from '../../js/ui/trabajador.js'
+import { recargarAlCambiarControlador, registrarTrabajador, pidieronApagarlo } from '../../js/ui/trabajador.js'
 
 const contenedorFalso = () => {
   const hechos = []
   return {
     hechos,
-    async register(ruta) { hechos.push('register:' + ruta) },
+    async register(ruta, opciones) { hechos.push(`register:${ruta}:${opciones?.updateViaCache}`) },
     async getRegistrations() {
       return [{ async unregister() { hechos.push('unregister') } }]
     },
@@ -13,10 +13,22 @@ const contenedorFalso = () => {
 }
 
 describe('registro del service worker', () => {
+  it('recarga una sola vez cuando el trabajador nuevo toma el control', () => {
+    let alCambiar = null
+    let recargas = 0
+    expect(recargarAlCambiarControlador({
+      contenedor: { addEventListener(tipo, accion) { if (tipo === 'controllerchange') alCambiar = accion } },
+      recargar: () => { recargas += 1 },
+    })).toBe(true)
+    alCambiar()
+    alCambiar()
+    expect(recargas).toBe(1)
+  })
+
   it('lo registra cuando el navegador lo soporta', async () => {
     const c = contenedorFalso()
     expect(await registrarTrabajador({ contenedor: c, busqueda: '' })).toBe('registrado')
-    expect(c.hechos).toEqual(['register:sw.js'])
+    expect(c.hechos).toEqual(['register:sw.js:none'])
   })
 
   it('con ?sw=off lo desregistra, que es la salida de emergencia', async () => {
@@ -43,6 +55,21 @@ describe('registro del service worker', () => {
     // Sin trabajador funciona todo, solo vuelve la ventana de cache.
     const roto = { async register() { throw new Error('no se pudo') }, async getRegistrations() { return [] } }
     expect(await registrarTrabajador({ contenedor: roto, busqueda: '' })).toBe('fallo')
+  })
+
+  it('acepta una ruta sellada para no reutilizar un trabajador anterior', async () => {
+    const c = contenedorFalso()
+    expect(await registrarTrabajador({ contenedor: c, ruta: 'sw.js?v=2026-08-29.1732' })).toBe('registrado')
+    expect(c.hechos).toEqual(['register:sw.js?v=2026-08-29.1732:none'])
+  })
+
+  it('actualiza el trabajador sin desregistrar antes el que controla la pagina', async () => {
+    const hechos = []
+    const contenedor = {
+      async register(ruta, opciones) { hechos.push(`register:${ruta}:${opciones.updateViaCache}`) },
+    }
+    expect(await registrarTrabajador({ contenedor, ruta: 'sw.js?v=nueva' })).toBe('registrado')
+    expect(hechos).toEqual(['register:sw.js?v=nueva:none'])
   })
 })
 

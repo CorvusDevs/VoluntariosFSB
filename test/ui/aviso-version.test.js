@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
-  sello, versionPublicada, hayQueActualizar, vigilarVersion,
+  sello, versionPublicada, hayQueActualizar, recargarVersion, vigilarVersion,
 } from '../../js/ui/aviso-version.js'
 import { VERSION } from '../../js/version.js'
 
@@ -12,6 +12,33 @@ describe('sello de version', () => {
     // Ruta desde la raiz del repo: en jsdom, import.meta.url es una URL http.
     const publicado = JSON.parse(readFileSync('version.json', 'utf8'))
     expect(publicado.version).toBe(VERSION)
+  })
+
+  it('versiona la hoja de estilos y los modulos de entrada', () => {
+    const publicada = JSON.parse(readFileSync('version.json', 'utf8')).version
+    for (const nombre of ['index.html', 'formulario.html']) {
+      const html = readFileSync(nombre, 'utf8')
+      expect(html).toContain(`css/estilos.css?v=${publicada}`)
+      expect(html).toContain(`.js?v=${publicada}`)
+    }
+  })
+
+  it('sella la pagina de recuperacion que descarta trabajadores anteriores', () => {
+    const publicada = JSON.parse(readFileSync('version.json', 'utf8')).version
+    const html = readFileSync('actualizar.html', 'utf8')
+    expect(html).toContain(`const version = '${publicada}'`)
+    expect(html).toContain('serviceWorker.getRegistrations()')
+    expect(html).toContain('registro.unregister()')
+    expect(html).toContain("nombre.startsWith('voluntarios-fsb-')")
+    expect(html).toContain('caches.delete(nombre)')
+    expect(html).toContain("destino.searchParams.set('v', version)")
+  })
+
+  it('reserva el ancho del panel lateral para el aviso en el gestor', () => {
+    const css = readFileSync('css/estilos.css', 'utf8')
+    expect(css).toContain('.app-cms > .aviso-version')
+    expect(css).toContain('width: calc(100% - 256px)')
+    expect(css).toContain('margin-left: 256px')
   })
 
   it('escribe la version en la pantalla', () => {
@@ -59,6 +86,23 @@ describe('barra de actualizacion', () => {
     expect(raiz.querySelector('.aviso-version')).toBeNull()
   })
 
+  it('descarta la cache anterior y actualiza el trabajador antes de recargar', async () => {
+    const pasos = []
+    await recargarVersion({
+      almacen: {
+        keys: async () => ['anterior-a', 'anterior-b'],
+        delete: async (nombre) => { pasos.push(`borrar:${nombre}`) },
+      },
+      navegador: {
+        serviceWorker: {
+          getRegistration: async () => ({ update: async () => { pasos.push('actualizar-trabajador') } }),
+        },
+      },
+      recargar: () => { pasos.push('recargar') },
+    })
+    expect(pasos).toEqual(['borrar:anterior-a', 'borrar:anterior-b', 'actualizar-trabajador', 'recargar'])
+  })
+
   it('aparece arriba de todo cuando hay una nueva, y recarga al tocarla', async () => {
     let recargo = false
     vigilarVersion(raiz, {
@@ -68,8 +112,25 @@ describe('barra de actualizacion', () => {
     await new Promise((r) => setTimeout(r, 0))
     const aviso = raiz.querySelector('.aviso-version')
     expect(aviso).not.toBeNull()
+    expect(aviso.textContent).toContain('versión nueva del gestor')
+    expect(aviso.textContent).toContain('cambios de contenido de la página web no activan este aviso')
     expect(raiz.firstElementChild).toBe(aviso)
     raiz.querySelector('[data-accion="actualizar-version"]').click()
     expect(recargo).toBe(true)
+    expect(aviso.dataset.estado).toBe('actualizando')
+    expect(aviso.textContent).toContain('Preparando la versión nueva')
+  })
+
+  it('muestra una recuperación clara cuando actualizar falla', async () => {
+    vigilarVersion(raiz, {
+      pedir: async () => ({ ok: true, json: async () => ({ version: 'mas-nueva' }) }),
+      recargar: async () => { throw new Error('sin conexión') },
+    })
+    await new Promise((r) => setTimeout(r, 0))
+    const boton = raiz.querySelector('[data-accion="actualizar-version"]')
+    boton.click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(raiz.querySelector('.aviso-version').dataset.estado).toBe('error')
+    expect(boton.textContent).toBe('Intentar de nuevo')
   })
 })

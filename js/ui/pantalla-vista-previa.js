@@ -3,9 +3,9 @@ import { selectorVisual } from './selector-visual.js'
 import { dibujarMuestra } from './muestra-celda.js'
 import { maquetar } from '../imagen/maquetar.js'
 import { pintar } from '../imagen/pintar.js'
-import { medidorDesde, esperarFuentes, cargarImagen, descargar, compartir, nombreDeArchivo }
+import { ALTO_WHATSAPP, ANCHO_WHATSAPP, crearLienzoWhatsApp } from '../imagen/whatsapp.js'
+import { medidorDesde, esperarFuentes, cargarImagen, descargar, nombreDeArchivo, nombreDeArchivoHorizontal }
   from '../imagen/exportar.js'
-import { formatearFechaLarga } from '../util/fechas.js'
 import {
   SALUDO_POR_DEFECTO, DESPEDIDA_POR_DEFECTO, FORMATO_POR_DEFECTO, ESQUINA_VOLUNTARIO_POR_DEFECTO, TAMANO_VOLUNTARIO_POR_DEFECTO, ASOMO_VOLUNTARIO_POR_DEFECTO,
 } from '../modelo/lista.js'
@@ -54,9 +54,18 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   const textoSaludo = () => lista.saludo ?? opciones.saludo ?? SALUDO_POR_DEFECTO
   const textoDespedida = () => lista.despedida ?? opciones.despedida ?? DESPEDIDA_POR_DEFECTO
   let lista = opciones.lista
-  const lienzo = document.createElement('canvas')
-  lienzo.className = 'lienzo-vista-previa'
-  const ctx = crearContexto ? crearContexto(lienzo) : lienzo.getContext('2d')
+  const lienzoVertical = document.createElement('canvas')
+  const ctx = crearContexto ? crearContexto(lienzoVertical) : lienzoVertical.getContext('2d')
+  const lienzoHorizontal = document.createElement('canvas')
+  lienzoHorizontal.className = 'lienzo-vista-previa lienzo-vista-previa-horizontal'
+  const ctxHorizontal = crearContexto
+    ? crearContexto(lienzoHorizontal)
+    : lienzoHorizontal.getContext('2d')
+  const crearLienzoAuxiliar = () => {
+    const auxiliar = document.createElement('canvas')
+    if (crearContexto) auxiliar.getContext = () => crearContexto(auxiliar)
+    return auxiliar
+  }
   const imagenes = {}
   const fotosApareciendo = new Map()
   let plano = null
@@ -72,6 +81,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   let pestanaActiva = 'resultado'
   // Aviso puntual para la coordinadora, por ejemplo cuando compartir no anda.
   let mensaje = ''
+  let composicionHorizontal = null
 
   function calcular() {
     plano = maquetar(lista, roster, {
@@ -94,6 +104,17 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (!vivo) return
     calcular()
     pintar(ctx, plano, imagenes, DENSIDAD, null, opacidadesDeFotos())
+    const resultado = crearLienzoWhatsApp({
+      lista,
+      roster,
+      imagenes,
+      medirTexto: medidorDesde(ctx),
+      crearLienzo: crearLienzoAuxiliar,
+    })
+    composicionHorizontal = resultado.composicion
+    lienzoHorizontal.width = ANCHO_WHATSAPP
+    lienzoHorizontal.height = ALTO_WHATSAPP
+    ctxHorizontal.drawImage(resultado.lienzo, 0, 0)
     continuarFundidoDeFotos()
   }
 
@@ -338,26 +359,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function informacion() {
     const caja = elemento('div', ['info-imagen'])
-    // La relacion no cambia con la densidad: es alto sobre ancho.
-    const relacion = plano.relacion.toFixed(2).replace('.', ',')
-    const ancho = plano.ancho * DENSIDAD
-    const alto = plano.alto * DENSIDAD
-    caja.textContent = `Archivo de ${ancho} por ${alto} px, relación ${relacion}.`
-    return caja
-  }
-
-  function avisoRecorte() {
-    if (!plano.recorteProbable) return null
-    const caja = elemento('div', ['aviso-recorte'])
-    // Pasadas unas 35 filas el modo compacto tampoco alcanza. Recomendarlo
-    // igual deja a la coordinadora sin salida, asi que se lo dice de frente.
-    const salida = planoCompacto().recorteProbable
-      ? 'Ni siquiera el modo compacto alcanza para esta lista. Conviene exportar una imagen por ' +
-        'grupo, o dividir la lista en dos mensajes.'
-      : 'Si preferís evitarlo, activá el modo compacto.'
-    caja.textContent =
-      'La imagen es muy alta y WhatsApp probablemente le haga un recorte en la vista previa del ' +
-      `chat. Se sigue viendo entera al tocarla. ${salida}`
+    caja.textContent = `Imagen final horizontal ampliada de ${ANCHO_WHATSAPP} por ${ALTO_WHATSAPP} px, relación 48:31.`
     return caja
   }
 
@@ -387,19 +389,17 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function acciones() {
     const caja = elemento('div', ['acciones-imagen'])
-    caja.appendChild(boton('Descargar planificación', () => conControlesBloqueados(async () => {
-      await dibujar()
-      await descargar(lienzo, nombreDeArchivo(lista))
-    })))
-    caja.appendChild(boton('Compartir', () => conControlesBloqueados(async () => {
+    caja.appendChild(boton('Descargar imagen horizontal', () => conControlesBloqueados(async () => {
       mensaje = ''
       await dibujar()
-      const texto = `Fútbol sin Barreras, ${formatearFechaLarga(lista.fecha)}`
-      const compartido = await compartir(lienzo, nombreDeArchivo(lista), texto)
-      // Nada de alert: es un modal que bloquea y que Safari en iOS puede tapar.
-      if (!compartido) {
-        avisar('Este dispositivo no permite compartir el archivo directamente. Usá el botón Descargar planificación.')
+      await descargar(lienzoHorizontal, nombreDeArchivoHorizontal(lista))
+      if (!composicionHorizontal.legible) {
+        avisar('La lista es excepcionalmente grande. Si algún nombre queda chico, compartí una imagen por grupo.')
       }
+    }), ['boton-principal']))
+    caja.appendChild(boton('Descargar imagen vertical', () => conControlesBloqueados(async () => {
+      await dibujar()
+      await descargar(lienzoVertical, nombreDeArchivo(lista))
     })))
     return caja
   }
@@ -421,12 +421,10 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     configuracion.hidden = pestanaActiva !== 'configuracion'
     configuracion.append(panelDeFormato(), interruptores(), informacion(), mensajes())
     raiz.appendChild(configuracion)
-    const aviso = avisoRecorte()
-    if (aviso) raiz.appendChild(aviso)
     if (mensaje) raiz.appendChild(elemento('div', ['aviso'], mensaje))
     const resultado = elemento('div', ['vista-panel-resultado'])
     resultado.hidden = pestanaActiva !== 'resultado'
-    resultado.append(acciones(), lienzo)
+    resultado.append(acciones(), lienzoHorizontal)
     raiz.appendChild(resultado)
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
     // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.
@@ -490,6 +488,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     lista: () => lista,
     plano: () => plano,
     nombreDeArchivo: () => nombreDeArchivo(lista),
+    nombreDeArchivoHorizontal: () => nombreDeArchivoHorizontal(lista),
     redibujar,
     destruir,
   }

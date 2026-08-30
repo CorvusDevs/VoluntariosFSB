@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verificación de navegación CMS</title>
+    <link rel="stylesheet" href="../../css/estilos.css">
+    <style>
+      body { margin: 0; min-height: 100vh; background: #faf8fc; }
+      .navegacion-cms { position: static; display: block !important; min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <aside class="navegacion-cms navegacion-escritorio" id="navegacion"></aside>
+    <script type="module">
+      import { boton, elemento } from '../../js/ui/componentes.js'
+      import {
+        ETIQUETAS_NAVEGACION_CMS,
+        GRUPOS_NAVEGACION_CMS,
+        TITULOS_GRUPOS_NAVEGACION_CMS,
+      } from '../../js/ui/preferencias-navegacion.js'
+
+      const navegacion = document.querySelector('#navegacion')
+      ;['paginaWeb', 'comunicacionVisual', 'organizacion', 'administracion'].forEach((clave) => {
+        const grupo = elemento('details', ['navegacion-cms-grupo'])
+        grupo.open = true
+        grupo.dataset.grupoNavegacion = clave
+        const resumen = elemento('summary', ['navegacion-cms-rotulo'], TITULOS_GRUPOS_NAVEGACION_CMS[clave])
+        const opciones = elemento('div', ['navegacion-cms-opciones'])
+        opciones.append(...GRUPOS_NAVEGACION_CMS[clave].map((destino) => boton(ETIQUETAS_NAVEGACION_CMS[destino], () => {})))
+        grupo.append(resumen, opciones)
+        navegacion.appendChild(grupo)
+      })
+    </script>
+  </body>
+</html>
