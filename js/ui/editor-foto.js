@@ -52,6 +52,7 @@ export function crearEditorDeFoto({
   const capa = elemento('div', ['capa-editor'])
   const panel = elemento('section', ['editor-foto'])
   panel.setAttribute('role', 'dialog')
+  panel.setAttribute('aria-modal', 'true')
   panel.setAttribute('aria-label', `Ajustar la foto de ${persona.nombre}`)
 
   const lienzo = document.createElement('canvas')

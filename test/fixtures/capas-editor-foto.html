@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Capas del editor de foto</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+  <main class="contenedor">
+    <h1>Personas</h1>
+  </main>
+  <section class="persona-editor" aria-label="Ficha personal">
+    <h2>Perfil de Cris</h2>
+    <p>Ficha personal abierta</p>
+  </section>
+  <div class="capa-editor">
+    <section class="editor-foto" role="dialog" aria-modal="true" aria-label="Ajustar la foto de Cris">
+      <h2 class="editor-titulo">Foto de Cris</h2>
+      <p class="editor-ayuda">El editor de recorte debe quedar por encima de la ficha.</p>
+      <canvas class="editor-lienzo" width="260" height="260"></canvas>
+      <div class="editor-acciones"><button class="boton">Guardar foto</button></div>
+    </section>
+  </div>
+</body>
+</html>

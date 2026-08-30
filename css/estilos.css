@@ -1050,7 +1050,9 @@ html, body { max-width: 100%; overflow-x: hidden; }
 .capa-editor {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  /* El recorte se abre desde fichas y otros paneles. Tiene que ser la capa
+     activa, no quedar atrapado debajo del panel que lo invoco. */
+  z-index: 1300;
   display: flex;
   align-items: flex-start;
   justify-content: center;
