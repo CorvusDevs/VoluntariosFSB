@@ -294,7 +294,7 @@ function navegacion() {
 
     const movil = elemento('nav', ['navegacion-movil', 'navegacion-cms-movil'])
     movil.setAttribute('aria-label', 'Secciones principales')
-    ;[['inicio', 'Inicio'], ['cms-trabajo', 'Mis tareas'], ['cms-agenda', 'Agenda']].forEach(([destino, etiqueta]) => {
+    ;[['inicio', 'Inicio'], ['cms-trabajo', 'Mis tareas'], ['cms-areas', 'Áreas']].forEach(([destino, etiqueta]) => {
       const control = ir(destino, etiqueta)
       if (control) movil.appendChild(control)
     })

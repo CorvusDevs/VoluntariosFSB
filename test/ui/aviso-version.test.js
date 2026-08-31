@@ -86,21 +86,26 @@ describe('barra de actualizacion', () => {
     expect(raiz.querySelector('.aviso-version')).toBeNull()
   })
 
-  it('descarta la cache anterior y actualiza el trabajador antes de recargar', async () => {
+  it('abre la recuperación sin esperar al trabajador y solo limpia caches propias', async () => {
     const pasos = []
-    await recargarVersion({
+    let resolverRegistros
+    recargarVersion({
       almacen: {
-        keys: async () => ['anterior-a', 'anterior-b'],
+        keys: async () => ['voluntarios-fsb-anterior', 'cache-de-otra-aplicacion'],
         delete: async (nombre) => { pasos.push(`borrar:${nombre}`) },
       },
       navegador: {
         serviceWorker: {
-          getRegistration: async () => ({ update: async () => { pasos.push('actualizar-trabajador') } }),
+          getRegistrations: () => new Promise((resolver) => { resolverRegistros = resolver }),
         },
       },
       recargar: () => { pasos.push('recargar') },
     })
-    expect(pasos).toEqual(['borrar:anterior-a', 'borrar:anterior-b', 'actualizar-trabajador', 'recargar'])
+    expect(pasos).toEqual(['recargar'])
+    await new Promise((resolver) => setTimeout(resolver, 0))
+    expect(pasos).toEqual(['recargar', 'borrar:voluntarios-fsb-anterior'])
+    resolverRegistros([])
+    await new Promise((resolver) => setTimeout(resolver, 0))
   })
 
   it('aparece arriba de todo cuando hay una nueva, y recarga al tocarla', async () => {

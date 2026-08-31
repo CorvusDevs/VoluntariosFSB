@@ -20,7 +20,7 @@ cp servidor-cpanel/app.mjs servidor-cpanel/base-mysql.mjs servidor-cpanel/cache-
   servidor-cpanel/cargar-entorno.mjs servidor-cpanel/migraciones.mjs servidor-cpanel/rutas-web.mjs \
   "$ETAPA/servidor-cpanel/"
 cp js/rutas-gestor.js "$ETAPA/js/"
-cp package.json package-lock.json "$ETAPA/"
+cp app.js package.json package-lock.json "$ETAPA/"
 
 test -f "$ETAPA/version.json"
 test -f "$ETAPA/index.html"
@@ -36,7 +36,7 @@ if grep -Eq '(^|/)(\.htaccess|\.env([^/]*)?|node_modules|migrations)(/|$)|^dist/
   echo "El paquete de cPanel contiene una ruta prohibida." >&2
   exit 1
 fi
-for REQUERIDO in version.json index.html js/app.js css/estilos.css 'functions/api/[[ruta]].js' servidor-cpanel/app.mjs; do
+for REQUERIDO in version.json index.html js/app.js css/estilos.css app.js 'functions/api/[[ruta]].js' servidor-cpanel/app.mjs; do
   grep -Fqx "$REQUERIDO" <<<"$LISTA" || { echo "Falta $REQUERIDO en la raíz del paquete." >&2; exit 1; }
 done
 

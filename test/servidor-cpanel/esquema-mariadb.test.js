@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('esquema MariaDB para cPanel', () => {
-  it('se regenera desde las 53 migraciones y contiene el modelo completo', () => {
+  it('se regenera desde las 54 migraciones y contiene el modelo completo', () => {
     execFileSync(process.execPath, ['servidor-cpanel/generar-esquema.mjs'])
     const esquema = readFileSync('servidor-cpanel/esquema-mariadb.sql', 'utf8')
     expect(esquema.match(/^CREATE TABLE/gm)).toHaveLength(44)
@@ -24,6 +24,7 @@ describe('esquema MariaDB para cPanel', () => {
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS unidades_vistas_equipo_cms')
     expect(esquema).toContain('unidad_id VARCHAR(191) REFERENCES unidades_operativas_cms(id)')
     expect(esquema).toContain('datos_personales_sin_vencimiento INT NOT NULL DEFAULT 0')
+    expect(esquema).toContain('acceso_hasta DATE')
     expect(esquema).toContain('requiere_consentimiento')
     expect(esquema).toContain('datos MEDIUMBLOB NOT NULL')
     expect(esquema).toContain('alcance LONGTEXT NOT NULL')

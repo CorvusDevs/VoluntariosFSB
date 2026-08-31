@@ -99,16 +99,23 @@ export async function recargarVersion({
   almacen = typeof caches !== 'undefined' ? caches : null,
   navegador = typeof navigator !== 'undefined' ? navigator : null,
   versionObjetivo = VERSION,
-  recargar = () => location.assign(`actualizar.html?v=${encodeURIComponent(versionObjetivo)}&t=${Date.now()}`),
+  recargar = () => location.assign(`/actualizar.html?v=${encodeURIComponent(versionObjetivo)}&t=${Date.now()}`),
 } = {}) {
-  try {
-    const nombres = await almacen?.keys?.() || []
-    await Promise.all(nombres.map((nombre) => almacen.delete(nombre)))
-  } catch { /* La cache no puede impedir la recarga. */ }
-  try {
-    const registro = await navegador?.serviceWorker?.getRegistration?.()
-    await registro?.update?.()
-  } catch { /* Sin conexion, la recarga conserva el comportamiento anterior. */ }
+  // La pagina de recuperacion repite esta limpieza. Aqui la iniciamos como
+  // mejor esfuerzo, pero no esperamos APIs que pueden quedar pendientes en un
+  // telefono con poca conectividad. El toque siempre debe navegar de inmediato.
+  void (async () => {
+    try {
+      const nombres = await almacen?.keys?.() || []
+      await Promise.all(nombres
+        .filter((nombre) => nombre.startsWith('voluntarios-fsb-'))
+        .map((nombre) => almacen.delete(nombre)))
+    } catch { /* La cache no puede impedir la recarga. */ }
+    try {
+      const registros = await navegador?.serviceWorker?.getRegistrations?.() || []
+      await Promise.all(registros.map((registro) => registro.unregister?.()))
+    } catch { /* La recuperacion terminara la limpieza al abrirse. */ }
+  })()
   recargar()
 }
 

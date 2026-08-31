@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import { cierreTareaCmsDesde } from '../../functions/api/[[ruta]].js'
-import { actividadCmsSinDatosDeEntradas, alianzaCmsDesde, asegurarFormularioPruebaCms, avanceSolicitudPrivacidadCms, cabecerasFormularioPublico, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, cierreReunionCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, compromisoPagoFsbDesde, configuracionFinanzasFsb, conflictoAgendaCms, conflictosAgendaCms, consentimientoFormularioPublicoValido, cuentaFsbDesde, datosTareaSinSeguimientoPersonalAjeno, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventoCmsSinDatosDeEntrada, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, formulariosPruebaCms, gastoProyectoCmsDesde, gruposConflictosAgendaCms, hitoProyectoCmsDesde, idCuentaFsbVinculable, movimientoFsbDesde, notificacionCmsSinDatosDeFormulario, perfilAccesoDe, plantillaTareasCmsDesde, puedeAccederFinanzasFsb, puedeGestionarFinanzasFsb, puedeGestionarSolicitudesPrivacidadCms, puedeVerAuditoria, puedeVerDocumentoCms, puedeVerRespuestasCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, reservarEnvioFormularioPublico, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, solicitudPrivacidadCmsDesde, tareaCmsDesde, tareaCmsSinDatosDeFormulario, tareaCmsSinSeguimientoPersonalAjeno, tareaRecurrenteCmsDesde, unidadOperativaCmsDesde, vigenciaDatosPersonalesDesde } from '../../functions/api/[[ruta]].js'
+import { actividadCmsSinDatosDeEntradas, alianzaCmsDesde, asegurarFormularioPruebaCms, avanceSolicitudPrivacidadCms, cabecerasFormularioPublico, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, cierreReunionCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, compromisoPagoFsbDesde, configuracionFinanzasFsb, conflictoAgendaCms, conflictosAgendaCms, consentimientoFormularioPublicoValido, cuentaFsbDesde, datosTareaSinSeguimientoPersonalAjeno, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventoCmsSinDatosDeEntrada, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, formulariosPruebaCms, gastoProyectoCmsDesde, gruposConflictosAgendaCms, hitoProyectoCmsDesde, idCuentaFsbVinculable, movimientoFsbDesde, notificacionCmsSinDatosDeFormulario, perfilAccesoDe, plantillaTareasCmsDesde, puedeAccederFinanzasFsb, puedeGestionarFinanzasFsb, puedeGestionarSolicitudesPrivacidadCms, puedeVerAuditoria, puedeVerDocumentoCms, puedeVerRespuestasCms, puedeVerTareaCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, reservarEnvioFormularioPublico, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, solicitudPrivacidadCmsDesde, tareaCmsDesde, tareaCmsSinDatosDeFormulario, tareaCmsSinSeguimientoPersonalAjeno, tareaRecurrenteCmsDesde, unidadOperativaCmsDesde, vigenciaCuentaDesde, vigenciaDatosPersonalesDesde } from '../../functions/api/[[ruta]].js'
 
 describe('validación del CMS en Cloudflare', () => {
+  it('mantiene visible para quien la creó una tarea ya completada aunque no pertenezca a su equipo', () => {
+    const alcance = { global: false, perfil: 'coordinacion', equipos: new Set(['familias']) }
+    const tarea = { creado_por: 'claudia@aletea.org', responsable_correo: 'ale@aletea.org', equipo_id: null, estado: 'completada' }
+    expect(puedeVerTareaCms(alcance, { correo: 'claudia@aletea.org' }, tarea)).toBe(true)
+    expect(puedeVerTareaCms(alcance, { correo: 'otra@aletea.org' }, tarea)).toBe(false)
+  })
+
   it('prepara un cierre con nota, resuelve el aviso propio y notifica a quien asignó', () => {
     expect(cierreTareaCmsDesde(
       { estado: 'completada', comentario_cierre: 'Se entregó el informe final.' },
@@ -34,6 +41,12 @@ describe('validación del CMS en Cloudflare', () => {
     expect(vigenciaDatosPersonalesDesde({ nivel: 'sensible' }).error).toContain('Elegí si')
     expect(vigenciaDatosPersonalesDesde({ nivel: 'sensible', vigencia: 'temporal', hasta: '2000-01-01' }).error).toContain('fecha válida')
     expect(vigenciaDatosPersonalesDesde({ nivel: 'ninguno', vigencia: 'indefinida' })).toEqual({ vigencia: 'ninguna', hastaGuardado: null, sinVencimiento: 0 })
+  })
+
+  it('valida la duración de una cuenta antes de crearla', () => {
+    expect(vigenciaCuentaDesde({ vigencia: 'indefinida' })).toEqual({ vigencia: 'indefinida', hastaGuardado: null })
+    expect(vigenciaCuentaDesde({ vigencia: 'temporal', hasta: '2999-12-31' })).toEqual({ vigencia: 'temporal', hastaGuardado: '2999-12-31' })
+    expect(vigenciaCuentaDesde({ vigencia: 'temporal', hasta: '2000-01-01' }).error).toContain('fecha válida')
   })
 
   it('valida cuentas y firma cargos y pagos antes de guardarlos', () => {

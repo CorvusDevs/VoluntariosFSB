@@ -26,6 +26,7 @@
     instalarAyudasContextuales(document)
     const equipos = ['Familias', 'Deportes', 'Comunicación', 'Capacitaciones', 'Finanzas', 'Eventos', 'Administración'].map((nombre, indice) => ({ id: `e${indice + 1}`, nombre, clave: ['familias', 'deportes', 'comunicacion', 'capacitaciones', 'finanzas', 'eventos', 'administracion'][indice] }))
     equipos.push({ id: 'e8', nombre: 'Comisión Directiva', clave: 'comision_directiva', categoria: 'comision_directiva' })
+    equipos.push({ id: 'e9', nombre: 'Interinstitucional', clave: 'interinstitucional', categoria: 'equipo', descripcion: 'Coordinación y trabajo conjunto con otras instituciones y redes.', color: '#397dba' })
     const tablero = {
       alcance: { perfil: 'direccion', equipos: equipos.map(({ id }) => id), puede_gestionar: true, global: true },
       equipos,

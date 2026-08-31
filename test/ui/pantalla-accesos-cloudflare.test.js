@@ -187,8 +187,23 @@ describe('pantalla de accesos en Cloudflare', () => {
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar(); await esperar()
     const [, opciones] = crear.mock.calls.find(([url, opciones]) => url === '/api/usuarios' && opciones?.method === 'POST')
-    expect(JSON.parse(opciones.body)).toMatchObject({ nombre: 'Nueva coordinación', usuario: 'nueva', perfil_acceso: 'coordinacion', equipos: ['e1'] })
+    expect(JSON.parse(opciones.body)).toMatchObject({ nombre: 'Nueva coordinación', usuario: 'nueva', perfil_acceso: 'coordinacion', equipos: ['e1'], vigencia_acceso: 'indefinida', acceso_hasta: '' })
     expect(raiz.textContent).toContain('Contraseña inicial de Nueva coordinación: temporal-segura')
+  })
+
+  it('permite crear una cuenta que se cierra automáticamente en una fecha', async () => {
+    const raiz = document.getElementById('raiz')
+    crearPantallaAccesosCloudflare(raiz, { sesion: { correo: 'admin@aletea.org' } })
+    await esperar(); await esperar()
+    raiz.querySelector('input[placeholder="Nombre"]').value = 'Apoyo temporal'
+    raiz.querySelector('input[placeholder="usuario"]').value = 'apoyo.temporal'
+    raiz.querySelector('.equipos-asignados-acceso input[value="e1"]').checked = true
+    raiz.querySelector('input[name="vigencia-nueva-cuenta"][value="temporal"]').click()
+    raiz.querySelector('[data-perfil="nuevo-acceso-hasta"]').value = '2999-12-31'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url, peticion]) => url === '/api/usuarios' && peticion?.method === 'POST')
+    expect(JSON.parse(opciones.body)).toMatchObject({ vigencia_acceso: 'temporal', acceso_hasta: '2999-12-31' })
   })
 
   it('guarda una foto de perfil opcional después de crear la cuenta', async () => {

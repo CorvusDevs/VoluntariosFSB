@@ -137,6 +137,20 @@ describe('API de fichas protegidas con D1 simulado', () => {
     estado.instantesUltimoAcceso.forEach((instante) => expect(instante).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/))
   })
 
+  it('impide iniciar y continuar una sesión cuando venció la cuenta', async () => {
+    const estado = basePrueba()
+    const cookie = await prepararSesion(estado)
+    estado.usuarios.set('coordinacion@aletea.uy', {
+      ...estado.usuarios.get('coordinacion@aletea.uy'), acceso_hasta: '2000-01-01',
+    })
+
+    expect((await llamada(estado, 'sesion', { method: 'GET' }, cookie)).status).toBe(401)
+    const ingreso = await llamada(estado, 'ingresar', {
+      method: 'POST', body: JSON.stringify({ usuario: 'coordinacion@aletea.uy', contrasena: 'secreta-segura' }),
+    })
+    expect(ingreso.status).toBe(401)
+  })
+
   it('bloquea temporalmente una cuenta después de cinco intentos fallidos', async () => {
     const estado = basePrueba()
     await prepararSesion(estado)

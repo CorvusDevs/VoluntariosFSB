@@ -14,6 +14,7 @@ let automatizacionesCms
 let alertasPospuestasCms
 let alcanceGlobalCms
 let tareaBloqueadaCms
+let tareaCompletadaCms
 let vistaMovilCms
 let accesoRespuestasCms
 
@@ -27,6 +28,7 @@ beforeEach(() => {
   alertasPospuestasCms = []
   alcanceGlobalCms = false
   tareaBloqueadaCms = false
+  tareaCompletadaCms = false
   vistaMovilCms = false
   accesoRespuestasCms = true
   window.matchMedia = vi.fn(() => ({ matches: vistaMovilCms, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
@@ -67,9 +69,19 @@ beforeEach(() => {
     }), { status: 200 })
     if (url === '/api/cms/tablero') return new Response(JSON.stringify({
       alcance: { perfil: perfilCms, equipos: [], puede_gestionar: true, global: alcanceGlobalCms, nivel_datos_personales: accesoRespuestasCms ? 'operativo' : 'ninguno', puede_ver_respuestas: accesoRespuestasCms },
-      tareas: [{ id: 't1', titulo: 'Confirmar la sala', descripcion: 'Llamar antes del jueves.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 2, fecha_limite: '2026-08-18', fecha_seguimiento: '2026-08-15', equipo_id: 'e1', evento_id: 'ev1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', solicitante_correo: 'claudia@aletea.org' }, { id: 'td1', titulo: 'Priorizar accesibilidad en actividades', descripcion: 'Aplicar ajustes razonables en toda actividad nueva.', tipo: 'directriz', estado: 'pendiente', prioridad: 'alta', equipo_nombre: 'Dirección', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }, ...(tareaBloqueadaCms ? [{ id: 'tb1', titulo: 'Confirmar accesibilidad de la jornada', descripcion: 'Esperando confirmación del lugar.', estado: 'bloqueada', prioridad: 'alta', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }] : [])],
+      tareas: [{ id: 't1', titulo: 'Confirmar la sala', descripcion: 'Llamar antes del jueves.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 2, fecha_limite: '2026-08-18', fecha_seguimiento: '2026-08-15', equipo_id: 'e1', evento_id: 'ev1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', solicitante_correo: 'claudia@aletea.org', creado_por: 'claudia@aletea.org' }, { id: 'td1', titulo: 'Priorizar accesibilidad en actividades', descripcion: 'Aplicar ajustes razonables en toda actividad nueva.', tipo: 'directriz', estado: 'pendiente', prioridad: 'alta', equipo_nombre: 'Dirección', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }, ...(tareaBloqueadaCms ? [{ id: 'tb1', titulo: 'Confirmar accesibilidad de la jornada', descripcion: 'Esperando confirmación del lugar.', estado: 'bloqueada', prioridad: 'alta', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }] : []), ...(tareaCompletadaCms ? [{ id: 'tc1', titulo: 'Entregar informe a Claudia', descripcion: 'Quedó enviado.', estado: 'completada', prioridad: 'normal', creado_por: 'claudia@aletea.org', responsable_nombre: 'Ale', responsable_correo: 'ale@aletea.org', completado_en: '2026-08-30T16:20:00Z', comentarios_total: 1 }] : [])],
       proyectos: [{ id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', prioridad: 'alta', fecha_inicio: '2026-08-01', fecha_fin: '2026-10-01', presupuesto: 15000, presupuesto_ejecutado: 2250, hitos_total: 2, hitos_completados: 1, notas: 'Confirmar transporte.', equipo_id: 'e1', responsable_correo: 'claudia@aletea.org', equipo_nombre: 'Familias', responsable_nombre: 'Claudia' }],
-      equipos: [{ id: 'e1', clave: 'familias', nombre: 'Familias' }, { id: 'e2', clave: 'comision_directiva', nombre: 'Comisión Directiva', categoria: 'comision_directiva' }, { id: 'e3', clave: 'deportes', nombre: 'Deportes' }, { id: 'e4', clave: 'finanzas', nombre: 'Finanzas' }],
+      equipos: [
+        { id: 'e1', clave: 'familias', nombre: 'Familias' },
+        { id: 'e2', clave: 'comision_directiva', nombre: 'Comisión Directiva', categoria: 'comision_directiva' },
+        { id: 'e3', clave: 'deportes', nombre: 'Deportes y Recreación' },
+        { id: 'e4', clave: 'finanzas', nombre: 'Finanzas' },
+        { id: 'e5', clave: 'comunicacion', nombre: 'Comunicación' },
+        { id: 'e6', clave: 'capacitaciones', nombre: 'Capacitaciones' },
+        { id: 'e7', clave: 'eventos', nombre: 'Eventos' },
+        { id: 'e8', clave: 'administracion', nombre: 'Administración' },
+        { id: 'e9', clave: 'interinstitucional', nombre: 'Interinstitucional', descripcion: 'Trabajo conjunto con otras instituciones y redes.', color: '#397dba' },
+      ],
       responsables: [{ correo: 'claudia@aletea.org', nombre: 'Claudia' }, { correo: 'marce@aletea.org', nombre: 'Marce' }],
       responsabilidades: [{ id: 're1', equipo_id: 'e1', usuario_correo: 'claudia@aletea.org', usuario_nombre: 'Claudia', tipo: 'coordinacion' }],
       reuniones: [{ id: 'r1', titulo: 'Coordinación semanal', fecha_hora: '2026-08-21 18:30:00', estado: 'planificada', equipo_id: 'e1', equipo_nombre: 'Familias', preparacion: 'Revisar necesidades' }],
@@ -550,7 +562,7 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Confirmar la sala')
     expect(raiz.textContent).toContain('Claudia')
     expect(raiz.textContent).toContain('Seguimiento pendiente')
-    expect(raiz.textContent).toContain('4 equipos activos')
+    expect(raiz.textContent).toContain('9 equipos activos')
     expect(raiz.textContent).toContain('Tu seguimiento')
     expect(raiz.textContent).toContain('Horizonte institucional')
     expect(raiz.textContent).toContain('7 días')
@@ -586,6 +598,20 @@ describe('tablero institucional', () => {
     ]))
     expect(raiz.querySelector('details.cms-area')).toBeNull()
     expect(raiz.querySelector('.cms-mapa-gobierno').textContent).toContain('Comisión Directiva')
+    expect(raiz.querySelector('.cms-mapa-transversales').textContent).toContain('Interinstitucional')
+    expect(raiz.querySelectorAll('.cms-mapa-area')).toHaveLength(7)
+    expect(raiz.querySelector('[aria-label="Abrir Grupo Apoyo Familias, unidad de Familias"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Abrir Fútbol sin Barreras, unidad de Finanzas"]')).not.toBeNull()
+  })
+
+  it('abre una rama transversal con responsabilidades, actividad y acciones permitidas', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'areas' })
+    await esperar()
+    raiz.querySelector('[aria-label="Abrir Interinstitucional"]').click()
+    const panel = raiz.querySelector('.cms-captura-rama')
+    expect(panel.textContent).toContain('Interinstitucional')
+    expect(panel.textContent).toContain('Trabajo conjunto con otras instituciones y redes.')
+    expect(panel.textContent).toContain('Crear tarea en esta rama')
   })
 
   it('muestra unidades propias y vistas transversales sin duplicar su origen', async () => {
@@ -602,8 +628,18 @@ describe('tablero institucional', () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
     await esperar()
     raiz.querySelector('[aria-label="Abrir Grupo Apoyo Familias"]').click()
-    expect(raiz.querySelector('.cms-captura-unidad-resumen').textContent).toContain('Grupo Apoyo Familias')
-    const tareas = [...raiz.querySelectorAll('.cms-captura-unidad-resumen a')].find((enlace) => enlace.textContent === 'Ver sus tareas')
+    const panel = raiz.querySelector('.cms-captura-unidad-resumen')
+    expect(panel.textContent).toContain('Grupo Apoyo Familias')
+    expect(panel.classList.contains('cms-captura-resumen-compacto')).toBe(true)
+    expect(panel.textContent).toContain('Dentro de Familias')
+    expect(panel.textContent).toContain('Tareas abiertas')
+    expect(panel.textContent).toContain('Todo listo para empezar')
+    expect([...panel.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(expect.arrayContaining(['Resumen', 'Tareas (0)', 'Personas (1)', 'Historial (0)']))
+    ;[...panel.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent.startsWith('Personas')).click()
+    expect(raiz.querySelector('.cms-unidad-contenido').textContent).toContain('Claudia')
+    expect(raiz.querySelector('.cms-unidad-contenido').textContent).toContain('Coordinación')
+    expect(panel.querySelector('[aria-label="Cerrar ficha de Grupo Apoyo Familias"]')).not.toBeNull()
+    const tareas = [...raiz.querySelectorAll('.cms-captura-unidad-resumen a')].find((enlace) => enlace.textContent.includes('Ver trabajo de la unidad'))
     expect(tareas.getAttribute('href')).toContain('/tareas?filtro=todas&unidad=uo1')
   })
 
@@ -680,6 +716,19 @@ describe('tablero institucional', () => {
     buscar.value = 'taller'
     buscar.dispatchEvent(new Event('input', { bubbles: true }))
     expect(raiz.querySelector('.cms-busqueda-resultados').textContent).toContain('Evento: Taller de juego')
+  })
+
+  it('encuentra personas y unidades desde la búsqueda institucional', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    const buscar = raiz.querySelector('input[aria-label="Buscar en Aletea"]')
+    buscar.value = 'Claudia'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.querySelector('.cms-busqueda-resultados').textContent).toContain('Persona: Claudia')
+    buscar.value = 'Grupo Apoyo'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    const resultado = [...raiz.querySelectorAll('.cms-busqueda-resultado')].find((control) => control.textContent.includes('Unidad: GAF'))
+    expect(resultado).not.toBeNull()
+    resultado.click()
+    expect(raiz.querySelector('.cms-captura-unidad-resumen').textContent).toContain('Grupo Apoyo Familias')
   })
 
   it('no abre los recientes solamente por enfocar el buscador', async () => {
@@ -833,6 +882,33 @@ describe('tablero institucional', () => {
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { tareaId: 't1' })
   })
 
+  it('permite a quien asignó una tarea encontrarla en el historial después del cierre', async () => {
+    tareaCompletadaCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
+    await esperar()
+
+    expect(raiz.textContent).not.toContain('Entregar informe a Claudia')
+    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Historial').click()
+
+    expect(raiz.textContent).toContain('Historial de tareas')
+    expect(raiz.textContent).toContain('Entregar informe a Claudia')
+    expect(raiz.textContent).toContain('Completada')
+    expect(raiz.textContent).toContain('1 comentario de seguimiento')
+  })
+
+  it('filtra tareas asignadas por la persona y permite reabrir una cerrada', async () => {
+    tareaCompletadaCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Asignadas por mí').click()
+    expect(raiz.textContent).toContain('Confirmar la sala')
+    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Historial').click()
+    const tarea = [...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Entregar informe a Claudia'))
+    ;[...tarea.querySelectorAll('button')].find((control) => control.textContent === 'Reabrir tarea').click()
+    await esperar()
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/tareas/tc1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ estado: 'pendiente' }) }))
+  })
+
   it('convierte el contador de notificaciones en un acceso visible y enfocable', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
     await esperar()
@@ -965,6 +1041,25 @@ describe('tablero institucional', () => {
     await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/formularios')
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Inscripción a jornada', visibilidad: 'publica', tipo: 'voluntariado' })
+  })
+
+  it('muestra una vista previa y recupera el borrador local de un formulario nuevo', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo formulario')).click()
+    const titulo = raiz.querySelector('input[aria-label="Título del formulario"]')
+    titulo.value = 'Consulta para Familias'; titulo.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.querySelector('.cms-formulario-vista-previa').textContent).toContain('Consulta para Familias')
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(expect.stringContaining('borrador-formulario'), expect.stringContaining('Consulta para Familias'))
+    const almacenado = window.localStorage.setItem.mock.calls.at(-1)[1]
+    window.localStorage.setItem.mock.calls.length = 0
+    window.localStorage.getItem.mockImplementation((clave) => clave.includes('borrador-formulario') ? almacenado : null)
+    raiz.innerHTML = ''
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo formulario')).click()
+    expect(raiz.querySelector('input[aria-label="Título del formulario"]').value).toBe('Consulta para Familias')
+    expect(raiz.textContent).toContain('Borrador recuperado de este dispositivo')
   })
 
   it('exige el equipo destinatario al crear un formulario de propuesta', async () => {
@@ -1490,7 +1585,7 @@ describe('tablero institucional', () => {
     const resultado = raiz.querySelector('.cms-busqueda-resultado')
     expect(resultado.textContent).toContain('Tarea: Confirmar la sala')
     resultado.click()
-    expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'todas' })
+    expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'todas', tareaId: 't1' })
   })
 
   it('muestra y permite limpiar las secciones visitadas recientemente', async () => {

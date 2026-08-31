@@ -14,7 +14,7 @@ const camposLargos = new Set([
   'cumplida_motivo', 'motivo', 'motivo_anulacion', 'motivo_cierre', 'nota', 'nota_revision', 'observaciones', 'permisos', 'personas_necesarias', 'preparacion', 'recursos', 'respuestas_json', 'resumen',
 ])
 const camposFechaHora = /^(actualizado_en|anulado_en|asignado_en|bloqueado_hasta|cerrada_en|completado_en|creado_en|cuando|fecha_fin|fecha_hora|identidad_verificada_en|revisado_en|ultimo_acceso|ventana_inicio)$/
-const camposFecha = /^(cumplida_en|datos_personales_hasta|fecha|fecha_acuerdo|fecha_inicio|fecha_limite|fecha_objetivo|fecha_prevista|fecha_propuesta|fecha_revision|fecha_seguimiento|generada_para|postergada_hasta|proxima_fecha|semana_inicio|vence_el|vencimiento)$/
+const camposFecha = /^(acceso_hasta|cumplida_en|datos_personales_hasta|fecha|fecha_acuerdo|fecha_inicio|fecha_limite|fecha_objetivo|fecha_prevista|fecha_propuesta|fecha_revision|fecha_seguimiento|generada_para|postergada_hasta|proxima_fecha|semana_inicio|vence_el|vencimiento)$/
 
 function tipoTexto(nombre, resto) {
   if (camposFechaHora.test(nombre)) return `DATETIME${resto}`

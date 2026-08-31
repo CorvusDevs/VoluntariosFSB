@@ -41,9 +41,26 @@ No alcanza con comprobar que `version.json` cambió. Si la interfaz muestra otro
 - Conservar el `.htaccess` y la configuración Passenger que ya pertenecen al servidor.
 - Generar el paquete de cPanel únicamente con `npm run empaquetar:cpanel`.
 - El paquete debe tener `version.json`, `index.html`, `js/` y `css/` en su raíz. La auditoría rechaza un ZIP que conserve `dist/` como carpeta superior.
-- Cargar el ZIP generado y extraerlo directamente en `/home/aleteaor/gestor.aletea.org`.
+- La publicación habitual se ejecuta mediante SFTP con una clave dedicada, no desde el Administrador de archivos:
+
+```sh
+npm run publicar:cpanel -- --web-root "/ruta/local/a/aletea-web"
+```
+
+- Antes de una publicación real se puede preparar y auditar todo sin modificar el servidor:
+
+```sh
+npm run publicar:cpanel:simular -- --web-root "/ruta/local/a/aletea-web"
+```
+
+- El comando construye tres capas separadas: raíz del gestor, `dist/` de Passenger y página de prueba. Respalda cada archivo que reemplazará, transfiere con nombres temporales, activa cada archivo y reinicia Passenger al final.
+- La clave privada nunca vive en cPanel ni en el repositorio. La clave dedicada predeterminada es `~/.ssh/aletea_deploy_ed25519`; cPanel conserva únicamente su parte pública.
+- El servidor usa `adriana.servidorlinux11.com`, usuario `aleteaor` y puerto `2200`. La cuenta permite SFTP, aunque el proveedor mantenga deshabilitada la terminal.
+- La configuración local opcional vive en `~/.config/aletea/publicacion.json` y puede definir `sshHost`, `sshUser`, `sshPort`, `sshKey` y `webRoot`, pero nunca secretos.
+- Si falla la transferencia, el reinicio o la verificación viva, el comando restaura automáticamente los archivos que estaban publicados y vuelve a reiniciar Passenger.
 - No armar ni corregir el ZIP manualmente. El empaquetador usa una lista permitida para el código de aplicación y excluye `.htaccess`, secretos y migraciones.
-- Reiniciar Passenger solo después de completar la transferencia.
+- La interfaz de cPanel queda como vía de recuperación, no como procedimiento normal.
+- `npm run publicar:cpanel:api` conserva la vía anterior de API solo como recuperación avanzada.
 
 ## 5. Verificación viva
 

@@ -164,9 +164,9 @@ async function sesionDe(contexto) {
   const firmada = await leerSesionFirmada(cookies(contexto.request).vfsb_sesion, contexto.env.SESSION_SECRET)
   if (!firmada) return null
   const cuenta = await contexto.env.BASE.prepare(
-    'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
+    'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, acceso_hasta, version_sesion FROM usuarios WHERE correo = ?1 AND activo = 1',
   ).bind(firmada.usuario).first()
-  return cuenta?.version_sesion === firmada.version ? exponerCuenta(cuenta) : null
+  return cuenta?.version_sesion === firmada.version && cuentaVigente(cuenta) ? exponerCuenta(cuenta) : null
 }
 
 async function registrar(base, sesion, accion, recurso, detalle = null) {
@@ -220,7 +220,19 @@ function exponerCuenta(cuenta) {
   const { sal, hash_contrasena, version_sesion, activo, ...publica } = cuenta
   const nivelDatos = nivelDatosPersonalesDe(cuenta)
   const vigenciaDatos = nivelDatos === 'ninguno' ? 'ninguna' : cuenta?.datos_personales_sin_vencimiento ? 'indefinida' : 'temporal'
-  return { ...publica, perfil_acceso: perfilAccesoDe(cuenta), nivel_datos_personales: nivelDatos, vigencia_datos_personales: vigenciaDatos, permisos: permisosDe(cuenta) }
+  return { ...publica, perfil_acceso: perfilAccesoDe(cuenta), nivel_datos_personales: nivelDatos, vigencia_datos_personales: vigenciaDatos, vigencia_acceso: cuenta?.acceso_hasta ? 'temporal' : 'indefinida', permisos: permisosDe(cuenta) }
+}
+
+function cuentaVigente(cuenta = {}) {
+  const hasta = String(cuenta.acceso_hasta || '').trim()
+  return !hasta || (fechaValida(hasta) && hasta >= fechaActualCms())
+}
+
+export function vigenciaCuentaDesde({ vigencia = 'indefinida', hasta = '' } = {}) {
+  const modo = String(vigencia || '').trim()
+  if (!['temporal', 'indefinida'].includes(modo)) return { error: 'Elegí si la cuenta vence o queda sin vencimiento.' }
+  if (modo === 'temporal' && (!fechaValida(hasta) || hasta < fechaActualCms())) return { error: 'Indicá una fecha válida para la cuenta temporal.' }
+  return { vigencia: modo, hastaGuardado: modo === 'temporal' ? hasta : null }
 }
 
 async function claveFotoPerfil(correo) {
@@ -354,8 +366,9 @@ function puedeGestionarTareaCms(alcance, sesion, tarea) {
   return alcance.perfil === 'integrante' && tarea?.responsable_correo === sesion.correo
 }
 
-function puedeVerTareaCms(alcance, sesion, tarea) {
+export function puedeVerTareaCms(alcance, sesion, tarea) {
   if (alcance.global) return true
+  if (tarea?.creado_por === sesion.correo) return true
   if (alcance.perfil === 'integrante') return tarea?.responsable_correo === sesion.correo
   if (alcance.perfil === 'consulta') return false
   return puedeVerEquipoCms(alcance, tarea?.equipo_id)
@@ -842,12 +855,12 @@ async function ingresar(contexto) {
   const esperaActual = await bloqueoIngreso(contexto.env.BASE, clavesIntento)
   if (esperaActual) return error(`Demasiados intentos. Probá nuevamente en ${esperaActual} segundos.`, 429, { 'retry-after': String(esperaActual) })
   const cuenta = await contexto.env.BASE.prepare(`
-    SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, foto_perfil, sal, hash_contrasena, version_sesion
+    SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, acceso_hasta, foto_perfil, sal, hash_contrasena, version_sesion
     FROM usuarios WHERE correo = ?1 AND activo = 1
   `).bind(usuario).first()
   const salFicticia = new Uint8Array((await crypto.subtle.digest('SHA-256', CODIFICADOR.encode(`${contexto.env.SESSION_SECRET}:cuenta-inexistente`))).slice(0, 16))
   const derivada = await derivarContrasena(contrasena, cuenta?.sal ? new Uint8Array(cuenta.sal) : salFicticia)
-  const correcta = Boolean(cuenta?.hash_contrasena) && iguales(derivada, new Uint8Array(cuenta.hash_contrasena || 32))
+  const correcta = Boolean(cuenta?.hash_contrasena) && cuentaVigente(cuenta) && iguales(derivada, new Uint8Array(cuenta.hash_contrasena || 32))
   if (!correcta) {
     await registrarFalloIngreso(contexto.env.BASE, clavesIntento)
     return error('Usuario o contraseña incorrectos.', 401)
@@ -857,7 +870,7 @@ async function ingresar(contexto) {
   const token = await firmarSesion({ usuario: cuenta.correo, version: cuenta.version_sesion, expira }, contexto.env.SESSION_SECRET)
   await contexto.env.BASE.prepare('UPDATE usuarios SET ultimo_acceso = ?2 WHERE correo = ?1').bind(cuenta.correo, instanteUtcSql()).run()
   await registrar(contexto.env.BASE, cuenta, 'ingresar', 'sesion')
-  return responder(exponerCuenta({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol, perfil_acceso: cuenta.perfil_acceso, permisos: cuenta.permisos, nivel_datos_personales: cuenta.nivel_datos_personales, datos_personales_hasta: cuenta.datos_personales_hasta, datos_personales_sin_vencimiento: cuenta.datos_personales_sin_vencimiento }), 200, {
+  return responder(exponerCuenta({ usuario: cuenta.correo, correo: cuenta.correo, nombre: cuenta.nombre, rol: cuenta.rol, perfil_acceso: cuenta.perfil_acceso, permisos: cuenta.permisos, nivel_datos_personales: cuenta.nivel_datos_personales, datos_personales_hasta: cuenta.datos_personales_hasta, datos_personales_sin_vencimiento: cuenta.datos_personales_sin_vencimiento, acceso_hasta: cuenta.acceso_hasta }), 200, {
     'set-cookie': cookieSesion(token),
   })
 }
@@ -871,7 +884,7 @@ async function usuarios(contexto, sesion) {
   const { request, env } = contexto
   if (request.method === 'GET') {
     const filas = await env.BASE.prepare(
-      'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, foto_perfil, ultimo_acceso FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
+      'SELECT correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, datos_personales_hasta, datos_personales_sin_vencimiento, acceso_hasta, foto_perfil, ultimo_acceso FROM usuarios WHERE activo = 1 ORDER BY nombre COLLATE NOCASE',
     ).all()
     return responder({ usuarios: filas.results.map(exponerCuenta) })
   }
@@ -883,10 +896,12 @@ async function usuarios(contexto, sesion) {
     const perfil_acceso = String(datos.perfil_acceso || datos.rol || '').trim()
     const rol = perfil_acceso === 'administracion' ? 'admin' : 'coordinacion'
     const nivelDatos = 'ninguno'
+    const decisionVigencia = vigenciaCuentaDesde({ vigencia: datos.vigencia_acceso, hasta: String(datos.acceso_hasta || '').trim() })
     const equiposSolicitados = [...new Set(Array.isArray(datos.equipos) ? datos.equipos.map((equipo) => String(equipo || '').trim()).filter(Boolean) : [])]
     if (!usuarioValido(correo) || !nombre || !PERFILES_ACCESO.includes(perfil_acceso)) {
       return error('Completá nombre, usuario y un perfil de acceso válido.', 400)
     }
+    if (decisionVigencia.error) return error(decisionVigencia.error, 400)
     const necesitaEquipo = ['coordinacion', 'integrante'].includes(perfil_acceso)
     if (necesitaEquipo && !equiposSolicitados.length) return error('Asigná al menos un equipo a esta cuenta.', 400)
     if (!necesitaEquipo && equiposSolicitados.length) return error('Este perfil no necesita equipos asignados.', 400)
@@ -898,15 +913,15 @@ async function usuarios(contexto, sesion) {
     const sal = crypto.getRandomValues(new Uint8Array(16))
     const hash = await derivarContrasena(contrasena, sal)
     const consultas = [env.BASE.prepare(`
-      INSERT INTO usuarios (correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, activo, sal, hash_contrasena, version_sesion)
-      VALUES (?1, ?2, ?3, ?4, ?5, ?6, 1, ?7, ?8, 0)
-    `).bind(correo, nombre, rol, perfil_acceso, perfil_acceso === 'administracion' ? null : JSON.stringify(PERMISOS_POR_PERFIL[perfil_acceso]), nivelDatos, sal, hash)]
+      INSERT INTO usuarios (correo, nombre, rol, perfil_acceso, permisos, nivel_datos_personales, acceso_hasta, activo, sal, hash_contrasena, version_sesion)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?9, 0)
+    `).bind(correo, nombre, rol, perfil_acceso, perfil_acceso === 'administracion' ? null : JSON.stringify(PERMISOS_POR_PERFIL[perfil_acceso]), nivelDatos, decisionVigencia.hastaGuardado, sal, hash)]
     equiposSolicitados.forEach((equipoId) => consultas.push(env.BASE.prepare(`INSERT INTO responsabilidades_equipo
       (id, equipo_id, usuario_correo, tipo, creado_por) VALUES (?1, ?2, ?3, ?4, ?5)`)
       .bind(crypto.randomUUID(), equipoId, correo, perfil_acceso === 'coordinacion' ? 'coordinacion' : 'integrante', sesion.correo)))
     try { await env.BASE.batch(consultas) } catch { return error('Ese usuario ya existe o no se pudo asignar a los equipos.', 409) }
     await registrar(env.BASE, sesion, 'dar acceso', correo, perfil_acceso)
-    return responder(exponerCuenta({ usuario: correo, correo, nombre, rol, perfil_acceso, permisos: PERMISOS_POR_PERFIL[perfil_acceso], nivel_datos_personales: nivelDatos, equipos: equiposSolicitados, contrasena }), 201)
+    return responder(exponerCuenta({ usuario: correo, correo, nombre, rol, perfil_acceso, permisos: PERMISOS_POR_PERFIL[perfil_acceso], nivel_datos_personales: nivelDatos, acceso_hasta: decisionVigencia.hastaGuardado, equipos: equiposSolicitados, contrasena }), 201)
   }
   if (request.method === 'PATCH') {
     let datos

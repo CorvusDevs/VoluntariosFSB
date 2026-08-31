@@ -47,6 +47,10 @@ const ESTADOS_PERMISO = {
   administrar: ['Administrar accesos', 'ajustes'],
 }
 
+const hoyEnUruguay = () => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Montevideo', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date())
+
 function vigenciaDatosDe(usuario = {}) {
   if (!usuario.nivel_datos_personales || usuario.nivel_datos_personales === 'ninguno') return 'ninguna'
   if (usuario.vigencia_datos_personales === 'indefinida' || Number(usuario.datos_personales_sin_vencimiento) === 1) return 'indefinida'
@@ -60,6 +64,12 @@ function textoVigenciaDatos(usuario = {}) {
   return usuario.datos_personales_hasta
     ? `Hasta ${usuario.datos_personales_hasta.split('-').reverse().join('/')}`
     : 'Falta definir la fecha'
+}
+
+function textoVigenciaCuenta(usuario = {}) {
+  return usuario.acceso_hasta
+    ? `Cuenta activa hasta ${usuario.acceso_hasta.split('-').reverse().join('/')}`
+    : 'Cuenta sin vencimiento'
 }
 
 export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = []) {
@@ -246,6 +256,42 @@ export function crearPantallaAccesosCloudflare(raiz, {
     })
     rol.value = 'coordinacion'
     const ayudaPerfil = elemento('p', ['ayuda-ajustes'], PERFILES[rol.value][1])
+    const selectorVenceCuenta = crearSelectorFecha({
+      clave: 'nuevo-acceso-hasta',
+      rotulo: 'Cuenta activa hasta',
+      min: hoyEnUruguay(),
+    })
+    const duracionCuenta = document.createElement('fieldset')
+    duracionCuenta.className = 'acceso-vigencia-opciones'
+    duracionCuenta.appendChild(elemento('legend', [], 'Duración de la cuenta'))
+    const modosCuenta = new Map()
+    ;[
+      ['indefinida', 'Sin vencimiento', 'Permanece activa hasta que Administración la quite.'],
+      ['temporal', 'Hasta una fecha', 'Se cierra automáticamente al terminar la fecha elegida.'],
+    ].forEach(([valor, etiqueta, descripcion]) => {
+      const opcion = document.createElement('label')
+      opcion.className = 'acceso-vigencia-opcion'
+      const radio = document.createElement('input')
+      radio.type = 'radio'; radio.name = 'vigencia-nueva-cuenta'; radio.value = valor
+      const textos = elemento('span')
+      textos.append(elemento('strong', [], etiqueta), elemento('small', [], descripcion))
+      opcion.append(radio, textos)
+      duracionCuenta.appendChild(opcion)
+      modosCuenta.set(valor, radio)
+    })
+    modosCuenta.get('indefinida').checked = true
+    const resumenDuracion = elemento('p', ['acceso-vigencia-resumen'])
+    const actualizarDuracionCuenta = () => {
+      const temporal = modosCuenta.get('temporal').checked
+      selectorVenceCuenta.campo.hidden = !temporal
+      selectorVenceCuenta.establecerActivo(temporal)
+      if (!temporal) selectorVenceCuenta.fijarValor('')
+      resumenDuracion.textContent = temporal
+        ? 'La cuenta dejará de iniciar sesión al terminar esa fecha.'
+        : 'La cuenta seguirá activa hasta que Administración la quite.'
+    }
+    modosCuenta.forEach((radio) => radio.addEventListener('change', actualizarDuracionCuenta))
+    actualizarDuracionCuenta()
     const equiposAsignados = document.createElement('fieldset')
     equiposAsignados.className = 'equipos-asignados-acceso'
     equiposAsignados.appendChild(elemento('legend', [], 'Equipos asignados'))
@@ -282,7 +328,9 @@ export function crearPantallaAccesosCloudflare(raiz, {
         enviar.textContent = 'Guardando acceso...'
         const creada = await pedir('/api/usuarios', {
           method: 'POST', body: JSON.stringify({ nombre: nombre.value, usuario: usuario.value, perfil_acceso: rol.value,
-            equipos: [...equiposAsignados.querySelectorAll('input:checked')].map((casilla) => casilla.value) }),
+            equipos: [...equiposAsignados.querySelectorAll('input:checked')].map((casilla) => casilla.value),
+            vigencia_acceso: modosCuenta.get('temporal').checked ? 'temporal' : 'indefinida',
+            acceso_hasta: selectorVenceCuenta.entrada.value }),
         })
         await guardarFotoPerfil(creada.correo, preparada)
         contrasenaNueva = creada
@@ -295,7 +343,7 @@ export function crearPantallaAccesosCloudflare(raiz, {
     enviar.type = 'submit'
     const forma = document.createElement('form')
     forma.className = 'formulario-agregar'
-    forma.append(campoAcceso('Nombre completo', nombre), campoAcceso('Usuario', usuario), ayudaUsuario, campoArchivo('Foto de perfil', fotoPerfil), ayudaFoto, campoAcceso('Perfil de acceso', rol), ayudaPerfil, equiposAsignados, enviar)
+    forma.append(campoAcceso('Nombre completo', nombre), campoAcceso('Usuario', usuario), ayudaUsuario, campoArchivo('Foto de perfil', fotoPerfil), ayudaFoto, campoAcceso('Perfil de acceso', rol), ayudaPerfil, duracionCuenta, selectorVenceCuenta.campo, resumenDuracion, equiposAsignados, enviar)
     forma.addEventListener('submit', (evento) => {
       evento.preventDefault()
       if (['coordinacion', 'integrante'].includes(rol.value) && !equiposAsignados.querySelector('input:checked')) {
@@ -434,7 +482,7 @@ export function crearPantallaAccesosCloudflare(raiz, {
       const adopcion = estadoAdopcion(usuario)
       datosIdentidad.append(
         elemento('strong', [], usuario.nombre),
-        elemento('span', ['ayuda-ajustes'], `${usuarioVisible(usuario)} · ${PERFILES[usuario.perfil_acceso]?.[0] ?? 'Coordinación'} · ${NIVELES_DATOS[usuario.nivel_datos_personales]?.[0] ?? 'Sin acceso a datos personales'} · ${usuario.ultimo_acceso ? `Último acceso: ${evitarCortesHora(new Intl.DateTimeFormat('es-UY', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Montevideo' }).format(fechaDesdeUTC(usuario.ultimo_acceso)))}` : 'Aún no ingresó'}`),
+        elemento('span', ['ayuda-ajustes'], `${usuarioVisible(usuario)} · ${PERFILES[usuario.perfil_acceso]?.[0] ?? 'Coordinación'} · ${textoVigenciaCuenta(usuario)} · ${NIVELES_DATOS[usuario.nivel_datos_personales]?.[0] ?? 'Sin acceso a datos personales'} · ${usuario.ultimo_acceso ? `Último acceso: ${evitarCortesHora(new Intl.DateTimeFormat('es-UY', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'America/Montevideo' }).format(fechaDesdeUTC(usuario.ultimo_acceso)))}` : 'Aún no ingresó'}`),
         elemento('span', ['estado-adopcion', `estado-adopcion-${adopcion.clave}`], adopcion.texto),
       )
       identidad.appendChild(datosIdentidad)

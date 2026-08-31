@@ -124,6 +124,21 @@ const MIGRACIONES = [
         WHERE clave = 'comision_directiva' AND informa_a = 'Comisión Directiva'`)
     },
   },
+  {
+    nombre: '0054_vigencia_cuentas',
+    async aplicar(conexion) {
+      const [columnas] = await conexion.execute(
+        'SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ? LIMIT 1',
+        ['usuarios', 'acceso_hasta'],
+      )
+      if (!columnas.length) await conexion.query('ALTER TABLE usuarios ADD COLUMN acceso_hasta DATE NULL')
+      const [indices] = await conexion.execute(
+        'SELECT 1 FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ? LIMIT 1',
+        ['usuarios', 'usuarios_acceso_hasta_activo'],
+      )
+      if (!indices.length) await conexion.query('CREATE INDEX usuarios_acceso_hasta_activo ON usuarios (activo, acceso_hasta)')
+    },
+  },
 ]
 
 export async function aplicarMigracionesMariaDb(base) {

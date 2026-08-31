@@ -30,9 +30,10 @@ describe('migraciones incrementales de MariaDB', () => {
     const { base, conexion } = baseFalsa({ columnas: ['cumplida_en'] })
     await aplicarMigracionesMariaDb(base)
     const alteraciones = conexion.query.mock.calls.map(([sql]) => sql).filter((sql) => sql.includes('ADD COLUMN'))
-    expect(alteraciones).toHaveLength(9)
+    expect(alteraciones).toHaveLength(10)
     expect(alteraciones.some((sql) => sql.includes('cumplida_en'))).toBe(false)
-    expect(conexion.commit).toHaveBeenCalledTimes(2)
+    expect(alteraciones.some((sql) => sql.includes('usuarios ADD COLUMN acceso_hasta'))).toBe(true)
+    expect(conexion.commit).toHaveBeenCalledTimes(3)
     expect(conexion.execute.mock.calls.some(([sql]) => sql.includes('INSERT INTO migraciones_cms'))).toBe(true)
     const crearHistorial = conexion.query.mock.calls.map(([sql]) => sql).find((sql) => sql.includes('CREATE TABLE IF NOT EXISTS historial_entradas_cms'))
     expect(crearHistorial).toContain('id VARCHAR(191) PRIMARY KEY')
@@ -48,7 +49,7 @@ describe('migraciones incrementales de MariaDB', () => {
   })
 
   it('no repite una migración ya aplicada', async () => {
-    const { base, conexion } = baseFalsa({ aplicadas: ['0052_cumplimientos_formularios_cms', '0053_unidades_operativas_cms'] })
+    const { base, conexion } = baseFalsa({ aplicadas: ['0052_cumplimientos_formularios_cms', '0053_unidades_operativas_cms', '0054_vigencia_cuentas'] })
     await aplicarMigracionesMariaDb(base)
     expect(conexion.beginTransaction).not.toHaveBeenCalled()
     expect(conexion.query.mock.calls.some(([sql]) => sql.includes('ADD COLUMN'))).toBe(false)

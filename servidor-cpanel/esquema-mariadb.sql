@@ -20,7 +20,8 @@ CREATE TABLE IF NOT EXISTS usuarios(
   datos_personales_hasta DATE,
   foto_perfil VARCHAR(191),
   datos_personales_sin_vencimiento INT NOT NULL DEFAULT 0
-  CHECK(datos_personales_sin_vencimiento IN(0, 1))
+  CHECK(datos_personales_sin_vencimiento IN(0, 1)),
+  acceso_hasta DATE
 );
 CREATE TABLE IF NOT EXISTS documentos(
   ruta VARCHAR(191) PRIMARY KEY,
@@ -797,6 +798,8 @@ ON unidades_operativas_cms(
   estado,
   orden
 );
+CREATE INDEX usuarios_acceso_hasta_activo
+ON usuarios(activo, acceso_hasta);
 
 DROP TRIGGER IF EXISTS tareas_cms_registrar_asignacion_insert;
 CREATE TRIGGER tareas_cms_registrar_asignacion_insert BEFORE INSERT ON tareas_cms FOR EACH ROW SET NEW.asignado_en = IF(NEW.responsable_correo IS NULL, NULL, COALESCE(NEW.asignado_en, CURRENT_TIMESTAMP));
