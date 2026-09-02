@@ -17,6 +17,8 @@ export const RUTAS_GESTOR = Object.freeze({
   'cms-agenda': '/agenda',
   'cms-pagina-web': '/pagina-web',
   'cms-comunicacion-visual': '/comunicacion-visual',
+  'cms-comunicaciones': '/comunicaciones',
+  'cms-operaciones': '/operaciones',
   'cms-areas': '/areas',
   'cms-formularios': '/formularios',
   'cms-biblioteca': '/biblioteca',
@@ -62,6 +64,8 @@ const TITULOS = Object.freeze({
   '/agenda': ['Agenda institucional | Aletea', 'Agenda privada de actividades y reuniones de Aletea.'],
   '/pagina-web': ['Página web | Aletea', 'Edición privada del sitio público de Aletea.'],
   '/comunicacion-visual': ['Comunicación visual | Aletea', 'Editor institucional de piezas de comunicación de Aletea.'],
+  '/comunicaciones': ['Comunicaciones | Aletea', 'Gestión privada de contactos, consentimiento y campañas de Aletea.'],
+  '/operaciones': ['Centro de operaciones | Aletea', 'Estado privado de integraciones, automatizaciones e incidentes del gestor de Aletea.'],
   '/areas': ['Áreas | Aletea', 'Organización privada de áreas y equipos de Aletea.'],
   '/formularios': ['Formularios | Aletea', 'Gestión privada de formularios institucionales de Aletea.'],
   '/biblioteca': ['Biblioteca | Aletea', 'Biblioteca de materiales y enlaces institucionales de Aletea.'],
@@ -95,6 +99,16 @@ function contextoDesdeConsulta(pantalla, consulta = '') {
     const unidadId = parametros.get('unidad')?.trim()
     if (unidadId) contexto.unidadId = unidadId.slice(0, 100)
   }
+  if (pantalla === 'ayuda') {
+    const volverPantalla = parametros.get('volver')?.trim()
+    if (volverPantalla && PANTALLAS_GESTOR.includes(volverPantalla) && volverPantalla !== 'ayuda') {
+      contexto.volverPantalla = volverPantalla
+      try {
+        const volverContexto = JSON.parse(parametros.get('contexto') || '{}')
+        if (volverContexto && typeof volverContexto === 'object' && !Array.isArray(volverContexto)) contexto.volverContexto = volverContexto
+      } catch { contexto.volverContexto = {} }
+    }
+  }
   return contexto
 }
 
@@ -111,6 +125,11 @@ function consultaDesdeContexto(pantalla, contexto = {}) {
     if (tareaId) parametros.set('tarea', String(tareaId).slice(0, 100))
     if (filtroTrabajo) parametros.set('filtro', String(filtroTrabajo).slice(0, 40))
     if (contexto.unidadId) parametros.set('unidad', String(contexto.unidadId).slice(0, 100))
+  }
+  if (pantalla === 'ayuda' && PANTALLAS_GESTOR.includes(contexto.volverPantalla) && contexto.volverPantalla !== 'ayuda') {
+    parametros.set('volver', contexto.volverPantalla)
+    const permitido = Object.fromEntries(Object.entries(contexto.volverContexto || {}).filter(([clave, valor]) => ['tareaId', 'tarea', 'filtroTrabajo', 'filtro', 'unidadId', 'personaId', 'accionPersona', 'busqueda'].includes(clave) && ['string', 'number', 'boolean'].includes(typeof valor)))
+    if (Object.keys(permitido).length) parametros.set('contexto', JSON.stringify(permitido))
   }
   return parametros.toString()
 }

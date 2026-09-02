@@ -5,6 +5,7 @@ const MAX_ITERACIONES = ITERACIONES * 2
 const LARGO_SAL = 16
 const LARGO_IV = 12
 export const LARGO_MINIMO_CONTRASENA = 16
+export const LARGO_CLAVE_ACCESO = 32
 
 const ALFABETO = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
 
@@ -25,6 +26,10 @@ export function generarContrasena(longitud = LARGO_MINIMO_CONTRASENA) {
     }
   }
   return salida
+}
+
+export function generarClaveAcceso() {
+  return generarContrasena(LARGO_CLAVE_ACCESO)
 }
 
 function aBase64(datos) {

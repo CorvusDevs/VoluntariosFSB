@@ -1,7 +1,227 @@
-export const VERSION_NOVEDADES = '1.9.15'
+export const VERSION_NOVEDADES = '2.0.9'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.0.9', estado: 'Preparada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Fútbol sin Barreras', 'Planillas', 'Vista previa'],
+    resumen: ['Una A4 por cancha', 'Fotos de ambos roles', 'Asignaciones múltiples completas'],
+    descripcion: 'Las planillas incorporan una salida A4 operativa por cancha y permiten revisar todas las orientaciones antes de descargar.',
+    actualizaciones: [
+      'Vista previa permite alternar entre la composición horizontal, la vertical completa y cada cancha en A4.',
+      'Cada hoja A4 reúne participantes, voluntariado y apoyos correspondientes a una sola cancha.',
+    ],
+    adiciones: [
+      'Las asignaciones muestran las fotos disponibles de participantes y voluntariado en el mismo bloque.',
+      'Ayuda explica cómo descargar cada cancha y cómo se representan las relaciones múltiples.',
+    ],
+    arreglos: [
+      'Un voluntario compartido por varias personas se muestra como una sola asignación grupal.',
+      'Un participante con varios voluntarios conserva a todas las personas acompañantes en la misma tarjeta.',
+      'La vista vertical ya no queda disponible solamente como descarga sin vista previa.',
+    ],
+  },
+  {
+    version: '2.0.8', estado: 'Preparada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Tareas', 'Administración', 'Ayuda'],
+    resumen: ['Menos botones en la bandeja', 'Completadas por alcance', 'Historial entregado por el servidor'],
+    descripcion: 'La bandeja prioriza las vistas cotidianas y permite revisar el trabajo completado propio, asignado o institucional sin perder filtros.',
+    actualizaciones: [
+      'Mis pendientes, Completadas, Asignadas por mí y Todo abierto quedan como vistas principales.',
+      'Las vistas operativas menos frecuentes se agrupan en Más vistas.',
+      'Dentro de Completadas, Administración puede elegir Todas las visibles, Completadas por mí o Asignadas por mí.',
+    ],
+    adiciones: [
+      'Ayuda explica cómo encontrar tareas que otra persona completó y dónde quedaron los filtros secundarios.',
+    ],
+    arreglos: [
+      'El tablero vuelve a recibir las tareas completadas y canceladas que antes eran excluidas por la consulta del servidor.',
+      'El contador y la lista de Completadas ahora parten del mismo conjunto visible para la cuenta.',
+    ],
+  },
+  {
+    version: '2.0.7', estado: 'Publicada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Tareas', 'Seguimiento', 'Ayuda'],
+    resumen: ['Completadas fáciles de encontrar', 'Reactivar y agendar en un paso', 'Historial separado de cancelaciones'],
+    descripcion: 'Las tareas terminadas dejan de quedar escondidas bajo una etiqueta ambigua y pueden retomarse con una nueva fecha sin perder su contexto.',
+    actualizaciones: [
+      'Mis tareas incorpora la sección Completadas con un contador visible y las tareas más recientes primero.',
+      'Las tareas canceladas quedan en un filtro separado para no mezclarse con el trabajo efectivamente terminado.',
+      'La búsqueda permite localizar una tarea completada por su título o descripción.',
+    ],
+    adiciones: [
+      'Reactivar y agendar solicita una nueva fecha de seguimiento y permite elegir el estado con el que continúa la tarea.',
+      'La persona responsable también puede retomar su propia tarea, aunque no tenga permisos generales de coordinación.',
+      'Ayuda responde dónde encontrar una tarea completada y cómo continuarla cuando surge un nuevo paso.',
+    ],
+    arreglos: [
+      'Historial deja de ser la única etiqueta para encontrar tareas completadas.',
+      'Reabrir ya no envía una tarea a pendientes sin indicar cuándo debe retomarse.',
+      'El cierre y los comentarios anteriores permanecen vinculados a la misma tarea después de reactivarla.',
+    ],
+  },
+  {
+    version: '2.0.6', estado: 'Publicada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Tareas', 'Reuniones', 'Navegación', 'Ayuda'],
+    resumen: ['Seguimiento previo de reuniones', 'Tareas recurrentes al crear', 'Logo siempre visible'],
+    descripcion: 'Las rutinas y la preparación de reuniones pasan a estar donde las personas esperan encontrarlas, con recordatorios visibles y una navegación lateral más estable.',
+    actualizaciones: [
+      'Nueva reunión y Editar reunión permiten elegir una fecha de seguimiento para preparar materiales, presentaciones o confirmaciones.',
+      'Nueva tarea ofrece repetición semanal o mensual sin obligar a buscar la función en otro panel.',
+      'La primera ocurrencia de una tarea recurrente se crea de inmediato y cada período conserva su propio historial.',
+    ],
+    adiciones: [
+      'Las tarjetas de reunión muestran la fecha de seguimiento junto a la fecha del encuentro.',
+      'El Centro de decisiones indica cuántas reuniones próximas tienen seguimiento programado.',
+      'Ayuda incorpora respuestas directas para preparación de reuniones y rutinas mensuales.',
+    ],
+    arreglos: [
+      'El selector del área de trabajo deja de cubrir el logo al desplazar el panel lateral.',
+      'La recurrencia deja de quedar escondida detrás del concepto interno de Rutinas.',
+      'El resumen Para mí conserva sus tres indicadores dentro de la pantalla del teléfono y usa la etiqueta breve Avisos nuevos.',
+      'Las fotografías institucionales recuperan contraste y color dentro de la página, y sus acentos respetan exactamente el mismo recorte curvo.',
+    ],
+  },
+  {
+    version: '2.0.5', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Página web', 'Contenido', 'Fotografías', 'Ayuda'],
+    resumen: ['Fotografías propias de Aletea', 'Familias y Adultos autistas separados', 'Portada más humana y directa'],
+    descripcion: 'La página de prueba incorpora una narrativa visual basada en la comunidad real de Aletea y recorridos independientes para familias y personas adultas autistas.',
+    actualizaciones: [
+      'La portada presenta el nuevo mensaje institucional y una fotografía panorámica de la comunidad.',
+      'Familias y Adultos autistas funcionan como secciones diferentes, con contenido y accesos propios.',
+      'Capacitaciones y Cuerpo y expresión reemplazan nombres de áreas demasiado generales.',
+    ],
+    adiciones: [
+      'Quiénes somos incorpora una fotografía del equipo y Qué hacemos suma una imagen de actividad.',
+      'Las nuevas fotografías usan versiones WebP livianas, descripciones accesibles y puntos focales.',
+      'Ayuda explica cómo editar las nuevas secciones y qué revisar antes de publicar una imagen.',
+    ],
+    arreglos: [
+      'La portada deja de superponer un cartel sobre la fotografía.',
+      'Los accesos de orientación incluyen explícitamente a personas adultas autistas.',
+      'Los textos institucionales incluyen a personas autistas, familias y comunidades sin fusionar sus recorridos.',
+    ],
+  },
+  {
+    version: '2.0.4', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Formularios', 'Navegación', 'Ayuda'],
+    resumen: ['Menos ruido visual', 'Acciones mejor priorizadas', 'Vista personalizable'],
+    descripcion: 'El gestor conserva todas sus funciones, pero muestra primero lo necesario para decidir y trabajar.',
+    actualizaciones: [
+      'La vista Compacta reduce espacios y mantiene cerrados los detalles secundarios. La vista Detallada ofrece una lectura más amplia.',
+      'La preferencia visual queda guardada por cuenta en el navegador.',
+      'Los formularios muestran una acción principal y reúnen el resto en Más acciones.',
+      'Las búsquedas quedan siempre visibles y los filtros secundarios se abren solamente cuando se necesitan.',
+    ],
+    adiciones: [
+      'Exportar respuestas tiene un menú propio para no competir con las acciones de revisión.',
+      'Los acuerdos y preferencias de cada respuesta se pueden desplegar sin mezclar datos operativos y técnicos.',
+      'Ayuda explica dónde encontrar cada control y cómo cambiar la densidad de información.',
+    ],
+    arreglos: [
+      'Las tarjetas dejan de presentar varias acciones con la misma importancia visual.',
+      'Los controles secundarios se adaptan al ancho completo del teléfono.',
+      'Los filtros activos indican su cantidad aunque el grupo esté cerrado.',
+    ],
+  },
+  {
+    version: '2.0.3', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Formularios', 'Accesos', 'Ayuda'],
+    resumen: ['Destinos de respuestas visibles', 'Permisos explicados sin ambigüedad', 'Seguimiento con referencia clara'],
+    descripcion: 'Formularios ahora diferencia el equipo que recibe una respuesta de los permisos necesarios para abrir sus datos.',
+    actualizaciones: [
+      'Cada formulario muestra el equipo destinatario y explica qué perfiles pueden abrir las respuestas.',
+      'La ayuda responde específicamente quién puede ver las respuestas asignadas a Familias.',
+      'Se aclara que pertenecer a un equipo no concede por sí solo acceso a datos personales.',
+    ],
+    adiciones: [
+      'Las tarjetas muestran la coordinación o referencia inicial para el seguimiento.',
+      'Administración puede abrir Accesos directamente desde el resumen del formulario.',
+    ],
+    arreglos: [
+      'Los formularios sin equipo o sin una referencia asignada muestran una advertencia antes de compartirse.',
+      'La explicación usa los mismos criterios que aplica la API al filtrar respuestas.',
+    ],
+  },
+  {
+    version: '2.0.2', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Formularios', 'Ayuda'],
+    resumen: ['Respuestas fáciles de recorrer', 'Consentimientos ordenados', 'Mejor lectura en teléfono'],
+    descripcion: 'Las respuestas de formularios dejan de verse como un bloque continuo y ahora separan la información útil para actuar de los datos técnicos que se consultan con menos frecuencia.',
+    actualizaciones: [
+      'Cada respuesta distingue con claridad la persona, el estado, el contacto, el próximo paso y la tarea vinculada.',
+      'Las preguntas y respuestas se presentan como campos separados, con más espacio para los textos extensos.',
+      'Los consentimientos, sus versiones y sus fechas quedan reunidos en una sección desplegable de trazabilidad.',
+    ],
+    adiciones: [
+      'El correo de contacto se puede abrir directamente desde la tarjeta.',
+      'Los estados y acuerdos breves se reconocen como etiquetas sin competir con el contenido principal.',
+      'La estructura se reorganiza automáticamente en pantallas angostas y conserva controles cómodos para tocar.',
+    ],
+    arreglos: [
+      'Las respuestas largas dejan de mezclarse visualmente con sus preguntas.',
+      'Las fechas técnicas se muestran en un formato comprensible para una persona.',
+      'La información de auditoría deja de ocupar el mismo nivel visual que el motivo de contacto.',
+    ],
+  },
+  {
+    version: '2.0.1', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Formularios', 'Accesos', 'Ayuda'],
+    resumen: ['Pestañas de formularios siempre legibles', 'Creación de tareas con permisos claros', 'Adultos autistas y ayuda actualizada'],
+    descripcion: 'Una mejora enfocada en hacer más claro quién puede crear trabajo, mantener visibles las opciones elegidas y documentar los recorridos nuevos con alternativas útiles.',
+    actualizaciones: [
+      'Administración puede permitir o bloquear la creación de tareas por perfil, por equipo y por persona desde Accesos.',
+      'Cada cuenta recibe un permiso efectivo explicado, con prioridad para la excepción individual, después el equipo y finalmente el perfil.',
+      'Adultos autistas se incorpora como programa estable de Familias para reunir proyectos, actividades, recursos y tareas relacionadas.',
+      'Ayuda explica los permisos nuevos, la alternativa de solicitudes, la unidad Adultos autistas y el uso accesible de las pestañas de Formularios.',
+    ],
+    adiciones: [
+      'Quien no puede crear una tarea conserva una acción clara para enviar una solicitud al equipo.',
+      'Las pestañas de Formularios admiten flechas, Inicio y Fin, e informan correctamente cuál está seleccionada.',
+      'La matriz de Accesos permite volver a la regla heredada sin borrar ni recrear cuentas o equipos.',
+    ],
+    arreglos: [
+      'El texto de la pestaña activa en Formularios deja de desaparecer por una variable de color inexistente.',
+      'Los botones que crean tareas dejan de aparecer en equipos donde la cuenta no tiene permiso.',
+      'La API comprueba el mismo permiso en tareas directas, recurrencias, acuerdos de reuniones, checklists y decisiones.',
+    ],
+  },
+  {
+    version: '2.0.0', estado: 'Publicada el 1 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Formularios', 'Comunicaciones', 'Operaciones', 'Página pública'],
+    resumen: ['Formularios más claros y completos', 'Comunicaciones con consentimiento y revisión', 'Operaciones y publicación más seguras'],
+    descripcion: 'Una actualización integral para trabajar con menos pasos, entender mejor cada estado y conservar evidencia clara desde el primer contacto hasta la publicación.',
+    actualizaciones: [
+      'Formularios reúne modelos guiados, campos configurables, vista pública, bandeja de respuestas, seguimiento y exportación en un mismo recorrido.',
+      'El ingreso a WhatsApp Familias incorpora datos mínimos, confirmación del correo, privacidad obligatoria y un acuerdo de confidencialidad y convivencia separado.',
+      'Los avisos de privacidad y los acuerdos ahora se pueden adaptar a cualquier formulario, conservan una versión automática y se muestran con el texto exacto que fue configurado.',
+      'Comunicaciones organiza contactos, temas, confirmaciones, bajas, campañas, revisión por una segunda persona y programación de envíos.',
+      'El Centro de operaciones muestra integraciones, controles, incidentes, cola de correo y trabajos automáticos con explicaciones y pasos de recuperación.',
+      'Áreas distingue equipos, unidades operativas y proyectos, e incorpora GWP y DAEA en una estructura institucional única.',
+      'La navegación, los formularios y las acciones principales se adaptan mejor al teléfono, conservan filtros útiles y explican con más claridad dónde está cada función.',
+    ],
+    adiciones: [
+      'Los formularios pueden exportar a Excel o CSV solamente las respuestas visibles después de buscar, filtrar y ordenar.',
+      'Las invitaciones de formularios se pueden personalizar y copiar completas, con su título, texto y enlace público.',
+      'Cualquier pregunta de correo puede pedir una segunda escritura para detectar errores antes de guardar la respuesta.',
+      'La suscripción a novedades es opcional, empieza desmarcada y requiere confirmación antes de habilitar envíos.',
+      'Cada campaña conserva su borrador, revisión, aprobación, programación, entregas, errores y bajas sin mezclar comunicaciones con datos operativos.',
+      'La publicación transaccional prepara una sola vez, reutiliza un recibo inmutable y omite las capas de cPanel que no cambiaron.',
+      'Los tres destinos se extraen primero en un área privada, conservan dos respaldos y vuelven automáticamente a la versión anterior si falla la verificación.',
+      'SFTP continúa disponible como recuperación independiente sin convertirse en el recorrido habitual.',
+      'Las auditorías permanentes cubren lenguaje institucional, accesibilidad, enlaces, adaptación visual y métricas de recorridos frecuentes.',
+    ],
+    arreglos: [
+      'Los consentimientos obligatorios y opcionales dejan de presentarse como una sola decisión.',
+      'Registrar una respuesta desde el gestor ya no permite omitir la privacidad o el acuerdo exigidos por el mismo formulario, y conserva fecha y versión de ambas confirmaciones.',
+      'Las respuestas cumplidas conservan el motivo, la fecha, la forma de resolución y la persona que registró el cierre.',
+      'Las unidades compartidas dejan de duplicarse entre equipos y se muestran desde una referencia institucional común.',
+      'La programación de campañas se bloquea cuando el correo o sus controles operativos todavía no están confirmados.',
+      'La publicación excluye e inventaría de forma recursiva todos los .htaccess activos para preservar la configuración administrada por cPanel.',
+      'Se corrigieron desbordes, acciones difíciles de tocar, diálogos sin foco claro e instrucciones antiguas que ya no correspondían al sistema actual.',
+    ],
+  },
   {
     version: '1.9.15', estado: 'Publicada el 29 de agosto de 2026', autor: 'Alejandro Estol',
     ambitos: ['Gestor'],

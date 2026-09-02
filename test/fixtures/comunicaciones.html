@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Auditoría visual de comunicaciones</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+  <div class="app-cms"><div class="cuerpo" id="fixture"></div></div>
+  <script type="module">
+    import { crearPantallaComunicaciones } from '../../js/ui/pantalla-comunicaciones.js'
+    const respuesta = {
+      contactos: [
+        { id: '1', nombre: 'Sofía Martínez', correo: 'sofia@ejemplo.uy', estado: 'activo', temas: ['familias', 'actividades'], consentimiento_fuente: 'formulario:familias' },
+        { id: '2', nombre: 'Daniel Pérez', correo: 'daniel@ejemplo.uy', estado: 'pendiente', temas: ['novedades'], consentimiento_fuente: 'formulario:voluntariado' },
+        { id: '3', nombre: 'María Silva', correo: 'maria@ejemplo.uy', estado: 'baja', temas: [], consentimiento_fuente: 'formulario:actividad' },
+      ],
+      campanas: [{ id: 'm1', titulo: 'Agenda de setiembre', asunto: 'Actividades para compartir', contenido_texto: 'Te acercamos las próximas actividades de Aletea.\n\nGracias por acompañarnos.', temas_json: '["actividades","familias"]', estado: 'revision', creado_por: 'direccion@aletea.org' }],
+      cola: [{ estado: 'pendiente', cantidad: 4 }],
+      eventos: [],
+      transporte: { smtp_configurado: false },
+    }
+    window.fetch = async () => new Response(JSON.stringify(respuesta), { status: 200 })
+    crearPantallaComunicaciones(document.getElementById('fixture'))
+  </script>
+</body>
+</html>

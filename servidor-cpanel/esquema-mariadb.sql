@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS formularios_cms(
   prioridad VARCHAR(191) NOT NULL DEFAULT 'normal' CHECK(prioridad IN('baja', 'normal', 'alta', 'urgente'))
   ,
   campos_json LONGTEXT NOT NULL DEFAULT '[]', finalidad VARCHAR(500) NOT NULL DEFAULT 'Responder la consulta y realizar su seguimiento.', responsable_datos VARCHAR(180) NOT NULL DEFAULT 'Aletea', conservacion_meses INT NOT NULL DEFAULT 12 CHECK(conservacion_meses IN(6, 12, 24)), requiere_consentimiento INT NOT NULL DEFAULT 1 CHECK(requiere_consentimiento IN(0, 1)), destino_respuesta VARCHAR(40) NOT NULL DEFAULT 'tarea'
-CHECK(destino_respuesta IN('tarea', 'solicitud', 'actividad', 'alta_persona', 'contacto', 'archivo')), unidad_id VARCHAR(191) REFERENCES unidades_operativas_cms(id)
+CHECK(destino_respuesta IN('tarea', 'solicitud', 'actividad', 'alta_persona', 'contacto', 'archivo')), unidad_id VARCHAR(191) REFERENCES unidades_operativas_cms(id), configuracion_publica_json LONGTEXT NOT NULL DEFAULT '{}'
 );
 CREATE INDEX formularios_cms_visibilidad ON formularios_cms(
   visibilidad,
@@ -800,6 +800,180 @@ ON unidades_operativas_cms(
 );
 CREATE INDEX usuarios_acceso_hasta_activo
 ON usuarios(activo, acceso_hasta);
+CREATE TABLE IF NOT EXISTS contactos_comunicacion(
+  id VARCHAR(191) PRIMARY KEY,
+  correo VARCHAR(191) NOT NULL UNIQUE,
+  nombre VARCHAR(191) NOT NULL DEFAULT '',
+  idioma VARCHAR(191) NOT NULL DEFAULT 'es',
+  estado VARCHAR(191) NOT NULL DEFAULT 'pendiente' CHECK(estado IN('pendiente', 'activo', 'baja', 'rebotado', 'bloqueado')),
+  fuente_ultima VARCHAR(191) NOT NULL DEFAULT '',
+  token_baja VARCHAR(191) NOT NULL UNIQUE,
+  confirmado_en DATETIME,
+  baja_en DATETIME,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS consentimientos_comunicacion(
+  id VARCHAR(191) PRIMARY KEY,
+  contacto_id VARCHAR(191) NOT NULL REFERENCES contactos_comunicacion(id) ON DELETE CASCADE,
+  finalidad VARCHAR(191) NOT NULL,
+  estado VARCHAR(191) NOT NULL DEFAULT 'pendiente' CHECK(estado IN('pendiente', 'aceptado', 'revocado', 'vencido')),
+  fuente VARCHAR(191) NOT NULL,
+  formulario_id VARCHAR(191) REFERENCES formularios_cms(id) ON DELETE SET NULL,
+  entrada_id VARCHAR(191) REFERENCES entradas_cms(id) ON DELETE SET NULL,
+  texto_version VARCHAR(191) NOT NULL,
+  texto_consentimiento LONGTEXT NOT NULL,
+  token_hash VARCHAR(191) NOT NULL UNIQUE,
+  solicitado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  confirmado_en DATETIME,
+  revocado_en DATETIME
+);
+CREATE TABLE IF NOT EXISTS preferencias_comunicacion(
+  contacto_id VARCHAR(191) NOT NULL REFERENCES contactos_comunicacion(id) ON DELETE CASCADE,
+  tema VARCHAR(191) NOT NULL,
+  habilitada INT NOT NULL DEFAULT 1 CHECK(habilitada IN(0, 1)),
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(contacto_id, tema)
+);
+CREATE TABLE IF NOT EXISTS supresiones_comunicacion(
+  correo VARCHAR(191) PRIMARY KEY,
+  motivo LONGTEXT NOT NULL,
+  origen VARCHAR(191) NOT NULL DEFAULT 'gestor',
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS campanas_comunicacion(
+  id VARCHAR(191) PRIMARY KEY,
+  titulo VARCHAR(191) NOT NULL,
+  asunto VARCHAR(191) NOT NULL,
+  contenido_texto LONGTEXT NOT NULL,
+  contenido_html LONGTEXT NOT NULL DEFAULT '',
+  temas_json LONGTEXT NOT NULL DEFAULT '["novedades"]',
+estado VARCHAR(191) NOT NULL DEFAULT 'borrador' CHECK(estado IN('borrador', 'revision', 'aprobada', 'programada', 'enviada', 'cancelada')),
+programada_para DATETIME,
+creado_por VARCHAR(191) NOT NULL REFERENCES usuarios(correo),
+aprobado_por VARCHAR(191) REFERENCES usuarios(correo),
+aprobado_en DATETIME,
+enviado_en DATETIME,
+creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS cola_correos(
+  id VARCHAR(191) PRIMARY KEY,
+  tipo VARCHAR(191) NOT NULL CHECK(tipo IN('confirmacion', 'campana', 'sistema')),
+  contacto_id VARCHAR(191) REFERENCES contactos_comunicacion(id) ON DELETE SET NULL,
+  campana_id VARCHAR(191) REFERENCES campanas_comunicacion(id) ON DELETE SET NULL,
+  destinatario VARCHAR(191) NOT NULL,
+  asunto VARCHAR(191) NOT NULL,
+  contenido_texto LONGTEXT NOT NULL,
+  contenido_html LONGTEXT NOT NULL DEFAULT '',
+  estado VARCHAR(191) NOT NULL DEFAULT 'pendiente' CHECK(estado IN('pendiente', 'procesando', 'enviado', 'fallido', 'suprimido')),
+  clave_idempotencia VARCHAR(191) NOT NULL UNIQUE,
+  intentos INT NOT NULL DEFAULT 0,
+  proximo_intento DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  proveedor_id VARCHAR(191),
+  ultimo_error LONGTEXT NOT NULL DEFAULT '',
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE TABLE IF NOT EXISTS eventos_correo(
+  id VARCHAR(191) PRIMARY KEY,
+  correo_id VARCHAR(191) REFERENCES cola_correos(id) ON DELETE SET NULL,
+  proveedor VARCHAR(191) NOT NULL DEFAULT 'hosting',
+  tipo VARCHAR(191) NOT NULL,
+  detalle LONGTEXT NOT NULL DEFAULT '',
+  ocurrido_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX contactos_comunicacion_estado ON contactos_comunicacion(
+  estado,
+  actualizado_en
+);
+CREATE INDEX consentimientos_comunicacion_contacto ON consentimientos_comunicacion(
+  contacto_id,
+  solicitado_en
+);
+CREATE INDEX preferencias_comunicacion_tema ON preferencias_comunicacion(
+  tema,
+  habilitada
+);
+CREATE INDEX campanas_comunicacion_estado ON campanas_comunicacion(
+  estado,
+  programada_para
+);
+CREATE INDEX cola_correos_pendientes ON cola_correos(estado, proximo_intento);
+CREATE INDEX eventos_correo_correo ON eventos_correo(correo_id, ocurrido_en);
+CREATE TABLE IF NOT EXISTS ejecuciones_sistema(
+  id VARCHAR(191) PRIMARY KEY,
+  trabajo VARCHAR(191) NOT NULL,
+  estado VARCHAR(191) NOT NULL DEFAULT 'procesando' CHECK(estado IN('procesando', 'completada', 'fallida', 'omitida')),
+  iniciada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  finalizada_en DATETIME,
+  encontrados INT NOT NULL DEFAULT 0,
+  procesados INT NOT NULL DEFAULT 0,
+  exitos INT NOT NULL DEFAULT 0,
+  reintentados INT NOT NULL DEFAULT 0,
+  fallidos INT NOT NULL DEFAULT 0,
+  suprimidos INT NOT NULL DEFAULT 0,
+  detalle LONGTEXT NOT NULL DEFAULT '',
+  error LONGTEXT NOT NULL DEFAULT '',
+  metadatos_json LONGTEXT NOT NULL DEFAULT '{}'
+);
+CREATE TABLE IF NOT EXISTS incidentes_operativos_cms(
+  id VARCHAR(191) PRIMARY KEY,
+  clave VARCHAR(191) NOT NULL UNIQUE,
+  tipo VARCHAR(191) NOT NULL,
+  severidad VARCHAR(191) NOT NULL DEFAULT 'advertencia' CHECK(severidad IN('informacion', 'advertencia', 'critica')),
+  estado VARCHAR(191) NOT NULL DEFAULT 'abierto' CHECK(estado IN('abierto', 'resuelto', 'ignorado')),
+  titulo VARCHAR(191) NOT NULL,
+  detalle LONGTEXT NOT NULL DEFAULT '',
+  fuente VARCHAR(191) NOT NULL DEFAULT 'sistema',
+  ocurrencias INT NOT NULL DEFAULT 1,
+  detectado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  ultimo_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  resuelto_en DATETIME,
+  resuelto_por VARCHAR(191)
+);
+CREATE TABLE IF NOT EXISTS controles_operativos_cms(
+  clave VARCHAR(191) PRIMARY KEY,
+  categoria VARCHAR(191) NOT NULL,
+  estado VARCHAR(191) NOT NULL DEFAULT 'pendiente' CHECK(estado IN('pendiente', 'confirmado', 'bloqueado')),
+  detalle LONGTEXT NOT NULL DEFAULT '',
+  evidencia LONGTEXT NOT NULL DEFAULT '',
+  actualizado_por VARCHAR(191),
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX ejecuciones_sistema_trabajo_fecha ON ejecuciones_sistema(
+  trabajo,
+  iniciada_en DESC
+);
+CREATE INDEX ejecuciones_sistema_estado_fecha ON ejecuciones_sistema(
+  estado,
+  iniciada_en DESC
+);
+CREATE INDEX incidentes_operativos_estado_fecha ON incidentes_operativos_cms(
+  estado,
+  ultimo_en DESC
+);
+CREATE INDEX controles_operativos_categoria ON controles_operativos_cms(
+  categoria,
+  estado
+);
+CREATE TABLE IF NOT EXISTS permisos_capacidades_cms(
+  id VARCHAR(191) PRIMARY KEY,
+  capacidad VARCHAR(191) NOT NULL CHECK(capacidad IN('crear_tareas')),
+  alcance_tipo VARCHAR(191) NOT NULL CHECK(alcance_tipo IN('perfil', 'equipo', 'usuario')),
+  alcance_id VARCHAR(191) NOT NULL,
+  efecto VARCHAR(191) NOT NULL CHECK(efecto IN('permitir', 'bloquear')),
+  creado_por VARCHAR(191) NOT NULL,
+  creado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(capacidad, alcance_tipo, alcance_id)
+);
+CREATE INDEX permisos_capacidades_busqueda
+ON permisos_capacidades_cms(
+  capacidad,
+  alcance_tipo,
+  alcance_id
+);
 
 DROP TRIGGER IF EXISTS tareas_cms_registrar_asignacion_insert;
 CREATE TRIGGER tareas_cms_registrar_asignacion_insert BEFORE INSERT ON tareas_cms FOR EACH ROW SET NEW.asignado_en = IF(NEW.responsable_correo IS NULL, NULL, COALESCE(NEW.asignado_en, CURRENT_TIMESTAMP));

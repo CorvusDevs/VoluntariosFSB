@@ -101,16 +101,18 @@ describe('pantalla de vista previa', () => {
     expect(p.lista().opcionesImagen.compacto).toBe(true)
   })
 
-  it('informa las medidas reales de la imagen horizontal ampliada', () => {
+  it('informa que ambas orientaciones se pueden revisar', () => {
     const info = raiz.querySelector('.info-imagen').textContent
     expect(info).toContain('1920 por 1240 px')
-    expect(info).toContain('horizontal ampliada')
+    expect(info).toContain('vertical completa')
   })
 
-  it('ofrece la descarga horizontal como acción principal y conserva la vertical', () => {
+  it('ofrece la descarga horizontal como acción principal y conserva la vertical y las A4', () => {
     const botones = [...raiz.querySelectorAll('button')].map((e) => e.textContent)
     expect(botones).toContain('Descargar imagen horizontal')
     expect(botones).toContain('Descargar imagen vertical')
+    expect(botones).toContain('Descargar Cancha 1 A4')
+    expect(botones).toContain('Descargar Cancha 2 A4')
     expect(botones.some((texto) => texto.includes('WhatsApp'))).toBe(false)
     expect(raiz.querySelector('.acciones-imagen .boton-principal').textContent)
       .toBe('Descargar imagen horizontal')
@@ -202,6 +204,34 @@ describe('pantalla de vista previa', () => {
     expect(previa).not.toBeNull()
     expect(previa.width).toBe(1920)
     expect(previa.height).toBe(1240)
+  })
+
+  it('permite alternar a la misma vista vertical que se descarga', async () => {
+    await new Promise((r) => setTimeout(r, 0))
+    const horizontal = raiz.querySelector('[data-orientacion="horizontal"]')
+    const vertical = raiz.querySelector('[data-orientacion="vertical"]')
+    expect(horizontal.getAttribute('aria-pressed')).toBe('true')
+    expect(raiz.querySelector('.vista-panel-resultado > .lienzo-vista-previa-horizontal')).not.toBeNull()
+    vertical.click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(raiz.querySelector('[data-orientacion="vertical"]').getAttribute('aria-pressed')).toBe('true')
+    const previa = raiz.querySelector('.vista-panel-resultado > .lienzo-vista-previa-vertical')
+    expect(previa).not.toBeNull()
+    expect(previa.width).toBeGreaterThan(0)
+    expect(previa.height).toBeGreaterThan(0)
+  })
+
+  it('permite revisar una hoja A4 diferente por cada cancha', async () => {
+    await new Promise((r) => setTimeout(r, 0))
+    const cancha1 = raiz.querySelector('[data-orientacion="a4-1"]')
+    const cancha2 = raiz.querySelector('[data-orientacion="a4-2"]')
+    expect(cancha1).not.toBeNull()
+    expect(cancha2).not.toBeNull()
+    cancha1.click()
+    await new Promise((r) => setTimeout(r, 0))
+    const previa = raiz.querySelector('.vista-panel-resultado > .lienzo-vista-previa-a4')
+    expect(previa.width).toBe(1240)
+    expect(previa.height).toBe(1754)
   })
 
   it('las instrucciones estan en rioplatense y con acentos', () => {

@@ -1,4 +1,4 @@
-import { puedeGestionarPaginaWeb, puedeUsarComunicacionVisual } from '../acceso/permisos-funciones.js'
+import { puedeGestionarComunicaciones, puedeGestionarPaginaWeb, puedeUsarComunicacionVisual, puedeVerOperaciones } from '../acceso/permisos-funciones.js'
 import { PANTALLAS_GESTOR, pantallaDesdeRuta, rutaParaPantalla } from '../rutas-gestor.js'
 
 const CLAVE = 'voluntarios-fsb:ultima-pantalla'
@@ -43,7 +43,7 @@ export function rutaCompartidaDesdeUbicacion({ pathname = '/', search = '', hash
   return pantallaDesdeRuta(pathname, search) || rutaCompartidaDesdeHash(hash)
 }
 
-export function pantallaPermitida(pantalla, { admin = false, cloudflare = false, permisos = null, perfilAcceso = null } = {}) {
+export function pantallaPermitida(pantalla, { admin = false, cloudflare = false, permisos = null, perfilAcceso = null, nivelDatosPersonales = 'ninguno' } = {}) {
   if (!PANTALLAS.includes(pantalla)) return false
   const cuenta = { rol: admin ? 'admin' : 'coordinacion', perfil_acceso: perfilAcceso }
   if (pantalla === 'registro') return admin && !cloudflare
@@ -52,6 +52,8 @@ export function pantallaPermitida(pantalla, { admin = false, cloudflare = false,
   if (pantalla === 'cms-privacidad') return admin && cloudflare && (!Array.isArray(permisos) || permisos.includes('cms'))
   if (pantalla === 'cms-pagina-web') return cloudflare && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeGestionarPaginaWeb(cuenta)
   if (pantalla === 'cms-comunicacion-visual') return cloudflare && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeUsarComunicacionVisual(cuenta)
+  if (pantalla === 'cms-comunicaciones') return cloudflare && nivelDatosPersonales !== 'ninguno' && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeGestionarComunicaciones(cuenta)
+  if (pantalla === 'cms-operaciones') return cloudflare && (!Array.isArray(permisos) || permisos.includes('cms')) && puedeVerOperaciones(cuenta)
   if (pantalla === 'ajustes') return admin
   if (pantalla === 'operacion' && !cloudflare) return false
   if (pantalla.startsWith('cms-') && !cloudflare) return false

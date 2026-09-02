@@ -30,4 +30,51 @@ describe('publicación SFTP de cPanel', () => {
   it('rechaza rutas que podrían inyectar comandos en el lote SFTP', () => {
     expect(() => _pruebas.escaparSftp('archivo\nrm peligro')).toThrow('saltos de línea')
   })
+
+  it('no intenta respaldar una versión inmutable que todavía no existe', () => {
+    expect(_pruebas.requiereRespaldo('release/2026-08-31.2032/js/app.js')).toBe(false)
+    expect(_pruebas.requiereRespaldo('js/app.js')).toBe(true)
+    expect(_pruebas.requiereRespaldo('version.json')).toBe(true)
+  })
+
+  it('solo solicita dependencias cuando cambió el archivo de bloqueo', async () => {
+    const raiz = await mkdtemp(join(tmpdir(), 'aletea-deps-test-'))
+    const carpeta = join(raiz, 'nueva')
+    const respaldo = join(raiz, 'anterior')
+    await mkdir(carpeta)
+    await mkdir(respaldo)
+    await writeFile(join(carpeta, 'package-lock.json'), '{"lockfileVersion":3}')
+    await writeFile(join(respaldo, 'package-lock.json'), '{"lockfileVersion":3}')
+    const capas = [{ clave: 'gestor-root', carpeta, respaldo }]
+    expect(await _pruebas.cambiaronDependencias(capas)).toBe(false)
+    await writeFile(join(carpeta, 'package-lock.json'), '{"lockfileVersion":4}')
+    expect(await _pruebas.cambiaronDependencias(capas)).toBe(true)
+  })
+
+  it('comprueba las versiones de producción instaladas antes de llamar a cPanel', async () => {
+    const raiz = await mkdtemp(join(tmpdir(), 'aletea-deps-instaladas-test-'))
+    const carpeta = join(raiz, 'paquete')
+    const instaladas = join(raiz, 'instaladas')
+    await mkdir(carpeta)
+    await mkdir(join(instaladas, 'mysql2'), { recursive: true })
+    await mkdir(join(instaladas, 'nodemailer'), { recursive: true })
+    await writeFile(join(carpeta, 'package-lock.json'), JSON.stringify({
+      packages: {
+        '': { dependencies: { mysql2: '^3.14.5', nodemailer: '^9.0.6' } },
+        'node_modules/mysql2': { version: '3.23.4' },
+        'node_modules/nodemailer': { version: '9.0.6' },
+      },
+    }))
+    const capas = [{ clave: 'gestor-root', carpeta }]
+    const dependencias = await _pruebas.dependenciasProduccion(capas)
+    expect(dependencias).toEqual([
+      { nombre: 'mysql2', version: '3.23.4' },
+      { nombre: 'nodemailer', version: '9.0.6' },
+    ])
+    await writeFile(join(instaladas, 'mysql2', 'package.json'), JSON.stringify({ version: '3.23.4' }))
+    await writeFile(join(instaladas, 'nodemailer', 'package.json'), JSON.stringify({ version: '9.0.6' }))
+    expect(await _pruebas.dependenciasInstaladas({ carpeta: instaladas, dependencias })).toBe(true)
+    await writeFile(join(instaladas, 'nodemailer', 'package.json'), JSON.stringify({ version: '9.0.5' }))
+    expect(await _pruebas.dependenciasInstaladas({ carpeta: instaladas, dependencias })).toBe(false)
+  })
 })

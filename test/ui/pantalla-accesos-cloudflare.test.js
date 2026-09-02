@@ -15,6 +15,7 @@ describe('pantalla de accesos en Cloudflare', () => {
     ]))
     expect(resumen.tarjetas.find((permiso) => permiso.tipo === 'publicar')).toMatchObject({ activo: false, texto: 'No puede publicar' })
     expect(resumen.modulos).toEqual(expect.arrayContaining([
+      ['Tareas institucionales', 'Edita, no crea', 'Familias · Predeterminado institucional'],
       ['Página web', 'Edita, no publica', 'Contenido y borradores'],
       ['Comunicación visual', 'Edita', 'Sin cartas membretadas'],
       ['Administración de accesos', 'Sin acceso', ''],
@@ -54,6 +55,8 @@ describe('pantalla de accesos en Cloudflare', () => {
       if (url === '/api/cms/responsabilidades' && !opciones.method) return new Response(JSON.stringify({ responsabilidades: [{ id: 'r1', equipo_id: 'e1', equipo_nombre: 'Familias', usuario_correo: 'coord@aletea.org', tipo: 'coordinacion' }] }))
       if (url === '/api/cms/responsabilidades' && opciones.method === 'POST') return new Response(JSON.stringify({ responsabilidad: { id: 'nueva' } }), { status: 201 })
       if (url === '/api/cms/responsabilidades/r1' && opciones.method === 'DELETE') return new Response(JSON.stringify({ quitada: true }))
+      if (url === '/api/cms/permisos-tareas' && !opciones.method) return new Response(JSON.stringify({ capacidad: 'crear_tareas', politicas: [], predeterminados: { administracion: 'permitir', coordinacion: 'bloquear' } }))
+      if (url === '/api/cms/permisos-tareas' && opciones.method === 'PUT') return new Response(JSON.stringify({ guardada: true }))
       if (url === '/api/auditoria?limite=80') return new Response(JSON.stringify({ actividad: [{ id: 1, actor_nombre: 'Administración', accion: 'crear formulario CMS', recurso: 'formularios/f1', detalle: 'Inscripción', cuando: '2026-08-17 12:00:00' }] }))
       return new Response(JSON.stringify({ guardado: true }))
     })
@@ -73,6 +76,29 @@ describe('pantalla de accesos en Cloudflare', () => {
     expect(raiz.textContent).toContain('no distingue mayúsculas')
     expect(raiz.textContent).toContain('Puede publicar')
     expect(raiz.textContent).toContain('Limitado a: Familias')
+    expect(raiz.querySelectorAll('h1')).toHaveLength(1)
+    expect(raiz.querySelector('[aria-label="Nivel de datos personales de Coordinación"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Perfil de acceso de Coordinación"]')).not.toBeNull()
+    expect(raiz.textContent).toContain('Por defecto solo Administración puede crear tareas')
+    expect(raiz.textContent).toContain('Permiso efectivo: no puede crear tareas')
+  })
+
+  it('guarda reglas de creación de tareas por equipo y por persona', async () => {
+    const raiz = document.getElementById('raiz')
+    crearPantallaAccesosCloudflare(raiz, { sesion: { correo: 'admin@aletea.org' } })
+    await esperar(); await esperar()
+    const selectorEquipo = raiz.querySelector('[aria-label="Creación de tareas para Familias"]')
+    selectorEquipo.value = 'permitir'
+    selectorEquipo.closest('.permiso-tareas-fila').querySelector('button').click()
+    await esperar(); await esperar()
+    const filaPersona = [...raiz.querySelectorAll('.persona-fila')].find((fila) => fila.querySelector('.acceso-identidad-texto strong')?.textContent === 'Coordinación')
+    const selectorPersona = filaPersona.querySelector('[aria-label="Creación de tareas para Coordinación"]')
+    selectorPersona.value = 'bloquear'
+    selectorPersona.closest('.permiso-tareas-fila').querySelector('button').click()
+    await esperar()
+    const cuerpos = globalThis.fetch.mock.calls.filter(([url, opciones]) => url === '/api/cms/permisos-tareas' && opciones?.method === 'PUT').map(([, opciones]) => JSON.parse(opciones.body))
+    expect(cuerpos).toContainEqual({ alcance_tipo: 'equipo', alcance_id: 'e1', efecto: 'permitir' })
+    expect(cuerpos).toContainEqual({ alcance_tipo: 'usuario', alcance_id: 'coord@aletea.org', efecto: 'bloquear' })
   })
 
   it('abre la cuenta y el control pedidos sin conceder el acceso automáticamente', async () => {
@@ -242,13 +268,13 @@ describe('pantalla de accesos en Cloudflare', () => {
     crearPantallaAccesosCloudflare(raiz, { sesion: { correo: 'admin@aletea.org' } })
     await esperar(); await esperar()
     const fila = [...raiz.querySelectorAll('.persona-fila')].find((elemento) => elemento.querySelector('.acceso-identidad-texto strong')?.textContent === 'Coordinación')
-    const detalles = fila.querySelectorAll('details')
-    detalles[0].open = true
-    const nivel = detalles[0].querySelector('select')
+    const detalleDatos = [...fila.querySelectorAll('details')].find((detalle) => detalle.querySelector('summary')?.textContent === 'Datos personales')
+    detalleDatos.open = true
+    const nivel = detalleDatos.querySelector('select')
     nivel.value = 'sensible'; nivel.dispatchEvent(new Event('change'))
-    detalles[0].querySelector('input[type="radio"][value="temporal"]').click()
-    detalles[0].querySelector('[data-perfil^="acceso-vigencia-"]').value = '2026-12-31'
-    ;[...detalles[0].querySelectorAll('button')].find((boton) => boton.textContent === 'Guardar acceso a datos').click()
+    detalleDatos.querySelector('input[type="radio"][value="temporal"]').click()
+    detalleDatos.querySelector('[data-perfil^="acceso-vigencia-"]').value = '2026-12-31'
+    ;[...detalleDatos.querySelectorAll('button')].find((boton) => boton.textContent === 'Guardar acceso a datos').click()
     await esperar()
     const [, datosPersonales] = globalThis.fetch.mock.calls.find(([url, opciones]) => url === '/api/usuarios' && opciones?.method === 'PATCH')
     expect(JSON.parse(datosPersonales.body)).toMatchObject({ correo: 'coord@aletea.org', nivel_datos_personales: 'sensible', vigencia_datos_personales: 'temporal', datos_personales_hasta: '2026-12-31' })

@@ -23,7 +23,11 @@ function basePrueba({ nivel = 'sensible', permisos = null } = {}) {
     async batch(consultas) { return Promise.all(consultas.map((consulta) => consulta.run())) },
     prepare(sql) {
       const consulta = sql.replace(/\s+/g, ' ').trim()
-      return {
+      const sentencia = {
+        async first() {
+          if (consulta === 'SELECT 1 AS ok') return { ok: 1 }
+          throw new Error(`Consulta no simulada: ${consulta}`)
+        },
         bind(...valores) {
           return {
             async first() {
@@ -63,6 +67,7 @@ function basePrueba({ nivel = 'sensible', permisos = null } = {}) {
           }
         },
       }
+      return sentencia
     },
   }
   return { usuarios, documentos, actividad, fotos, base, nivel, permisos, actualizacionesUltimoAcceso: () => actualizacionesUltimoAcceso, instantesUltimoAcceso }
@@ -102,7 +107,7 @@ describe('API de fichas protegidas con D1 simulado', () => {
 
     expect(respuesta.status).toBe(200)
     expect(respuesta.headers.get('cache-control')).toBe('no-store')
-    expect(await respuesta.json()).toEqual({ ok: true, servicio: 'gestor-aletea' })
+    expect(await respuesta.json()).toEqual({ ok: true, servicio: 'gestor-aletea', version: null })
   })
 
   it('renueva la sesión actual al cambiar un permiso propio', async () => {

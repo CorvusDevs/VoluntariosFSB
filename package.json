@@ -9,15 +9,20 @@
     "sellar": "bash herramientas/sellar.sh",
     "construir:cloudflare": "node herramientas/preparar-cloudflare.mjs",
     "auditar:publicacion": "node herramientas/auditar-publicacion.mjs",
+    "auditar:ui-ux": "node herramientas/auditar-ui-ux-permanente.mjs",
     "preparar:publicacion": "npm run sellar && npm run construir:cloudflare && npm run auditar:publicacion",
     "empaquetar:cpanel": "bash herramientas/preparar-cpanel.sh",
-    "publicar:cpanel": "node herramientas/publicar-cpanel-sftp.mjs",
-    "publicar:cpanel:simular": "node herramientas/publicar-cpanel-sftp.mjs --simular",
+    "publicar:cpanel": "node herramientas/publicar-cpanel-api.mjs",
+    "publicar:cpanel:simular": "node herramientas/publicar-cpanel-api.mjs --simular",
     "publicar:cpanel:api": "node herramientas/publicar-cpanel-api.mjs",
+    "publicar:cpanel:sftp": "node herramientas/publicar-cpanel-sftp.mjs",
+    "configurar:cpanel:comunicaciones": "node herramientas/configurar-cpanel-comunicaciones.mjs",
     "esquema:cpanel": "node servidor-cpanel/generar-esquema.mjs",
     "iniciar:cpanel": "node app.js",
     "migraciones:cpanel": "node servidor-cpanel/migrar.mjs",
     "importar:cpanel": "node servidor-cpanel/importar-d1.mjs",
+    "correo:procesar": "node servidor-cpanel/procesar-cola-correos.mjs",
+    "mantenimiento:procesar": "node servidor-cpanel/mantenimiento-sistema.mjs",
     "respaldo:crear": "node herramientas/respaldar-d1.mjs",
     "respaldo:verificar": "node herramientas/verificar-respaldo-d1.mjs",
     "respaldo:preparar-recuperacion": "node herramientas/preparar-recuperacion-d1.mjs",
@@ -26,7 +31,8 @@
     "servir": "python3 -m http.server 8765"
   },
   "dependencies": {
-    "mysql2": "^3.14.5"
+    "mysql2": "^3.14.5",
+    "nodemailer": "^9.0.6"
   },
   "devDependencies": {
     "fake-indexeddb": "^6.2.5",

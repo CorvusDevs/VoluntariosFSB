@@ -9,11 +9,11 @@ const carpetaTemporal = await mkdtemp(join(tmpdir(), 'aletea-esquema-'))
 const baseTemporal = join(carpetaTemporal, 'esquema.sqlite')
 
 const camposLargos = new Set([
-  'alcance', 'campos_json', 'constancia', 'contenido', 'decisiones_permitidas', 'descripcion', 'detalle',
-  'debe_escalar', 'error', 'informa_a', 'minuta', 'notas', 'objetivo', 'pasos',
-  'cumplida_motivo', 'motivo', 'motivo_anulacion', 'motivo_cierre', 'nota', 'nota_revision', 'observaciones', 'permisos', 'personas_necesarias', 'preparacion', 'recursos', 'respuestas_json', 'resumen',
+  'alcance', 'campos_json', 'configuracion_publica_json', 'constancia', 'contenido', 'decisiones_permitidas', 'descripcion', 'detalle',
+  'debe_escalar', 'error', 'evidencia', 'informa_a', 'metadatos_json', 'minuta', 'notas', 'objetivo', 'pasos',
+  'contenido_html', 'contenido_texto', 'cumplida_motivo', 'motivo', 'motivo_anulacion', 'motivo_cierre', 'nota', 'nota_revision', 'observaciones', 'permisos', 'personas_necesarias', 'preparacion', 'recursos', 'respuestas_json', 'resumen', 'temas_json', 'texto_consentimiento', 'ultimo_error',
 ])
-const camposFechaHora = /^(actualizado_en|anulado_en|asignado_en|bloqueado_hasta|cerrada_en|completado_en|creado_en|cuando|fecha_fin|fecha_hora|identidad_verificada_en|revisado_en|ultimo_acceso|ventana_inicio)$/
+const camposFechaHora = /^(actualizado_en|anulado_en|aprobado_en|asignado_en|baja_en|bloqueado_hasta|cerrada_en|completado_en|confirmado_en|creado_en|cuando|detectado_en|enviado_en|fecha_fin|fecha_hora|finalizada_en|identidad_verificada_en|iniciada_en|ocurrido_en|programada_para|proximo_intento|resuelto_en|revisado_en|revocado_en|solicitado_en|ultimo_acceso|ultimo_en|ventana_inicio)$/
 const camposFecha = /^(acceso_hasta|cumplida_en|datos_personales_hasta|fecha|fecha_acuerdo|fecha_inicio|fecha_limite|fecha_objetivo|fecha_prevista|fecha_propuesta|fecha_revision|fecha_seguimiento|generada_para|postergada_hasta|proxima_fecha|semana_inicio|vence_el|vencimiento)$/
 
 function tipoTexto(nombre, resto) {

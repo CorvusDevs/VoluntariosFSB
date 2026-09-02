@@ -3,7 +3,7 @@ import { normalizarEnlaceUsuario } from '../util/enlaces.js'
 const MAXIMO_JSON = 220_000
 const ESTILOS_TIPOGRAFICOS = new Set(['institucional', 'expresiva'])
 const TIPOGRAFIAS_REQUERIDAS = Object.freeze(['portada', 'cifrasTitulo', 'cifrasNumeros', 'participacion', 'actividades', 'formacion', 'actualidad'])
-const TIPOGRAFIAS_OPCIONALES = Object.freeze(['areas', 'institucion', 'familias', 'biblioteca', 'recursos', 'tienda', 'donaciones', 'contacto', 'orientacion', 'redes'])
+const TIPOGRAFIAS_OPCIONALES = Object.freeze(['areas', 'institucion', 'familias', 'adultosAutistas', 'biblioteca', 'recursos', 'tienda', 'donaciones', 'contacto', 'orientacion', 'redes'])
 
 export const SECCIONES_PAGINA_WEB = Object.freeze([
   { id: 'portada', titulo: 'Portada', ayuda: 'El primer mensaje que recibe una persona al entrar al sitio.', rutas: ['portada', 'proposito'] },
@@ -12,6 +12,7 @@ export const SECCIONES_PAGINA_WEB = Object.freeze([
   { id: 'institucion', titulo: 'Quiénes somos', ayuda: 'Presentación, historia, misión, visión y equipo de Aletea.', rutas: ['historia', 'paginas.institucion'] },
   { id: 'actividades', titulo: 'Qué hacemos', ayuda: 'Actividades, programas y propuestas institucionales.', rutas: ['paginas.actividades'] },
   { id: 'familias', titulo: 'Familias', ayuda: 'Orientación, comunidad y accesos pensados para familias.', rutas: ['paginas.familias'] },
+  { id: 'adultos-autistas', titulo: 'Adultos autistas', ayuda: 'Encuentro, orientación, derechos y oportunidades para la vida adulta.', rutas: ['paginas.adultosAutistas'] },
   { id: 'formacion', titulo: 'Formación', ayuda: 'Cursos, talleres y propuestas para profesionales e instituciones.', rutas: ['paginas.formacion'] },
   { id: 'biblioteca', titulo: 'Biblioteca', ayuda: 'Publicaciones, materiales, entrevistas y sitios de interés.', rutas: ['paginas.biblioteca'] },
   { id: 'recursos', titulo: 'Recursos', ayuda: 'Selección visual de guías, materiales y enlaces recomendados.', rutas: ['paginas.recursos'] },
@@ -161,13 +162,16 @@ export function validarContenidoPaginaWeb(contenido) {
   }
   const requeridos = ['editorial', 'seo', 'organizacion', 'navegacion', 'portada', 'proposito', 'impacto', 'mapaAreas', 'areas', 'historia', 'participacion', 'orientacion', 'actualidad', 'tienda', 'redes', 'paginas']
   requeridos.forEach((clave) => { if (contenido[clave] === undefined || contenido[clave] === null) errores.push(`Falta la sección ${etiquetaCampo(clave)}.`) })
-  if (!Array.isArray(contenido.navegacion) || contenido.navegacion.length > 8) errores.push('El menú puede tener hasta 8 secciones.')
+  const navegacionEsperada = ['Aletea', 'Qué hacemos', 'Para familias', 'Recursos', 'Participá']
+  if (!Array.isArray(contenido.navegacion) || contenido.navegacion.length !== navegacionEsperada.length) errores.push('El menú debe tener los 5 grupos institucionales acordados.')
   if (Array.isArray(contenido.navegacion)) contenido.navegacion.forEach((item, indice) => {
     if (!item?.etiqueta || String(item.etiqueta).length > 32) errores.push(`Usá hasta 32 caracteres en la sección ${indice + 1} del menú.`)
     if (!item?.enlace || !esEnlaceValido(item.enlace)) errores.push(`El enlace de la sección ${indice + 1} del menú no es válido.`)
     if (item?.visible !== undefined && typeof item.visible !== 'boolean') errores.push(`Indicá si la sección ${indice + 1} del menú debe mostrarse.`)
     if (item?.orden !== undefined && (!Number.isInteger(item.orden) || item.orden < 1)) errores.push(`La posición de la sección ${indice + 1} del menú no es válida.`)
   })
+  if (Array.isArray(contenido.navegacion) && contenido.navegacion.some((item) => item.visible === false)) errores.push('Los 5 grupos del menú deben estar visibles.')
+  if (Array.isArray(contenido.navegacion) && contenido.navegacion.map((item) => item.etiqueta).join('|') !== navegacionEsperada.join('|')) errores.push('Usá Aletea, Qué hacemos, Para familias, Recursos y Participá en ese orden.')
   if (!Array.isArray(contenido.areas) || contenido.areas.length > 8) errores.push('La página puede tener hasta 8 áreas.')
   if (!Array.isArray(contenido.impacto?.cifras) || contenido.impacto.cifras.length > 6) errores.push('La página puede tener hasta 6 cifras.')
   if (!Array.isArray(contenido.organizacion?.redes) || contenido.organizacion.redes.length > 12) errores.push('La página puede mostrar hasta 12 redes sociales.')
@@ -180,7 +184,7 @@ export function validarContenidoPaginaWeb(contenido) {
     if (propuesta.visible && ((propuesta.area !== undefined && !String(propuesta.area).trim()) || (propuesta.dia !== undefined && !String(propuesta.dia).trim()))) errores.push(`Completá área y día en la actividad ${indice + 1} antes de mostrarla.`)
     if (propuesta.visible && propuesta.vigencia !== 'Histórica' && (!propuesta.accion?.etiqueta || !propuesta.accion?.enlace || !esEnlaceValido(propuesta.accion.enlace))) errores.push(`Completá el botón de la actividad ${indice + 1} con un enlace válido.`)
   })
-  ;['familias', 'formacion', 'privacidad'].forEach((nombre) => {
+  ;['familias', 'adultosAutistas', 'formacion', 'privacidad'].forEach((nombre) => {
     const pagina = contenido.paginas?.[nombre]
     if (pagina === undefined) return
     if (!pagina || typeof pagina !== 'object' || Array.isArray(pagina)) return errores.push(`La página ${etiquetaCampo(nombre)} no es válida.`)

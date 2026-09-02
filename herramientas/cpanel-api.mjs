@@ -50,7 +50,11 @@ export class CpanelApi {
     })
     const texto = await respuesta.text()
     let datos
-    try { datos = JSON.parse(texto) } catch { throw new Error(`cPanel respondió ${respuesta.status} sin JSON válido.`) }
+    try { datos = JSON.parse(texto) } catch {
+      const tipo = respuesta.headers?.get?.('content-type') || 'tipo desconocido'
+      const destino = respuesta.url || url
+      throw new Error(`cPanel respondió ${respuesta.status} sin JSON válido (${tipo}) desde ${destino}.`)
+    }
     if (!respuesta.ok) throw new Error(`cPanel respondió ${respuesta.status}: ${mensajeDe(datos?.errors || datos?.error)}`)
     return datos
   }
@@ -58,7 +62,13 @@ export class CpanelApi {
   async uapi(modulo, funcion, parametros = {}) {
     const url = new URL(`https://${this.host}:2083/execute/${modulo}/${funcion}`)
     for (const [nombre, valor] of Object.entries(parametros)) {
-      if (valor !== undefined && valor !== null) url.searchParams.set(nombre, String(valor))
+      if (Array.isArray(valor)) {
+        for (const elemento of valor) {
+          if (elemento !== undefined && elemento !== null) url.searchParams.append(nombre, String(elemento))
+        }
+      } else if (valor !== undefined && valor !== null) {
+        url.searchParams.set(nombre, String(valor))
+      }
     }
     return validarRespuestaUapi(await this.solicitar(url), modulo, funcion)
   }

@@ -1,4 +1,4 @@
-import { cifrar } from '../../js/acceso/cripto.js'
+import { cifrar, generarClaveAcceso } from '../../js/acceso/cripto.js'
 
 export { cifrar }
 
@@ -9,9 +9,11 @@ const CLAVE = 'actual'
 // Arma un archivo de usuarios real, con el token cifrado de verdad, para que
 // las pruebas de sesion ejerciten la criptografia y no una imitacion.
 export async function archivoConUsuario(usuario, nombre, contrasena, token, rol = 'admin') {
-  const registro = await cifrar(token, contrasena)
+  const claveAcceso = generarClaveAcceso()
+  const registro = await cifrar(claveAcceso, contrasena)
   return {
-    version: 1,
+    version: 2,
+    credencial: await cifrar(token, claveAcceso),
     usuarios: [{ usuario, nombre, rol, ...registro }],
   }
 }

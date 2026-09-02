@@ -1,7 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { alertaComisionDirectivaCms, alertasInstitucionalesCms, clasificarTarea, decisionValida, esperaProlongada, eventoValido, horizonteInstitucionalCms, metricasOperativasCms, proyectoValido, reunionValida, requiereSeguimiento, resumenSemanalCms, resumenTablero, tareaValida } from '../../js/modelo/cms.js'
+import { alertaComisionDirectivaCms, alertasInstitucionalesCms, clasificarTarea, decisionValida, esperaProlongada, eventoValido, horizonteInstitucionalCms, metricasOperativasCms, proyectosCompatiblesCms, proyectoValido, reunionValida, requiereSeguimiento, resumenSemanalCms, resumenTablero, tareaValida, unidadesCompatiblesCms } from '../../js/modelo/cms.js'
 
 describe('núcleo CMS', () => {
+  it('limita unidades y proyectos al contexto elegido', () => {
+    const unidades = [
+      { id: 'gaf', equipo_id: 'familias', estado: 'activa', vistas: [] },
+      { id: 'fsb', equipo_id: 'deportes', estado: 'activa', vistas: [{ equipo_id: 'finanzas' }] },
+      { id: 'vieja', equipo_id: 'familias', estado: 'archivada', vistas: [] },
+    ]
+    expect(unidadesCompatiblesCms(unidades, 'familias').map((fila) => fila.id)).toEqual(['gaf'])
+    expect(unidadesCompatiblesCms(unidades, 'finanzas').map((fila) => fila.id)).toEqual(['fsb'])
+    const proyectos = [
+      { id: 'p-gaf', equipo_id: 'familias', unidad_id: 'gaf', estado: 'en_marcha' },
+      { id: 'p-gwp', equipo_id: 'familias', unidad_id: 'gwp', estado: 'en_marcha' },
+      { id: 'p-cerrado', equipo_id: 'familias', unidad_id: 'gaf', estado: 'cerrado' },
+      { id: 'p-admin', equipo_id: 'administracion', unidad_id: 'gestoria', estado: 'en_marcha' },
+    ]
+    expect(proyectosCompatiblesCms(proyectos, { equipoId: 'familias' }).map((fila) => fila.id)).toEqual(['p-gaf', 'p-gwp'])
+    expect(proyectosCompatiblesCms(proyectos, { equipoId: 'familias', unidadId: 'gaf' }).map((fila) => fila.id)).toEqual(['p-gaf'])
+  })
+
   it('clasifica atrasos, espera y cierres sin depender de la interfaz', () => {
     expect(clasificarTarea({ estado: 'pendiente', fecha_limite: '2026-08-01' }, '2026-08-16')).toBe('atrasada')
     expect(clasificarTarea({ estado: 'esperando_respuesta' }, '2026-08-16')).toBe('esperando_respuesta')

@@ -1,20 +1,22 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { crearPantallaAjustes } from '../../js/ui/pantalla-ajustes.js'
-import { cifrar, descifrar, LARGO_MINIMO_CONTRASENA } from '../../js/acceso/cripto.js'
+import { cifrar, descifrar, generarClaveAcceso, LARGO_MINIMO_CONTRASENA } from '../../js/acceso/cripto.js'
 import { buscarUsuario } from '../../js/acceso/usuarios.js'
 
 const TOKEN = 'ghp_tokenDelDuenio'
-const SESION = { token: TOKEN, nombre: 'Majo', usuario: 'majo', rol: 'admin' }
+const CLAVE_ACCESO = generarClaveAcceso()
+const SESION = { token: TOKEN, claveAcceso: CLAVE_ACCESO, nombre: 'Majo', usuario: 'majo', rol: 'admin' }
 
 let raiz, archivo, pantalla, guardados, cerradas, tokensAvisados, lecturas
 
 // Dos personas de verdad, con el token cifrado de verdad, para poder comprobar
 // despues que las contraseñas nuevas realmente abren el token.
 async function archivoDePrueba() {
-  const deMajo = await cifrar(TOKEN, 'ContrasenaDeMajo0001')
-  const deAna = await cifrar(TOKEN, 'ContrasenaDeAna00001')
+  const deMajo = await cifrar(CLAVE_ACCESO, 'ContrasenaDeMajo0001')
+  const deAna = await cifrar(CLAVE_ACCESO, 'ContrasenaDeAna00001')
   return {
-    version: 1,
+    version: 2,
+    credencial: await cifrar(TOKEN, CLAVE_ACCESO),
     usuarios: [
       { usuario: 'majo', nombre: 'Majo', rol: 'admin', ...deMajo },
       { usuario: 'ana', nombre: 'Ana', rol: 'coordinacion', ...deAna },
@@ -136,7 +138,7 @@ describe('agregar una persona', () => {
     await agregar('sofi', 'Sofía')
     const generada = caja().querySelector('.contrasena-valor').textContent
     const guardado = guardados.at(-1)
-    expect(await descifrar(buscarUsuario(guardado, 'sofi'), generada)).toBe(TOKEN)
+    expect(await descifrar(buscarUsuario(guardado, 'sofi'), generada)).toBe(CLAVE_ACCESO)
   })
 
   it('la contraseña usa solo caracteres sin ambiguedad', async () => {
@@ -238,11 +240,9 @@ describe('quitar a una persona', () => {
 })
 
 describe('rotar el token', () => {
-  it('advierte que es destructivo y que deja a todas afuera', () => {
+  it('explica que conserva las contraseñas personales', () => {
     const aviso = raiz.querySelector('.aviso-rotar').textContent
-    expect(aviso).toMatch(/no se puede deshacer/i)
-    expect(aviso).toMatch(/dejan de funcionar/i)
-    expect(aviso).toMatch(/incluida la tuya/i)
+    expect(aviso).toMatch(/sin cambiar las contraseñas personales/i)
   })
 
   it('viene plegado, para no quedar a un toque de las acciones de todos los dias', () => {
@@ -261,20 +261,15 @@ describe('rotar el token', () => {
       .toBe(plegable)
   })
 
-  it('vuelve a cifrar para todas y muestra todas las contraseñas nuevas', async () => {
+  it('cambia solo la credencial técnica y no genera contraseñas nuevas', async () => {
+    const usuariosAntes = structuredClone(archivo.usuarios)
     campo('token-nuevo').value = 'ghp_tokenNuevo'
     await enviar('.formulario-rotar')
 
     const guardado = guardados.at(-1)
-    expect(guardado.usuarios).toHaveLength(2)
-    const entradas = [...raiz.querySelectorAll('.contrasena-entrada')]
-    expect(entradas.map((e) => e.dataset.usuario)).toEqual(['majo', 'ana'])
-
-    for (const entrada of entradas) {
-      const generada = entrada.querySelector('.contrasena-valor').textContent
-      const registro = buscarUsuario(guardado, entrada.dataset.usuario)
-      expect(await descifrar(registro, generada)).toBe('ghp_tokenNuevo')
-    }
+    expect(guardado.usuarios).toEqual(usuariosAntes)
+    expect(await descifrar(guardado.credencial, CLAVE_ACCESO)).toBe('ghp_tokenNuevo')
+    expect(raiz.querySelector('.contrasena-generada')).toBeNull()
   })
 
   it('conserva el rol de cada una', async () => {

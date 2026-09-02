@@ -10,7 +10,7 @@ const contenidoInicial = JSON.parse(readFileSync(new URL('../../assets/pagina-pu
 describe('contenido de la página web', () => {
   it('acepta como semilla el contenido público verificado', () => {
     expect(validarContenidoPaginaWeb(contenidoInicial)).toEqual([])
-    expect(SECCIONES_PAGINA_WEB.map((seccion) => seccion.id)).toEqual(['portada', 'impacto', 'areas', 'institucion', 'actividades', 'familias', 'formacion', 'biblioteca', 'recursos', 'tienda', 'donaciones', 'contacto', 'participacion', 'orientacion', 'actualidad', 'redes', 'general', 'apariencia', 'calidad', 'privacidad', 'operacion'])
+    expect(SECCIONES_PAGINA_WEB.map((seccion) => seccion.id)).toEqual(['portada', 'impacto', 'areas', 'institucion', 'actividades', 'familias', 'adultos-autistas', 'formacion', 'biblioteca', 'recursos', 'tienda', 'donaciones', 'contacto', 'participacion', 'orientacion', 'actualidad', 'redes', 'general', 'apariencia', 'calidad', 'privacidad', 'operacion'])
     expect(contenidoInicial.aparienciaSitio).toEqual({ movimiento: 'suave', mostrarListon: true, mostrarOrbita: true, mostrarRedAreas: true })
     expect(contenidoInicial.paginas.privacidad).toMatchObject({ visible: true, etiqueta: 'Privacidad' })
     expect(resumenSeccion(contenidoInicial, 'privacidad').cantidad).toBe(5)
@@ -23,6 +23,18 @@ describe('contenido de la página web', () => {
       cifrasNumeros: 'expresiva', participacion: 'expresiva', portada: 'institucional',
       areas: 'institucional', institucion: 'institucional', familias: 'institucional', contacto: 'institucional',
     })
+  })
+
+  it('exige los cinco grupos institucionales visibles y en el orden acordado', () => {
+    const oculto = clonarContenidoPaginaWeb(contenidoInicial)
+    oculto.navegacion[4].visible = false
+    expect(validarContenidoPaginaWeb(oculto)).toContain('Los 5 grupos del menú deben estar visibles.')
+    const renombrado = clonarContenidoPaginaWeb(contenidoInicial)
+    renombrado.navegacion[0].etiqueta = 'Inicio'
+    expect(validarContenidoPaginaWeb(renombrado)).toContain('Usá Aletea, Qué hacemos, Para familias, Recursos y Participá en ese orden.')
+    const incompleto = clonarContenidoPaginaWeb(contenidoInicial)
+    incompleto.navegacion.pop()
+    expect(validarContenidoPaginaWeb(incompleto)).toContain('El menú debe tener los 5 grupos institucionales acordados.')
   })
 
   it('limita la apariencia a opciones seguras', () => {
@@ -107,8 +119,8 @@ describe('contenido de la página web', () => {
     expect(validarContenidoPaginaWeb(invalido)).toContain('Completá área y día en la actividad 1 antes de mostrarla.')
   })
 
-  it('admite ocho destinos de menú y protege visibilidad, orden y enlaces', () => {
-    expect(contenidoInicial.navegacion).toHaveLength(8)
+  it('conserva cinco destinos de menú y protege visibilidad, orden y enlaces', () => {
+    expect(contenidoInicial.navegacion).toHaveLength(5)
     expect(validarContenidoPaginaWeb(contenidoInicial)).toEqual([])
     const invalido = clonarContenidoPaginaWeb(contenidoInicial)
     invalido.navegacion[0].visible = 'sí'

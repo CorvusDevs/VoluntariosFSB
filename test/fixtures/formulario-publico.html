@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Auditoría visual del formulario público</title>
+  <base href="/">
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body class="formulario-publico-pagina">
+  <main id="formulario-publico" class="formulario-publico" aria-live="polite"></main>
+  <script>
+    history.replaceState({}, '', '/test/fixtures/formulario-publico.html?id=ingreso-whatsapp-familias')
+    const definicion = {
+      formulario: {
+        id: 'ingreso-whatsapp-familias',
+        titulo: 'Ingreso a los grupos de WhatsApp de Aletea',
+        descripcion: 'Completá tus datos, conocé cómo los cuidamos y aceptá las pautas de convivencia antes de solicitar el ingreso.',
+        tipo: 'inscripcion',
+        finalidad: 'Gestionar el ingreso y la participación en los grupos de WhatsApp de familias de Aletea.',
+        responsable_datos: 'Aletea Asociación Civil',
+        conservacion_meses: 12,
+        requiere_consentimiento: true,
+        configuracion_publica_json: JSON.stringify({ modelo: 'whatsapp_familias' }),
+        campos_json: '[]',
+      },
+    }
+    window.fetch = async (_url, opciones = {}) => opciones.method === 'POST'
+      ? new Response(JSON.stringify({ recibida: true, suscripcion: 'pendiente', referencia: 'ALE-260831-0042' }), { status: 201, headers: { 'content-type': 'application/json' } })
+      : new Response(JSON.stringify(definicion), { status: 200, headers: { 'content-type': 'application/json' } })
+  </script>
+  <script type="module" src="js/formulario-publico.js"></script>
+</body>
+</html>

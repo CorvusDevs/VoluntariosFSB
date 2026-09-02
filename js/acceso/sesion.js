@@ -15,13 +15,20 @@ const CONTRASENA_MAL = 'Esa contraseña no coincide. Pegala de nuevo, sin espaci
 export async function ingresar({ archivo, usuario, contrasena }) {
   const registro = buscarParaIngresar(archivo, usuario)
   if (!registro) throw new Error(SIN_USUARIO)
-  let token
+  let token, claveAcceso = null
   try {
-    token = await descifrar(registro, contrasena)
+    if (archivo.version >= 2 && archivo.credencial) {
+      claveAcceso = await descifrar(registro, contrasena)
+      token = await descifrar(archivo.credencial, claveAcceso)
+    } else {
+      // Compatibilidad transitoria: los archivos v1 cifraban el token
+      // directamente con cada contraseña.
+      token = await descifrar(registro, contrasena)
+    }
   } catch {
     throw new Error(CONTRASENA_MAL)
   }
-  return { token, nombre: registro.nombre, usuario: registro.usuario, rol: registro.rol }
+  return { token, claveAcceso, nombre: registro.nombre, usuario: registro.usuario, rol: registro.rol }
 }
 
 function abrir() {
@@ -52,11 +59,11 @@ function operar(db, modo, accion) {
 // La clave se genera con extractable en false y se guarda como CryptoKey, que
 // IndexedDB clona sin exponer el material. Ni un script en la pagina puede
 // sacarla: solo puede pedirle al navegador que descifre.
-export async function recordar(token, nombre, { usuario = null, rol = null } = {}) {
+export async function recordar(token, nombre, { usuario = null, rol = null, claveAcceso = null } = {}) {
   const clave = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'])
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const datos = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv }, clave, new TextEncoder().encode(token),
+    { name: 'AES-GCM', iv }, clave, new TextEncoder().encode(JSON.stringify({ token, claveAcceso })),
   )
   const db = await abrir()
   await operar(db, 'readwrite', (d) => d.put({ clave, iv, datos, nombre, usuario, rol }, CLAVE))
@@ -72,8 +79,12 @@ export async function recuperarRecordado() {
     const datos = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: guardado.iv }, guardado.clave, guardado.datos,
     )
+    const texto = new TextDecoder().decode(datos)
+    let credencial
+    try { credencial = JSON.parse(texto) } catch { credencial = { token: texto, claveAcceso: null } }
     return {
-      token: new TextDecoder().decode(datos),
+      token: credencial.token,
+      claveAcceso: credencial.claveAcceso ?? null,
       nombre: guardado.nombre,
       usuario: guardado.usuario ?? null,
       // Sin rol guardado, el permiso mas bajo: que un registro viejo o

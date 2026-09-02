@@ -121,6 +121,16 @@ describe('ultima pantalla', () => {
     expect(pantallaPermitida('cms-comunicacion-visual', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'coordinacion' })).toBe(true)
   })
 
+  it('limita contactos y campañas a Dirección o Administración con acceso a datos', () => {
+    expect(pantallaPermitida('cms-comunicaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'direccion', nivelDatosPersonales: 'operativo' })).toBe(true)
+    expect(pantallaPermitida('cms-comunicaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'administracion', nivelDatosPersonales: 'sensible' })).toBe(true)
+    expect(pantallaPermitida('cms-comunicaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'coordinacion', nivelDatosPersonales: 'operativo' })).toBe(false)
+    expect(pantallaPermitida('cms-comunicaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'direccion', nivelDatosPersonales: 'ninguno' })).toBe(false)
+    expect(pantallaPermitida('cms-operaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'direccion' })).toBe(true)
+    expect(pantallaPermitida('cms-operaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'administracion' })).toBe(true)
+    expect(pantallaPermitida('cms-operaciones', { cloudflare: true, permisos: ['cms'], perfilAcceso: 'coordinacion' })).toBe(false)
+  })
+
   it('ofrece ayuda a cualquier cuenta del gestor institucional', () => {
     expect(pantallaPermitida('ayuda', { cloudflare: true, permisos: ['cms'] })).toBe(true)
     expect(pantallaPermitida('ayuda', { cloudflare: false, permisos: ['cms'] })).toBe(false)

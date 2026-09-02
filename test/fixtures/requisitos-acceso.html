@@ -7,14 +7,16 @@
   <link rel="stylesheet" href="../../css/estilos.css">
   <style>
     body { margin: 0; background: #FBF9FC; }
-    main { width: min(1120px, calc(100% - 32px)); margin: 32px auto; display: grid; gap: 24px; }
+    main { box-sizing: border-box; width: min(1120px, calc(100% - 32px)); min-width: 0; margin: 32px auto; display: grid; gap: 24px; }
+    .muestra, #panel, #accesos { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+    main input, main select, main textarea { box-sizing: border-box; max-width: 100%; }
     .muestra { display: grid; gap: 12px; }
   </style>
 </head>
 <body>
   <main>
     <section class="muestra">
-      <h1>Permisos guiados</h1>
+      <p class="cms-panel-etiqueta">Permisos guiados</p>
       <div id="panel"></div>
     </section>
     <div id="accesos"></div>

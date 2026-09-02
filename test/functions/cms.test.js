@@ -1,8 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { cierreTareaCmsDesde } from '../../functions/api/[[ruta]].js'
-import { actividadCmsSinDatosDeEntradas, alianzaCmsDesde, asegurarFormularioPruebaCms, avanceSolicitudPrivacidadCms, cabecerasFormularioPublico, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, cierreReunionCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, compromisoPagoFsbDesde, configuracionFinanzasFsb, conflictoAgendaCms, conflictosAgendaCms, consentimientoFormularioPublicoValido, cuentaFsbDesde, datosTareaSinSeguimientoPersonalAjeno, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventoCmsSinDatosDeEntrada, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, formulariosPruebaCms, gastoProyectoCmsDesde, gruposConflictosAgendaCms, hitoProyectoCmsDesde, idCuentaFsbVinculable, movimientoFsbDesde, notificacionCmsSinDatosDeFormulario, perfilAccesoDe, plantillaTareasCmsDesde, puedeAccederFinanzasFsb, puedeGestionarFinanzasFsb, puedeGestionarSolicitudesPrivacidadCms, puedeVerAuditoria, puedeVerDocumentoCms, puedeVerRespuestasCms, puedeVerTareaCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, reservarEnvioFormularioPublico, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, solicitudPrivacidadCmsDesde, tareaCmsDesde, tareaCmsSinDatosDeFormulario, tareaCmsSinSeguimientoPersonalAjeno, tareaRecurrenteCmsDesde, unidadOperativaCmsDesde, vigenciaCuentaDesde, vigenciaDatosPersonalesDesde } from '../../functions/api/[[ruta]].js'
+import { actividadCmsSinDatosDeEntradas, alianzaCmsDesde, asegurarFormularioPruebaCms, auditoriaAcuerdosFormularioDesde, avanceSolicitudPrivacidadCms, cabecerasFormularioPublico, camposFormularioCmsDesde, capacidadTrabajoCmsDesde, cierreReunionCmsDesde, comentarioTareaCmsDesde, comunicadoCmsDesde, compromisoFormularioPublicoValido, compromisoPagoFsbDesde, configuracionFinanzasFsb, conflictoAgendaCms, conflictosAgendaCms, consentimientoFormularioPublicoValido, cuentaFsbDesde, datosTareaSinSeguimientoPersonalAjeno, decisionCmsDesde, derivarEntradaCms, documentoCmsDesde, entradaCmsDesde, equipoCmsDesde, esperaIntentoIngreso, eventoCmsDesde, eventoCmsSinDatosDeEntrada, eventosRecurrentesCmsDesde, fechaActualCms, fechaCmsValida, fechaHoraCmsValida, formularioCmsDesde, formulariosPruebaCms, gastoProyectoCmsDesde, gruposConflictosAgendaCms, hitoProyectoCmsDesde, idCuentaFsbVinculable, movimientoFsbDesde, notificacionCmsSinDatosDeFormulario, perfilAccesoDe, plantillaTareasCmsDesde, puedeAccederFinanzasFsb, puedeGestionarFinanzasFsb, puedeGestionarSolicitudesPrivacidadCms, puedeVerAuditoria, puedeVerDocumentoCms, puedeVerRespuestasCms, puedeVerTareaCms, programaCmsDesde, proyectoCmsDesde, referenciasCmsValidas, registrarSolicitudComunicacion, reservarEnvioFormularioPublico, respuestaFormularioCmsDesde, reunionCmsDesde, reunionesRecurrentesCmsDesde, responsabilidadCmsDesde, responsableSolicitudDe, revisionSemanalCmsDesde, riesgoProyectoCmsDesde, siguienteFechaRecurrenteCms, solicitudPrivacidadCmsDesde, tareaCmsDesde, tareaCmsSinDatosDeFormulario, tareaCmsSinSeguimientoPersonalAjeno, tareaRecurrenteCmsDesde, unidadOperativaCmsDesde, vigenciaCuentaDesde, vigenciaDatosPersonalesDesde } from '../../functions/api/[[ruta]].js'
 
 describe('validación del CMS en Cloudflare', () => {
+  it('crea una confirmación separada y nunca reactiva una baja', async () => {
+    const ejecutadas = []
+    const base = {
+      prepare(sql) {
+        return {
+          valores: [],
+          bind(...valores) { this.valores = valores; return this },
+          async first() { return null },
+          async run() { ejecutadas.push({ sql, valores: this.valores }); return { success: true } },
+        }
+      },
+    }
+    const solicitud = { correo: 'persona@ejemplo.uy', temas: ['familias'], finalidad: 'Novedades', texto_version: 'v1', texto_consentimiento: 'Acepto novedades.' }
+    expect(await registrarSolicitudComunicacion(base, solicitud, { nombre: 'Persona', origen: 'https://gestor.aletea.org' })).toEqual({ estado: 'pendiente' })
+    expect(ejecutadas.some(({ sql }) => sql.includes('INSERT INTO contactos_comunicacion'))).toBe(true)
+    expect(ejecutadas.some(({ sql }) => sql.includes('INSERT INTO consentimientos_comunicacion'))).toBe(true)
+    const cola = ejecutadas.find(({ sql }) => sql.includes('INSERT INTO cola_correos'))
+    expect(cola.valores[4]).toContain('Confirmá')
+    expect(cola.valores[5]).toContain('/api/comunicaciones/confirmar?token=')
+
+    const baseSuprimida = { prepare: () => ({ bind() { return this }, first: async () => ({ correo: solicitud.correo }) }) }
+    expect(await registrarSolicitudComunicacion(baseSuprimida, solicitud, { origen: 'https://gestor.aletea.org' })).toEqual({ estado: 'suprimida' })
+  })
   it('mantiene visible para quien la creó una tarea ya completada aunque no pertenezca a su equipo', () => {
     const alcance = { global: false, perfil: 'coordinacion', equipos: new Set(['familias']) }
     const tarea = { creado_por: 'claudia@aletea.org', responsable_correo: 'ale@aletea.org', equipo_id: null, estado: 'completada' }
@@ -148,6 +171,12 @@ describe('validación del CMS en Cloudflare', () => {
     expect(cierre.cierre.acuerdos[0]).toMatchObject({ titulo: 'Confirmar salón', crear_tarea: true, fecha_limite: '2026-08-30' })
     expect(cierreReunionCmsDesde({ minuta: '', resumen: '' }).error).toContain('minuta')
     expect(cierreReunionCmsDesde({ minuta: 'Texto', resumen: 'Texto', acuerdos: [{ titulo: 'Acuerdo', fecha_limite: '2026-02-30' }] }).error).toContain('fecha')
+  })
+
+  it('conserva y valida la fecha de seguimiento al editar una reunión', () => {
+    expect(reunionCmsDesde({ titulo: 'Preparar asamblea', fecha_hora: '2026-09-08T19:00', proxima_revision: '2026-09-05' }).reunion)
+      .toMatchObject({ titulo: 'Preparar asamblea', proxima_revision: '2026-09-05' })
+    expect(reunionCmsDesde({ proxima_revision: '2026-02-30' }, { titulo: 'Asamblea', fecha_hora: '2026-09-08T19:00', estado: 'planificada' }).error).toContain('seguimiento')
   })
 
   it('valida esfuerzo y disponibilidad sin inventar horas faltantes', () => {
@@ -310,6 +339,25 @@ describe('validación del CMS en Cloudflare', () => {
     await expect(referenciasCmsValidas(base, { solicitante_correo: 'cuenta-inactiva@aletea.uy' })).resolves.toContain('solicitante')
   })
 
+  it('exige que el proyecto pertenezca a la unidad o al equipo elegidos', async () => {
+    const consultas = []
+    const base = {
+      prepare: (sql) => ({
+        bind: (...valores) => ({
+          first: async () => {
+            consultas.push({ sql, valores })
+            if (sql.includes('FROM unidades_operativas_cms')) return { id: valores[0] }
+            return null
+          },
+        }),
+      }),
+    }
+    await expect(referenciasCmsValidas(base, { unidad_id: 'gaf', proyecto_id: 'proyecto-ajeno' }))
+      .resolves.toContain('no pertenece')
+    expect(consultas.find((consulta) => consulta.sql.includes('FROM proyectos_cms'))).toMatchObject({ valores: ['proyecto-ajeno', 'gaf'] })
+    expect(consultas.find((consulta) => consulta.sql.includes('FROM proyectos_cms')).sql).toContain('unidad_id = ?2')
+  })
+
   it('asigna una solicitud al rol operativo más cercano del equipo', () => {
     const responsabilidades = [
       { equipo_id: 'familias', usuario_correo: 'integrante@aletea.org', tipo: 'integrante', activo: 1 },
@@ -466,6 +514,7 @@ describe('validación del CMS en Cloudflare', () => {
     expect(formulario).toMatchObject({ visibilidad: 'publica', estado: 'activa', responsable_datos: 'Aletea', conservacion_meses: 12, requiere_consentimiento: true })
     expect(consentimientoFormularioPublicoValido({}, formulario)).toBe(false)
     expect(consentimientoFormularioPublicoValido({ consentimiento_privacidad: true }, formulario)).toBe(true)
+    expect(compromisoFormularioPublicoValido({}, formulario)).toBe(true)
     expect(formularioCmsDesde({ titulo: 'Público incompleto', tipo: 'voluntariado', visibilidad: 'publica', finalidad: '' }).error).toContain('finalidad')
     expect(formularioCmsDesde({ titulo: 'Plazo inválido', tipo: 'voluntariado', conservacion_meses: 18 }).error).toContain('plazo')
     expect(respuestaFormularioCmsDesde({ nombre: 'Camila', contacto: 'camila@example.com', detalle: 'Puedo colaborar.' }, formulario).entrada).toMatchObject({ nombre: 'Camila', tipo: 'voluntariado' })
@@ -477,6 +526,26 @@ describe('validación del CMS en Cloudflare', () => {
     expect(formularioCmsDesde({ titulo: 'Pedido', tipo: 'pedido', visibilidad: 'interna', equipo_id: 'familias', equipo_solicitante_id: 'eventos', prioridad: 'alta' }).formulario).toMatchObject({ equipo_id: 'familias', equipo_solicitante_id: 'eventos', prioridad: 'alta' })
     expect(formularioCmsDesde({ titulo: 'Alta', tipo: 'inscripcion', destino_respuesta: 'alta_persona' }).formulario.destino_respuesta).toBe('alta_persona')
     expect(formularioCmsDesde({ titulo: 'Alta', tipo: 'inscripcion', destino_respuesta: 'crear_perfil' }).error).toContain('destino')
+  })
+
+  it('valida el ingreso a WhatsApp Familias sin aceptar correos inconsistentes', () => {
+    const formulario = formularioCmsDesde({
+      titulo: 'Ingreso a WhatsApp Familias', tipo: 'inscripcion', visibilidad: 'publica',
+      configuracion_publica: { modelo: 'whatsapp_familias' },
+    }).formulario
+    expect(compromisoFormularioPublicoValido({}, formulario)).toBe(false)
+    expect(compromisoFormularioPublicoValido({ compromiso_confidencialidad: true }, formulario)).toBe(true)
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: 'mal', contacto_confirmacion: 'mal' }, formulario).error).toContain('correo')
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: 'ana@example.org', contacto_confirmacion: 'otra@example.org' }, formulario).error).toContain('no coinciden')
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: 'ana@example.org', contacto_confirmacion: 'ANA@example.org', detalle: 'Debe ignorarse' }, formulario).entrada).toMatchObject({ nombre: 'Ana', contacto: 'ana@example.org', detalle: '' })
+    expect(auditoriaAcuerdosFormularioDesde({}, formulario, '2026-09-01 17:00:00').error).toContain('datos')
+    expect(auditoriaAcuerdosFormularioDesde({ consentimiento_privacidad: true }, formulario, '2026-09-01 17:00:00').error).toContain('acuerdo')
+    expect(auditoriaAcuerdosFormularioDesde({ consentimiento_privacidad: true, compromiso_confidencialidad: true }, formulario, '2026-09-01 17:00:00').respuestas).toMatchObject({
+      _consentimiento_privacidad: 'Aceptado',
+      _consentimiento_privacidad_fecha: '2026-09-01 17:00:00',
+      _compromiso_confidencialidad: 'Aceptado',
+      _compromiso_confidencialidad_version: '2026-09-01-v1',
+    })
   })
 
   it('prepara cinco formularios reales de prueba con equipos y preguntas trazables', () => {
@@ -537,6 +606,21 @@ describe('validación del CMS en Cloudflare', () => {
     expect(JSON.parse(respuesta.respuestas_json)).toEqual({ modalidad: 'Virtual', acepta: true })
     expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { modalidad: 'Teléfono', acepta: true } }, formulario).error).toContain('no es válida')
     expect(camposFormularioCmsDesde([{ etiqueta: 'Única', tipo: 'seleccion', opciones: ['Una'] }]).error).toContain('dos opciones')
+  })
+
+  it('valida correo, número y selección múltiple sin aceptar valores inventados', () => {
+    const campos = [
+      { clave: 'correo', etiqueta: 'Correo', tipo: 'correo', requerido: true, confirmar_correo: true },
+      { clave: 'cantidad', etiqueta: 'Cantidad', tipo: 'numero', requerido: true },
+      { clave: 'intereses', etiqueta: 'Intereses', tipo: 'seleccion_multiple', requerido: true, opciones: ['Familias', 'Formación', 'Actividades'] },
+    ]
+    const formulario = formularioCmsDesde({ titulo: 'Ingreso', tipo: 'inscripcion', campos }).formulario
+    const respuesta = respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { correo: 'ana@example.org', cantidad: '2,5', intereses: ['Familias', 'Actividades'] }, confirmaciones_correo: { correo: 'ANA@example.org' } }, formulario)
+    expect(respuesta.entrada.respuestas).toEqual({ correo: 'ana@example.org', cantidad: '2,5', intereses: ['Familias', 'Actividades'] })
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { correo: 'mal', cantidad: '2', intereses: ['Familias'] } }, formulario).error).toContain('correo')
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { correo: 'ana@example.org', cantidad: '2', intereses: ['Familias'] }, confirmaciones_correo: { correo: 'otra@example.org' } }, formulario).error).toContain('no coinciden')
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { correo: 'ana@example.org', cantidad: 'dos', intereses: ['Familias'] }, confirmaciones_correo: { correo: 'ana@example.org' } }, formulario).error).toContain('número')
+    expect(respuestaFormularioCmsDesde({ nombre: 'Ana', contacto: '099', respuestas: { correo: 'ana@example.org', cantidad: '2', intereses: ['Inventado'] }, confirmaciones_correo: { correo: 'ana@example.org' } }, formulario).error).toContain('no es válida')
   })
 
   it('mantiene los formularios públicos separados de los perfiles internos', () => {

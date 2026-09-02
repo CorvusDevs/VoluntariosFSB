@@ -4,6 +4,7 @@ import { dibujarMuestra } from './muestra-celda.js'
 import { maquetar } from '../imagen/maquetar.js'
 import { pintar } from '../imagen/pintar.js'
 import { ALTO_WHATSAPP, ANCHO_WHATSAPP, crearLienzoWhatsApp } from '../imagen/whatsapp.js'
+import { crearLienzoA4, nombreDeArchivoA4 } from '../imagen/a4.js'
 import { medidorDesde, esperarFuentes, cargarImagen, descargar, nombreDeArchivo, nombreDeArchivoHorizontal }
   from '../imagen/exportar.js'
 import {
@@ -55,6 +56,7 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   const textoDespedida = () => lista.despedida ?? opciones.despedida ?? DESPEDIDA_POR_DEFECTO
   let lista = opciones.lista
   const lienzoVertical = document.createElement('canvas')
+  lienzoVertical.className = 'lienzo-vista-previa lienzo-vista-previa-vertical'
   const ctx = crearContexto ? crearContexto(lienzoVertical) : lienzoVertical.getContext('2d')
   const lienzoHorizontal = document.createElement('canvas')
   lienzoHorizontal.className = 'lienzo-vista-previa lienzo-vista-previa-horizontal'
@@ -79,9 +81,11 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
   // Los bosquejos arrancan plegados: se abren al tocar "Cambiar".
   let formatoAbierto = false
   let pestanaActiva = 'resultado'
+  let orientacionPrevia = 'horizontal'
   // Aviso puntual para la coordinadora, por ejemplo cuando compartir no anda.
   let mensaje = ''
   let composicionHorizontal = null
+  const lienzosA4 = new Map()
 
   function calcular() {
     plano = maquetar(lista, roster, {
@@ -115,6 +119,14 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     lienzoHorizontal.width = ANCHO_WHATSAPP
     lienzoHorizontal.height = ALTO_WHATSAPP
     ctxHorizontal.drawImage(resultado.lienzo, 0, 0)
+    lienzosA4.clear()
+    lista.grupos.filter((grupo) => grupo.filas.length || grupo.apoyo?.length).forEach((grupo) => {
+      const resultadoA4 = crearLienzoA4({
+        lista, roster, grupo, imagenes, medirTexto: medidorDesde(ctx), crearLienzo: crearLienzoAuxiliar,
+      })
+      resultadoA4.lienzo.className = 'lienzo-vista-previa lienzo-vista-previa-a4'
+      lienzosA4.set(grupo.numero, resultadoA4.lienzo)
+    })
     continuarFundidoDeFotos()
   }
 
@@ -359,7 +371,26 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   function informacion() {
     const caja = elemento('div', ['info-imagen'])
-    caja.textContent = `Imagen final horizontal ampliada de ${ANCHO_WHATSAPP} por ${ALTO_WHATSAPP} px, relación 48:31.`
+    caja.textContent = `Vista horizontal de ${ANCHO_WHATSAPP} por ${ALTO_WHATSAPP} px, relación 48:31, vista vertical completa y una hoja A4 por cancha listas para revisar antes de descargar.`
+    return caja
+  }
+
+  function selectorOrientacion() {
+    const caja = elemento('div', ['selector-orientacion-previa'])
+    caja.setAttribute('role', 'group')
+    caja.setAttribute('aria-label', 'Orientación de la vista previa')
+    const opciones = [['horizontal', 'Horizontal'], ['vertical', 'Vertical']]
+    lista.grupos.filter((grupo) => grupo.filas.length || grupo.apoyo?.length).forEach((grupo) => {
+      opciones.push([`a4-${grupo.numero}`, `${grupo.cancha ?? `Cancha ${grupo.numero}`} A4`])
+    })
+    opciones.forEach(([valor, etiqueta]) => {
+      const control = boton(etiqueta, () => { orientacionPrevia = valor; redibujar() })
+      control.dataset.orientacion = valor
+      control.classList.add('boton-orientacion-previa')
+      control.classList.toggle('activa', orientacionPrevia === valor)
+      control.setAttribute('aria-pressed', String(orientacionPrevia === valor))
+      caja.appendChild(control)
+    })
     return caja
   }
 
@@ -401,7 +432,19 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
       await dibujar()
       await descargar(lienzoVertical, nombreDeArchivo(lista))
     })))
+    lista.grupos.filter((grupo) => grupo.filas.length || grupo.apoyo?.length).forEach((grupo) => {
+      caja.appendChild(boton(`Descargar ${grupo.cancha ?? `Cancha ${grupo.numero}`} A4`, () => conControlesBloqueados(async () => {
+        await dibujar()
+        await descargar(lienzosA4.get(grupo.numero), nombreDeArchivoA4(lista, grupo))
+      })))
+    })
     return caja
+  }
+
+  function lienzoActivo() {
+    if (orientacionPrevia === 'vertical') return lienzoVertical
+    if (orientacionPrevia.startsWith('a4-')) return lienzosA4.get(Number(orientacionPrevia.slice(3))) ?? lienzoHorizontal
+    return lienzoHorizontal
   }
 
   function redibujar() {
@@ -424,7 +467,11 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     if (mensaje) raiz.appendChild(elemento('div', ['aviso'], mensaje))
     const resultado = elemento('div', ['vista-panel-resultado'])
     resultado.hidden = pestanaActiva !== 'resultado'
-    resultado.append(acciones(), lienzoHorizontal)
+    resultado.append(
+      acciones(),
+      selectorOrientacion(),
+      lienzoActivo(),
+    )
     raiz.appendChild(resultado)
     // Un repintado en medio de una exportacion (por ejemplo, cuando termina la
     // precarga de fotos) arma controles nuevos: hay que volver a bloquearlos.

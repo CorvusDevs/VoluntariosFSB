@@ -3,8 +3,17 @@ import { importeCentavosFsb, prepararCuotasFsb, prepararRecargosFsb, resumenFina
 import { bytesImagenConLimite, LIMITE_IMAGEN_REMOTA, urlDescargaGoogleDrive } from '../../js/imagen/cargar-remota.js'
 import { MENSAJE_ENLACE_INVALIDO, normalizarEnlaceUsuario } from '../../js/util/enlaces.js'
 import {
-  perfilAccesoInstitucional, puedeGestionarPaginaWeb, puedeUsarComunicacionVisual, puedeVerMetricasPaginaWeb,
+  CAPACIDAD_CREAR_TAREAS, perfilAccesoInstitucional, permisoCrearTareasEfectivo, puedeGestionarPaginaWeb, puedeUsarComunicacionVisual, puedeVerMetricasPaginaWeb,
 } from '../../js/acceso/permisos-funciones.js'
+import {
+  campanaComunicacionDesde, solicitudComunicacionDesde, temasComunicacionValidos,
+} from '../../js/modelo/comunicaciones.js'
+import {
+  controlOperativoDesde, controlesOperativosConEstado, estadoTrabajoCorreo, resumenOperativo,
+} from '../../js/modelo/operaciones.js'
+import {
+  campoBaseRequerido, campoBaseVisible, configuracionPublicaFormulario, configuracionPublicaJson, correoFormularioValido,
+} from '../../js/modelo/formularios.js'
 
 const responder = (datos, estado = 200, cabeceras = {}) => new Response(
   datos === null ? null : JSON.stringify(datos),
@@ -12,6 +21,10 @@ const responder = (datos, estado = 200, cabeceras = {}) => new Response(
 )
 
 const error = (mensaje, estado, cabeceras = {}) => responder({ error: mensaje }, estado, cabeceras)
+const responderHtml = (contenido, estado = 200) => new Response(contenido, {
+  status: estado,
+  headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-robots-tag': 'noindex, nofollow, noarchive' },
+})
 
 const ORIGENES_FORMULARIOS_PUBLICOS = new Set([
   'https://prueba.aletea.org',
@@ -364,6 +377,28 @@ function puedeGestionarEquipoCms(alcance, equipoId) {
 function puedeGestionarTareaCms(alcance, sesion, tarea) {
   if (puedeGestionarEquipoCms(alcance, tarea?.equipo_id)) return true
   return alcance.perfil === 'integrante' && tarea?.responsable_correo === sesion.correo
+}
+
+async function politicasCrearTareasCms(base) {
+  const filas = await base.prepare(`SELECT capacidad, alcance_tipo, alcance_id, efecto
+    FROM permisos_capacidades_cms WHERE capacidad = ?1`).bind(CAPACIDAD_CREAR_TAREAS).all()
+  return filas.results || []
+}
+
+function puedeCrearTareaCms(alcance, sesion, equipoId, politicas) {
+  return (equipoId ? puedeVerEquipoCms(alcance, equipoId) : alcance.global)
+    && permisoCrearTareasEfectivo(sesion, equipoId, politicas).permitido
+}
+
+function capacidadesCrearTareasCms(alcance, sesion, equipos, politicas) {
+  const permitidos = equipos.filter((equipo) => puedeCrearTareaCms(alcance, sesion, equipo.id, politicas)).map((equipo) => equipo.id)
+  const permisoSinEquipo = puedeCrearTareaCms(alcance, sesion, null, politicas)
+  return {
+    global: Boolean(alcance.global && permisoSinEquipo),
+    equipos: permitidos,
+    puede_crear: Boolean(permisoSinEquipo || permitidos.length),
+    predeterminado: perfilAccesoDe(sesion) === 'administracion' ? 'permitir' : 'bloquear',
+  }
 }
 
 export function puedeVerTareaCms(alcance, sesion, tarea) {
@@ -1697,7 +1732,7 @@ export function reaperturaEntradaCmsDesde(datos = {}) {
   return { motivo }
 }
 
-const TIPOS_CAMPO_FORMULARIO_CMS = ['texto', 'texto_largo', 'seleccion', 'casilla', 'fecha']
+const TIPOS_CAMPO_FORMULARIO_CMS = ['texto', 'correo', 'numero', 'texto_largo', 'seleccion', 'seleccion_multiple', 'casilla', 'fecha']
 
 export function camposFormularioCmsDesde(valor) {
   let filas = valor ?? []
@@ -1717,12 +1752,12 @@ export function camposFormularioCmsDesde(valor) {
     while (claves.has(clave)) { clave = `${claveBase}_${sufijo}`; sufijo += 1 }
     if (!etiqueta || !TIPOS_CAMPO_FORMULARIO_CMS.includes(tipo)) return { error: 'Cada campo necesita un título y un tipo válido.' }
     const opciones = Array.isArray(fila.opciones) ? fila.opciones.map((opcion) => textoCms(opcion, 100)).filter(Boolean).slice(0, 20) : []
-    if (tipo === 'seleccion' && opciones.length < 2) return { error: `El campo “${etiqueta}” necesita al menos dos opciones.` }
+    if (['seleccion', 'seleccion_multiple'].includes(tipo) && opciones.length < 2) return { error: `El campo “${etiqueta}” necesita al menos dos opciones.` }
     const condicionCampo = textoCms(fila.mostrar_si?.campo, 80)
     const mostrar_si = condicionCampo ? { campo: condicionCampo, valor: textoCms(fila.mostrar_si?.valor, 180) } : null
     if (mostrar_si && !claves.has(mostrar_si.campo)) return { error: `La condición de “${etiqueta}” debe depender de un campo anterior.` }
     claves.add(clave)
-    campos.push({ clave, etiqueta, tipo, requerido: Boolean(fila.requerido), ayuda: textoCms(fila.ayuda, 240), opciones, mostrar_si })
+    campos.push({ clave, etiqueta, tipo, requerido: Boolean(fila.requerido), confirmar_correo: tipo === 'correo' && Boolean(fila.confirmar_correo), ayuda: textoCms(fila.ayuda, 240), opciones, mostrar_si })
   }
   return { campos }
 }
@@ -1730,6 +1765,7 @@ export function camposFormularioCmsDesde(valor) {
 export function formularioCmsDesde(datos, actual = {}) {
   const resultadoCampos = camposFormularioCmsDesde(datos.campos ?? datos.campos_json ?? actual.campos_json ?? [])
   if (resultadoCampos.error) return resultadoCampos
+  const configuracionPublica = configuracionPublicaFormulario(datos.configuracion_publica ?? datos.configuracion_publica_json ?? actual.configuracion_publica_json ?? {})
   const formulario = {
     titulo: textoCms(datos.titulo ?? actual.titulo, 180),
     descripcion: textoCms(datos.descripcion ?? actual.descripcion),
@@ -1746,6 +1782,8 @@ export function formularioCmsDesde(datos, actual = {}) {
     conservacion_meses: Number(datos.conservacion_meses ?? actual.conservacion_meses ?? 12),
     requiere_consentimiento: Boolean(datos.requiere_consentimiento ?? actual.requiere_consentimiento ?? true),
     destino_respuesta: datos.destino_respuesta ?? actual.destino_respuesta ?? 'tarea',
+    configuracion_publica: configuracionPublica,
+    configuracion_publica_json: configuracionPublicaJson(configuracionPublica),
     campos: resultadoCampos.campos,
     campos_json: JSON.stringify(resultadoCampos.campos),
   }
@@ -1845,40 +1883,50 @@ export async function asegurarFormularioPruebaCms(base, id) {
   await base.prepare(`UPDATE formularios_cms SET
     titulo = ?2, descripcion = ?3, tipo = ?4, visibilidad = ?5, estado = ?6, equipo_id = ?7, equipo_solicitante_id = ?8,
     prioridad = ?9, proyecto_id = ?10, campos_json = ?11, finalidad = ?12, responsable_datos = ?13, conservacion_meses = ?14,
-    requiere_consentimiento = ?15, destino_respuesta = ?16, actualizado_en = CURRENT_TIMESTAMP
+    requiere_consentimiento = ?15, destino_respuesta = ?16, configuracion_publica_json = ?17, actualizado_en = CURRENT_TIMESTAMP
     WHERE id = ?1`)
     .bind(plantilla.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado,
       formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json,
       formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0,
-      formulario.destino_respuesta).run()
+      formulario.destino_respuesta, formulario.configuracion_publica_json).run()
   const existente = await base.prepare('SELECT id FROM formularios_cms WHERE id = ?1').bind(plantilla.id).first()
   if (existente) return true
   await base.prepare(`INSERT INTO formularios_cms
     (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json,
-      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, creado_por)
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`)
+      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, configuracion_publica_json, creado_por)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`)
     .bind(plantilla.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado,
       formulario.equipo_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json,
       formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0,
-      formulario.destino_respuesta, creador.correo).run()
+      formulario.destino_respuesta, formulario.configuracion_publica_json, creador.correo).run()
   return true
 }
 
 export function respuestaFormularioCmsDesde(datos, formulario) {
   if (textoCms(datos.empresa, 180)) return { error: 'No se pudo enviar la respuesta.' }
+  const configuracion = configuracionPublicaFormulario(formulario?.configuracion_publica_json ?? formulario?.configuracion_publica ?? {})
+  const nombreRecibido = campoBaseVisible(configuracion.nombre) ? textoCms(datos.nombre, 180) : ''
+  const contactoRecibido = campoBaseVisible(configuracion.contacto) ? textoCms(datos.contacto, 180) : ''
+  const detalleRecibido = campoBaseVisible(configuracion.detalle) ? textoCms(datos.detalle, 4000) : ''
+  if (campoBaseRequerido(configuracion.nombre) && !nombreRecibido) return { error: 'Completá tu nombre o referencia.' }
+  if (campoBaseRequerido(configuracion.contacto) && !contactoRecibido) return { error: 'Dejá un medio de contacto para poder responderte.' }
+  if (configuracion.contacto_tipo === 'correo' && contactoRecibido && !correoFormularioValido(contactoRecibido)) return { error: 'Ingresá un correo electrónico válido.' }
+  if (configuracion.confirmar_contacto && contactoRecibido.toLocaleLowerCase('es') !== textoCms(datos.contacto_confirmacion, 180).toLocaleLowerCase('es')) return { error: 'Los correos electrónicos no coinciden.' }
+  if (campoBaseRequerido(configuracion.detalle) && !detalleRecibido) return { error: 'Completá el mensaje o contexto.' }
   const resultado = entradaCmsDesde({
-    tipo: formulario.tipo, nombre: datos.nombre, contacto: datos.contacto,
-    detalle: datos.detalle, fecha_propuesta: datos.fecha_propuesta, equipo_id: formulario.equipo_id, equipo_solicitante_id: formulario.equipo_solicitante_id,
+    tipo: formulario.tipo, nombre: nombreRecibido || 'Respuesta sin nombre', contacto: contactoRecibido,
+    detalle: detalleRecibido, fecha_propuesta: datos.fecha_propuesta, equipo_id: formulario.equipo_id, equipo_solicitante_id: formulario.equipo_solicitante_id,
     prioridad: formulario.prioridad, proyecto_id: formulario.proyecto_id, objetivo: datos.objetivo, pasos: datos.pasos, recursos: datos.recursos, personas_necesarias: datos.personas_necesarias,
   })
   if (resultado.error) return resultado
-  if (!resultado.entrada.contacto) return { error: 'Dejá un medio de contacto para poder responderte.' }
   const resultadoCampos = camposFormularioCmsDesde(formulario.campos ?? formulario.campos_json ?? [])
   if (resultadoCampos.error) return resultadoCampos
   const recibidas = datos.respuestas && typeof datos.respuestas === 'object' && !Array.isArray(datos.respuestas) ? datos.respuestas : {}
+  const confirmacionesCorreo = datos.confirmaciones_correo && typeof datos.confirmaciones_correo === 'object' && !Array.isArray(datos.confirmaciones_correo) ? datos.confirmaciones_correo : {}
   const respuestas = {}
   for (const campo of resultadoCampos.campos) {
-    const visible = !campo.mostrar_si || String(respuestas[campo.mostrar_si.campo] ?? '') === campo.mostrar_si.valor
+    const anterior = respuestas[campo.mostrar_si?.campo]
+    const visible = !campo.mostrar_si || (Array.isArray(anterior) ? anterior.includes(campo.mostrar_si.valor) : String(anterior ?? '') === campo.mostrar_si.valor)
     if (!visible) continue
     const original = recibidas[campo.clave]
     if (campo.tipo === 'casilla') {
@@ -1887,10 +1935,20 @@ export function respuestaFormularioCmsDesde(datos, formulario) {
       respuestas[campo.clave] = valor
       continue
     }
+    if (campo.tipo === 'seleccion_multiple') {
+      const valores = Array.isArray(original) ? original.map((valor) => textoCms(valor, 100)).filter(Boolean) : []
+      if (campo.requerido && !valores.length) return { error: `Completá “${campo.etiqueta}”.` }
+      if (valores.some((valor) => !campo.opciones.includes(valor))) return { error: `La respuesta de “${campo.etiqueta}” no es válida.` }
+      respuestas[campo.clave] = [...new Set(valores)].slice(0, campo.opciones.length)
+      continue
+    }
     const valor = textoCms(original, campo.tipo === 'texto_largo' ? 4000 : 500)
     if (campo.requerido && !valor) return { error: `Completá “${campo.etiqueta}”.` }
     if (campo.tipo === 'seleccion' && valor && !campo.opciones.includes(valor)) return { error: `La respuesta de “${campo.etiqueta}” no es válida.` }
     if (campo.tipo === 'fecha' && valor && !fechaCmsValida(valor)) return { error: `La fecha de “${campo.etiqueta}” no es válida.` }
+    if (campo.tipo === 'correo' && valor && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valor)) return { error: `El correo de “${campo.etiqueta}” no es válido.` }
+    if (campo.tipo === 'correo' && campo.confirmar_correo && valor.toLocaleLowerCase('es') !== textoCms(confirmacionesCorreo[campo.clave], 500).toLocaleLowerCase('es')) return { error: `Los correos de “${campo.etiqueta}” no coinciden.` }
+    if (campo.tipo === 'numero' && valor && !/^-?\d+(?:[.,]\d+)?$/.test(valor)) return { error: `El número de “${campo.etiqueta}” no es válido.` }
     respuestas[campo.clave] = valor
   }
   resultado.entrada.respuestas = respuestas
@@ -1901,6 +1959,27 @@ export function respuestaFormularioCmsDesde(datos, formulario) {
 
 export function consentimientoFormularioPublicoValido(datos, formulario) {
   return !Boolean(formulario?.requiere_consentimiento) || datos?.consentimiento_privacidad === true
+}
+
+export function compromisoFormularioPublicoValido(datos, formulario) {
+  const configuracion = configuracionPublicaFormulario(formulario?.configuracion_publica_json ?? formulario?.configuracion_publica ?? {})
+  return !configuracion.requiere_compromiso || datos?.compromiso_confidencialidad === true
+}
+
+export function auditoriaAcuerdosFormularioDesde(datos, formulario, fecha = instanteUtcSql()) {
+  if (!consentimientoFormularioPublicoValido(datos, formulario)) return { error: 'Confirmá que la persona leyó cómo se usarán sus datos.' }
+  if (!compromisoFormularioPublicoValido(datos, formulario)) return { error: 'Confirmá que la persona aceptó el acuerdo requerido.' }
+  const configuracion = configuracionPublicaFormulario(formulario?.configuracion_publica_json ?? formulario?.configuracion_publica ?? {})
+  return {
+    respuestas: {
+      _consentimiento_privacidad: Boolean(formulario?.requiere_consentimiento) ? 'Aceptado' : 'No requerido',
+      _consentimiento_privacidad_version: Boolean(formulario?.requiere_consentimiento) ? configuracion.privacidad_version : '',
+      _consentimiento_privacidad_fecha: Boolean(formulario?.requiere_consentimiento) ? fecha : '',
+      _compromiso_confidencialidad: configuracion.requiere_compromiso ? 'Aceptado' : 'No requerido',
+      _compromiso_confidencialidad_version: configuracion.requiere_compromiso ? configuracion.compromiso_version : '',
+      _compromiso_confidencialidad_fecha: configuracion.requiere_compromiso ? fecha : '',
+    },
+  }
 }
 
 export function responsabilidadCmsDesde(datos) {
@@ -1946,11 +2025,13 @@ export function reunionCmsDesde(datos, actual = {}) {
     lugar: textoCms(datos.lugar ?? actual.lugar, 180),
     estado: datos.estado ?? actual.estado ?? 'planificada',
     preparacion: textoCms(datos.preparacion ?? actual.preparacion),
+    proxima_revision: textoCms(datos.proxima_revision ?? actual.proxima_revision, 10) || null,
     minuta: textoCms(datos.minuta ?? actual.minuta),
     resumen: textoCms(datos.resumen ?? actual.resumen),
   }
   if (!reunion.titulo) return { error: 'La reunión necesita un título.' }
   if (!fechaHoraCmsValida(reunion.fecha_hora) || !ESTADOS_REUNION_CMS.includes(reunion.estado)) return { error: 'La fecha, hora o estado de la reunión no es válido.' }
+  if (reunion.proxima_revision && !fechaCmsValida(reunion.proxima_revision)) return { error: 'La fecha de seguimiento debe ser válida.' }
   return { reunion }
 }
 
@@ -2223,12 +2304,20 @@ export async function referenciasCmsValidas(base, { equipo_id, equipo_solicitant
         AND (u.equipo_id = ?2 OR EXISTS (SELECT 1 FROM unidades_vistas_equipo_cms v WHERE v.unidad_id = u.id AND v.equipo_id = ?2))`).bind(unidad_id, equipo_id)
     : base.prepare("SELECT id FROM unidades_operativas_cms WHERE id = ?1 AND estado != 'archivada'").bind(unidad_id))
     .first().then((fila) => fila ? null : 'unidad'))
-  if (proyecto_id) consultas.push(base.prepare("SELECT id FROM proyectos_cms WHERE id = ?1 AND estado != 'cerrado'").bind(proyecto_id).first().then((fila) => fila ? null : 'proyecto'))
+  if (proyecto_id) {
+    const consultaProyecto = unidad_id
+      ? base.prepare("SELECT id FROM proyectos_cms WHERE id = ?1 AND unidad_id = ?2 AND estado != 'cerrado'").bind(proyecto_id, unidad_id)
+      : equipo_id
+        ? base.prepare("SELECT id FROM proyectos_cms WHERE id = ?1 AND equipo_id = ?2 AND estado != 'cerrado'").bind(proyecto_id, equipo_id)
+        : base.prepare("SELECT id FROM proyectos_cms WHERE id = ?1 AND estado != 'cerrado'").bind(proyecto_id)
+    consultas.push(consultaProyecto.first().then((fila) => fila ? null : 'proyecto-contexto'))
+  }
   if (programa_id) consultas.push(base.prepare("SELECT id FROM programas_cms WHERE id = ?1 AND estado != 'cerrado'").bind(programa_id).first().then((fila) => fila ? null : 'programa'))
   if (responsable_correo) consultas.push(base.prepare('SELECT correo FROM usuarios WHERE correo = ?1 AND activo = 1').bind(responsable_correo).first().then((fila) => fila ? null : 'responsable'))
   if (solicitante_correo) consultas.push(base.prepare('SELECT correo FROM usuarios WHERE correo = ?1 AND activo = 1').bind(solicitante_correo).first().then((fila) => fila ? null : 'solicitante'))
   if (evento_id) consultas.push(base.prepare("SELECT id FROM eventos_cms WHERE id = ?1 AND estado != 'cancelado'").bind(evento_id).first().then((fila) => fila ? null : 'actividad'))
   const invalida = (await Promise.all(consultas)).find(Boolean)
+  if (invalida === 'proyecto-contexto') return 'El proyecto seleccionado no pertenece al equipo o a la unidad elegidos.'
   return invalida ? `El ${invalida} seleccionado ya no está disponible.` : null
 }
 
@@ -2313,6 +2402,133 @@ export async function derivarEntradaCms(base, entradaBase, creador, formularioId
   return { entrada, tarea: insertarTarea ? tarea : null, asignada_automaticamente: Boolean(insertarTarea && responsableCorreo) }
 }
 
+function tokenComunicacion(longitud = 32) {
+  const bytes = new Uint8Array(longitud)
+  crypto.getRandomValues(bytes)
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '')
+}
+
+async function hashTokenComunicacion(token) {
+  const resumen = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))
+  return [...resumen].map((valor) => valor.toString(16).padStart(2, '0')).join('')
+}
+
+function origenPublicoComunicacion(request, env = {}) {
+  const configurado = String(env.ORIGEN_PUBLICO || '').trim().replace(/\/$/, '')
+  return configurado || new URL(request.url).origin
+}
+
+function escaparHtmlComunicacion(valor) {
+  return String(valor ?? '').replace(/[&<>"']/g, (caracter) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[caracter])
+}
+
+function paginaComunicacion({ titulo, mensaje, contenido = '' }) {
+  return `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>${escaparHtmlComunicacion(titulo)} | Aletea</title><style>body{margin:0;background:#f8f5fa;color:#312d33;font-family:system-ui,-apple-system,sans-serif}.caja{box-sizing:border-box;width:min(42rem,calc(100% - 2rem));margin:8vh auto;background:#fff;border:1px solid #e7dfea;border-radius:1.5rem;padding:clamp(1.5rem,5vw,3rem);box-shadow:0 1rem 3rem #54216618}.marca{color:#0b7563;font-size:.82rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}h1{color:#632776;font-size:clamp(2rem,8vw,3.5rem);line-height:1;margin:.6rem 0 1.25rem}p{font-size:1.08rem;line-height:1.55}.boton{display:inline-flex;margin-top:1rem;border:0;border-radius:999px;background:#632776;color:#fff;padding:.9rem 1.35rem;font:inherit;font-weight:750;cursor:pointer}</style></head><body><main class="caja"><div class="marca">Aletea</div><h1>${escaparHtmlComunicacion(titulo)}</h1><p>${escaparHtmlComunicacion(mensaje)}</p>${contenido}</main></body></html>`
+}
+
+export async function registrarSolicitudComunicacion(base, solicitud, { nombre = '', formularioId = null, entradaId = null, fuente = 'formulario_publico', origen = '' } = {}) {
+  if (!solicitud) return null
+  const suprimida = await base.prepare('SELECT correo FROM supresiones_comunicacion WHERE correo = ?1').bind(solicitud.correo).first()
+  if (suprimida) return { estado: 'suprimida' }
+  const contacto = await base.prepare('SELECT * FROM contactos_comunicacion WHERE correo = ?1').bind(solicitud.correo).first()
+  if (contacto && ['baja', 'rebotado', 'bloqueado'].includes(contacto.estado)) return { estado: 'suprimida' }
+  const ahora = instanteUtcSql()
+  const contactoId = contacto?.id || crypto.randomUUID()
+  const tokenBaja = contacto?.token_baja || tokenComunicacion()
+  const yaActivo = contacto?.estado === 'activo'
+  if (!contacto) {
+    await base.prepare(`INSERT INTO contactos_comunicacion
+      (id, correo, nombre, idioma, estado, fuente_ultima, token_baja)
+      VALUES (?1, ?2, ?3, 'es', 'pendiente', ?4, ?5)`)
+      .bind(contactoId, solicitud.correo, textoCms(nombre, 191), textoCms(fuente, 191), tokenBaja).run()
+  } else {
+    await base.prepare(`UPDATE contactos_comunicacion SET
+      nombre = CASE WHEN ?2 <> '' THEN ?2 ELSE nombre END,
+      fuente_ultima = ?3, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+      .bind(contactoId, textoCms(nombre, 191), textoCms(fuente, 191)).run()
+  }
+  const tokenConfirmacion = tokenComunicacion()
+  const tokenHash = await hashTokenComunicacion(tokenConfirmacion)
+  const consentimientoId = crypto.randomUUID()
+  if (!yaActivo) {
+    await base.prepare(`UPDATE consentimientos_comunicacion SET estado = 'vencido'
+      WHERE contacto_id = ?1 AND estado = 'pendiente'`).bind(contactoId).run()
+  }
+  await base.prepare(`INSERT INTO consentimientos_comunicacion
+    (id, contacto_id, finalidad, estado, fuente, formulario_id, entrada_id, texto_version, texto_consentimiento, token_hash, solicitado_en, confirmado_en)
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`)
+    .bind(consentimientoId, contactoId, solicitud.finalidad, yaActivo ? 'aceptado' : 'pendiente', textoCms(fuente, 191), formularioId, entradaId, solicitud.texto_version, solicitud.texto_consentimiento, tokenHash, ahora, yaActivo ? ahora : null).run()
+  for (const tema of temasComunicacionValidos(solicitud.temas)) {
+    await base.prepare(`INSERT INTO preferencias_comunicacion (contacto_id, tema, habilitada)
+      VALUES (?1, ?2, 1) ON CONFLICT(contacto_id, tema)
+      DO UPDATE SET habilitada = 1, actualizado_en = CURRENT_TIMESTAMP`).bind(contactoId, tema).run()
+  }
+  if (yaActivo) return { estado: 'activo' }
+  const confirmar = `${origen}/api/comunicaciones/confirmar?token=${encodeURIComponent(tokenConfirmacion)}`
+  const baja = `${origen}/api/comunicaciones/baja?token=${encodeURIComponent(tokenBaja)}`
+  const asunto = 'Confirmá que querés recibir novedades de Aletea'
+  const contenidoTexto = `Recibimos una solicitud para enviarte novedades y actividades de Aletea.\n\nConfirmá tu suscripción: ${confirmar}\n\nSi no hiciste esta solicitud, ignorá este mensaje.\n\nPodés darte de baja en cualquier momento: ${baja}`
+  const contenidoHtml = `<p>Recibimos una solicitud para enviarte novedades y actividades de Aletea.</p><p><a href="${escaparHtmlComunicacion(confirmar)}">Confirmar suscripción</a></p><p>Si no hiciste esta solicitud, ignorá este mensaje.</p><p><a href="${escaparHtmlComunicacion(baja)}">Darme de baja</a></p>`
+  await base.prepare(`INSERT INTO cola_correos
+    (id, tipo, contacto_id, destinatario, asunto, contenido_texto, contenido_html, estado, clave_idempotencia)
+    VALUES (?1, 'confirmacion', ?2, ?3, ?4, ?5, ?6, 'pendiente', ?7)
+    ON CONFLICT(clave_idempotencia) DO UPDATE SET clave_idempotencia = excluded.clave_idempotencia`)
+    .bind(crypto.randomUUID(), contactoId, solicitud.correo, asunto, contenidoTexto, contenidoHtml, `confirmacion:${consentimientoId}`).run()
+  return { estado: 'pendiente' }
+}
+
+async function comunicacionPublica(contexto, ruta) {
+  const { request, env } = contexto
+  const url = new URL(request.url)
+  let token = String(url.searchParams.get('token') || '')
+  if (ruta === 'comunicaciones/baja' && request.method === 'POST') {
+    const formulario = await request.formData().catch(() => null)
+    token = String(formulario?.get('token') || token)
+  }
+  if (!/^[A-Za-z0-9_-]{20,120}$/.test(token)) return responderHtml(paginaComunicacion({ titulo: 'Enlace no válido', mensaje: 'El enlace está incompleto o ya no es válido.' }), 400)
+  if (ruta === 'comunicaciones/confirmar' && request.method === 'GET') {
+    const tokenHash = await hashTokenComunicacion(token)
+    const consentimiento = await env.BASE.prepare(`SELECT c.id, c.contacto_id, c.estado, c.solicitado_en, p.correo
+      FROM consentimientos_comunicacion c JOIN contactos_comunicacion p ON p.id = c.contacto_id
+      WHERE c.token_hash = ?1`).bind(tokenHash).first()
+    if (!consentimiento || consentimiento.estado !== 'pendiente') {
+      return responderHtml(paginaComunicacion({ titulo: 'Enlace ya utilizado', mensaje: 'Esta confirmación ya fue utilizada o dejó de estar disponible.' }), 410)
+    }
+    const solicitado = new Date(String(consentimiento.solicitado_en).replace(' ', 'T') + 'Z').getTime()
+    if (!Number.isFinite(solicitado) || Date.now() - solicitado > 7 * 86400000) {
+      await env.BASE.prepare("UPDATE consentimientos_comunicacion SET estado = 'vencido' WHERE id = ?1").bind(consentimiento.id).run()
+      return responderHtml(paginaComunicacion({ titulo: 'El enlace venció', mensaje: 'Por seguridad, las confirmaciones duran siete días. Completá nuevamente un formulario para solicitar otra.' }), 410)
+    }
+    const suprimida = await env.BASE.prepare('SELECT correo FROM supresiones_comunicacion WHERE correo = ?1').bind(consentimiento.correo).first()
+    if (suprimida) return responderHtml(paginaComunicacion({ titulo: 'Suscripción bloqueada', mensaje: 'Este correo figura en la lista de bajas y no será reactivado automáticamente.' }), 409)
+    const ahora = instanteUtcSql()
+    await env.BASE.batch([
+      env.BASE.prepare("UPDATE consentimientos_comunicacion SET estado = 'aceptado', confirmado_en = ?2 WHERE id = ?1").bind(consentimiento.id, ahora),
+      env.BASE.prepare("UPDATE contactos_comunicacion SET estado = 'activo', confirmado_en = ?2, baja_en = NULL, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(consentimiento.contacto_id, ahora),
+    ])
+    return responderHtml(paginaComunicacion({ titulo: 'Suscripción confirmada', mensaje: 'Listo. A partir de ahora recibirás solamente las novedades que elegiste.' }))
+  }
+  if (ruta === 'comunicaciones/baja' && request.method === 'GET') {
+    const contenido = `<form method="post"><input type="hidden" name="token" value="${escaparHtmlComunicacion(token)}"><button class="boton" type="submit">Confirmar baja</button></form>`
+    return responderHtml(paginaComunicacion({ titulo: 'Dejar de recibir correos', mensaje: 'Confirmá la baja. No volveremos a activar este correo desde otro formulario sin una nueva decisión tuya.', contenido }))
+  }
+  if (ruta === 'comunicaciones/baja' && request.method === 'POST') {
+    const contacto = await env.BASE.prepare('SELECT id, correo, estado FROM contactos_comunicacion WHERE token_baja = ?1').bind(token).first()
+    if (!contacto) return responderHtml(paginaComunicacion({ titulo: 'Enlace no válido', mensaje: 'No encontramos una suscripción asociada a este enlace.' }), 404)
+    const ahora = instanteUtcSql()
+    await env.BASE.batch([
+      env.BASE.prepare("UPDATE contactos_comunicacion SET estado = 'baja', baja_en = ?2, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(contacto.id, ahora),
+      env.BASE.prepare(`INSERT INTO supresiones_comunicacion (correo, motivo, origen) VALUES (?1, 'Baja solicitada por la persona', 'enlace')
+        ON CONFLICT(correo) DO UPDATE SET motivo = excluded.motivo, origen = excluded.origen, creado_en = CURRENT_TIMESTAMP`).bind(contacto.correo),
+      env.BASE.prepare('UPDATE preferencias_comunicacion SET habilitada = 0, actualizado_en = CURRENT_TIMESTAMP WHERE contacto_id = ?1').bind(contacto.id),
+      env.BASE.prepare("UPDATE consentimientos_comunicacion SET estado = 'revocado', revocado_en = ?2 WHERE contacto_id = ?1 AND estado IN ('pendiente', 'aceptado')").bind(contacto.id, ahora),
+      env.BASE.prepare("UPDATE cola_correos SET estado = 'suprimido', actualizado_en = CURRENT_TIMESTAMP WHERE contacto_id = ?1 AND estado IN ('pendiente', 'procesando')").bind(contacto.id),
+    ])
+    return responderHtml(paginaComunicacion({ titulo: 'Baja confirmada', mensaje: 'Listo. Este correo quedó bloqueado para futuros envíos de novedades.' }))
+  }
+  return error('Método no permitido.', 405)
+}
+
 async function formularioPublico(contexto, ruta) {
   const { request, env } = contexto
   const cabeceras = cabecerasFormularioPublico(request)
@@ -2320,11 +2536,11 @@ async function formularioPublico(contexto, ruta) {
   const id = ruta.split('/').filter(Boolean)[1]
   if (!id) return error('No encontramos ese formulario.', 404, cabeceras)
   let formulario = await env.BASE.prepare(`SELECT id, titulo, descripcion, tipo, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, creado_por, campos_json, destino_respuesta,
-      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento
+      finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, configuracion_publica_json
     FROM formularios_cms WHERE id = ?1 AND visibilidad = 'publica' AND estado = 'activa'`).bind(id).first()
   if (!formulario && await asegurarFormularioPruebaCms(env.BASE, id)) {
     formulario = await env.BASE.prepare(`SELECT id, titulo, descripcion, tipo, equipo_id, equipo_solicitante_id, prioridad, proyecto_id, creado_por, campos_json, destino_respuesta,
-        finalidad, responsable_datos, conservacion_meses, requiere_consentimiento
+        finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, configuracion_publica_json
       FROM formularios_cms WHERE id = ?1 AND visibilidad = 'publica' AND estado = 'activa'`).bind(id).first()
   }
   if (!formulario) return error('Este formulario no está disponible.', 404, cabeceras)
@@ -2332,11 +2548,17 @@ async function formularioPublico(contexto, ruta) {
   if (request.method !== 'POST') return error('Método no permitido.', 405, cabeceras)
   let datos; try { datos = await request.json() } catch { return error('Los datos del formulario no son válidos.', 400, cabeceras) }
   if (!consentimientoFormularioPublicoValido(datos, formulario)) return error('Confirmá que leíste cómo se usarán tus datos.', 400, cabeceras)
+  if (!compromisoFormularioPublicoValido(datos, formulario)) return error('Aceptá el compromiso de confidencialidad y convivencia para continuar.', 400, cabeceras)
+  const resultadoSuscripcion = solicitudComunicacionDesde(datos)
+  if (resultadoSuscripcion.error) return error(resultadoSuscripcion.error, 400, cabeceras)
   const resultado = respuestaFormularioCmsDesde(datos, formulario)
   if (resultado.error) return error(resultado.error, 400, cabeceras)
+  const fechaConsentimiento = instanteUtcSql()
+  const auditoriaAcuerdos = auditoriaAcuerdosFormularioDesde(datos, formulario, fechaConsentimiento)
   resultado.entrada.respuestas = {
     ...(resultado.entrada.respuestas || {}),
-    _consentimiento_privacidad: Boolean(formulario.requiere_consentimiento) ? 'Aceptado' : 'No requerido',
+    ...auditoriaAcuerdos.respuestas,
+    _consentimiento_comunicaciones: resultadoSuscripcion.solicitud ? 'Solicitado, pendiente de confirmación' : 'No solicitado',
   }
   resultado.entrada.respuestas_json = JSON.stringify(resultado.entrada.respuestas)
   const ip = request.headers.get('CF-Connecting-IP') || 'sin-direccion'
@@ -2350,8 +2572,34 @@ async function formularioPublico(contexto, ruta) {
     return error('Probá nuevamente en unos minutos.', 429, cabeceras)
   }
   const derivada = await derivarEntradaCms(env.BASE, resultado.entrada, { correo: formulario.creado_por }, formulario.id, false)
+  let suscripcion = null
+  let advertenciaSuscripcion = ''
+  try {
+    suscripcion = await registrarSolicitudComunicacion(env.BASE, resultadoSuscripcion.solicitud, {
+      nombre: resultado.entrada.nombre,
+      formularioId: formulario.id,
+      entradaId: derivada.entrada.id,
+      fuente: `formulario:${formulario.id}`,
+      origen: origenPublicoComunicacion(request, env),
+    })
+  } catch (falloSuscripcion) {
+    advertenciaSuscripcion = 'Recibimos tu respuesta, pero no pudimos iniciar la suscripción a novedades. No necesitás volver a enviar el formulario.'
+    try {
+      await env.BASE.prepare(`INSERT INTO incidentes_operativos_cms
+        (id, clave, tipo, severidad, estado, titulo, detalle, fuente)
+        VALUES (?1, 'comunicaciones:alta', 'correo', 'advertencia', 'abierto', 'Falló un alta de comunicaciones', ?2, 'formulario_publico')
+        ON CONFLICT(clave) DO UPDATE SET estado = 'abierto', detalle = excluded.detalle,
+          ocurrencias = ocurrencias + 1, ultimo_en = CURRENT_TIMESTAMP, resuelto_en = NULL, resuelto_por = NULL`)
+        .bind(crypto.randomUUID(), `Código técnico: ${textoCms(falloSuscripcion?.code || falloSuscripcion?.name || 'ERROR', 80)}`).run()
+    } catch {}
+  }
   await registrar(env.BASE, { correo: formulario.creado_por }, 'recibir formulario público', `formularios/${formulario.id}`, 'Respuesta recibida')
-  return responder({ recibida: true, referencia: derivada.entrada.id }, 201, cabeceras)
+  return responder({
+    recibida: true,
+    referencia: derivada.entrada.id,
+    suscripcion: suscripcion?.estado || (advertenciaSuscripcion ? 'no_disponible' : null),
+    advertencia: advertenciaSuscripcion || null,
+  }, 201, cabeceras)
 }
 
 export async function reservarEnvioFormularioPublico(base, formularioId, clave, ventana) {
@@ -2564,6 +2812,315 @@ async function finanzasFsbCms(contexto, sesion, partes, alcance) {
   return error('No encontramos esa operación financiera.', 404)
 }
 
+function puedeGestionarComunicacionesCms(sesion) {
+  return ['administracion', 'direccion'].includes(perfilAccesoDe(sesion)) && nivelDatosPersonalesDe(sesion) !== 'ninguno'
+}
+
+const CONTROLES_CORREO_REQUERIDOS = Object.freeze([
+  'correo_cuenta_remitente', 'correo_dmarc', 'correo_limites_proveedor', 'correo_prueba_externa', 'correo_baja_verificada',
+])
+
+export function preparacionCorreoCms(controles = [], env = {}) {
+  const confirmados = new Set((controles || []).filter((control) => control.estado === 'confirmado').map((control) => control.clave))
+  const pendientes = CONTROLES_CORREO_REQUERIDOS.filter((clave) => !confirmados.has(clave))
+  const smtpConfigurado = env.EMAIL_TRANSPORT === 'smtp' && Boolean(env.EMAIL_FROM && env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD)
+  return { lista: smtpConfigurado && pendientes.length === 0, smtp_configurado: smtpConfigurado, controles_pendientes: pendientes }
+}
+
+function htmlCampanaDesdeTexto(texto, enlaceBaja) {
+  const parrafos = String(texto || '').split(/\n{2,}/).map((parrafo) => `<p>${escaparHtmlComunicacion(parrafo).replace(/\n/g, '<br>')}</p>`).join('')
+  return `${parrafos}<p><a href="${escaparHtmlComunicacion(enlaceBaja)}">Dejar de recibir estos correos</a></p>`
+}
+
+async function comunicacionesCms(contexto, sesion, ruta) {
+  const { request, env } = contexto
+  if (!puedeGestionarComunicacionesCms(sesion)) return error('Necesitás un perfil de Dirección o Administración y acceso vigente a datos personales.', 403)
+  const partes = ruta.split('/').filter(Boolean)
+  const recurso = partes[2] || ''
+  const id = partes[3] || ''
+  const accion = partes[4] || ''
+  if (!recurso && request.method === 'GET') {
+    const url = new URL(request.url)
+    const buscarContactos = textoCms(url.searchParams.get('contactos_buscar'), 120).toLocaleLowerCase('es-UY')
+    const paginaContactos = Math.max(1, Math.min(100000, Number.parseInt(url.searchParams.get('contactos_pagina') || '1', 10) || 1))
+    const limiteContactos = 100
+    const desplazamientoContactos = (paginaContactos - 1) * limiteContactos
+    const patronContactos = `%${buscarContactos}%`
+    const filtroContactos = "WHERE (?1 = '' OR LOWER(c.nombre) LIKE ?2 OR LOWER(c.correo) LIKE ?2)"
+    const [contactos, totalContactos, campanas, cola, eventos, controlesCorreo] = await Promise.all([
+      env.BASE.prepare(`SELECT c.id, c.correo, c.nombre, c.estado, c.fuente_ultima, c.confirmado_en, c.baja_en, c.creado_en, c.actualizado_en,
+        (SELECT GROUP_CONCAT(p.tema) FROM preferencias_comunicacion p WHERE p.contacto_id = c.id AND p.habilitada = 1) AS temas,
+        (SELECT x.estado FROM consentimientos_comunicacion x WHERE x.contacto_id = c.id ORDER BY x.solicitado_en DESC LIMIT 1) AS consentimiento_estado,
+        (SELECT x.fuente FROM consentimientos_comunicacion x WHERE x.contacto_id = c.id ORDER BY x.solicitado_en DESC LIMIT 1) AS consentimiento_fuente,
+        (SELECT x.texto_version FROM consentimientos_comunicacion x WHERE x.contacto_id = c.id ORDER BY x.solicitado_en DESC LIMIT 1) AS consentimiento_version
+        FROM contactos_comunicacion c ${filtroContactos} ORDER BY c.actualizado_en DESC LIMIT ?3 OFFSET ?4`)
+        .bind(buscarContactos, patronContactos, limiteContactos, desplazamientoContactos).all(),
+      env.BASE.prepare(`SELECT COUNT(*) AS total FROM contactos_comunicacion c ${filtroContactos}`)
+        .bind(buscarContactos, patronContactos).first(),
+      env.BASE.prepare(`SELECT id, titulo, asunto, contenido_texto, temas_json, estado, programada_para, creado_por, aprobado_por, aprobado_en, enviado_en, creado_en, actualizado_en
+        FROM campanas_comunicacion ORDER BY actualizado_en DESC LIMIT 200`).all(),
+      env.BASE.prepare(`SELECT estado, COUNT(*) AS cantidad FROM cola_correos GROUP BY estado`).all(),
+      env.BASE.prepare(`SELECT e.id, e.correo_id, e.proveedor, e.tipo, e.detalle, e.ocurrido_en, c.destinatario, c.asunto
+        FROM eventos_correo e LEFT JOIN cola_correos c ON c.id = e.correo_id ORDER BY e.ocurrido_en DESC LIMIT 100`).all(),
+      env.BASE.prepare("SELECT clave, estado FROM controles_operativos_cms WHERE categoria = 'correo'").all(),
+    ])
+    const preparacion = preparacionCorreoCms(controlesCorreo.results, env)
+    return responder({
+      acceso: { puede_gestionar: true, privacidad: 'operativa' },
+      contactos: contactos.results.map((contacto) => ({ ...contacto, temas: String(contacto.temas || '').split(',').filter(Boolean) })),
+      paginacion_contactos: {
+        pagina: paginaContactos,
+        por_pagina: limiteContactos,
+        total: Number(totalContactos?.total || 0),
+        paginas: Math.max(1, Math.ceil(Number(totalContactos?.total || 0) / limiteContactos)),
+        busqueda: buscarContactos,
+      },
+      campanas: campanas.results,
+      cola: cola.results,
+      eventos: eventos.results,
+      transporte: {
+        modo: env.EMAIL_TRANSPORT === 'smtp' ? 'smtp' : 'sin_configurar',
+        remitente_configurado: Boolean(env.EMAIL_FROM),
+        smtp_configurado: preparacion.smtp_configurado,
+        lista_para_enviar: preparacion.lista,
+        controles_pendientes: preparacion.controles_pendientes,
+      },
+    }, 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
+  }
+  if (recurso === 'contactos' && id && accion === 'baja' && request.method === 'POST') {
+    const contacto = await env.BASE.prepare('SELECT id, correo FROM contactos_comunicacion WHERE id = ?1').bind(id).first()
+    if (!contacto) return error('No encontramos ese contacto.', 404)
+    let datos; try { datos = await request.json() } catch { datos = {} }
+    const motivo = textoCms(datos.motivo, 300)
+    if (motivo.length < 5) return error('Explicá brevemente por qué se registra la baja.', 400)
+    const ahora = instanteUtcSql()
+    await env.BASE.batch([
+      env.BASE.prepare("UPDATE contactos_comunicacion SET estado = 'baja', baja_en = ?2, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id, ahora),
+      env.BASE.prepare(`INSERT INTO supresiones_comunicacion (correo, motivo, origen) VALUES (?1, ?2, 'gestor')
+        ON CONFLICT(correo) DO UPDATE SET motivo = excluded.motivo, origen = excluded.origen, creado_en = CURRENT_TIMESTAMP`).bind(contacto.correo, motivo),
+      env.BASE.prepare('UPDATE preferencias_comunicacion SET habilitada = 0, actualizado_en = CURRENT_TIMESTAMP WHERE contacto_id = ?1').bind(id),
+      env.BASE.prepare("UPDATE consentimientos_comunicacion SET estado = 'revocado', revocado_en = ?2 WHERE contacto_id = ?1 AND estado IN ('pendiente', 'aceptado')").bind(id, ahora),
+      env.BASE.prepare("UPDATE cola_correos SET estado = 'suprimido', actualizado_en = CURRENT_TIMESTAMP WHERE contacto_id = ?1 AND estado IN ('pendiente', 'procesando')").bind(id),
+    ])
+    await registrar(env.BASE, sesion, 'registrar baja de comunicaciones', `contactos-comunicacion/${id}`, motivo)
+    return responder({ baja: true })
+  }
+  if (recurso === 'contactos' && id && request.method === 'PATCH') {
+    const contacto = await env.BASE.prepare('SELECT id, estado FROM contactos_comunicacion WHERE id = ?1').bind(id).first()
+    if (!contacto) return error('No encontramos ese contacto.', 404)
+    if (contacto.estado !== 'activo') return error('Solo se pueden ajustar temas de un contacto confirmado y activo.', 409)
+    let datos; try { datos = await request.json() } catch { return error('Las preferencias no son válidas.', 400) }
+    const temas = temasComunicacionValidos(datos.temas, [])
+    await env.BASE.prepare('UPDATE preferencias_comunicacion SET habilitada = 0, actualizado_en = CURRENT_TIMESTAMP WHERE contacto_id = ?1').bind(id).run()
+    for (const tema of temas) {
+      await env.BASE.prepare(`INSERT INTO preferencias_comunicacion (contacto_id, tema, habilitada) VALUES (?1, ?2, 1)
+        ON CONFLICT(contacto_id, tema) DO UPDATE SET habilitada = 1, actualizado_en = CURRENT_TIMESTAMP`).bind(id, tema).run()
+    }
+    await registrar(env.BASE, sesion, 'editar preferencias de comunicaciones', `contactos-comunicacion/${id}`, temas.join(', ') || 'Sin temas')
+    return responder({ temas })
+  }
+  if (recurso === 'campanas' && request.method === 'POST' && !id) {
+    let datos; try { datos = await request.json() } catch { return error('La campaña no es válida.', 400) }
+    const resultado = campanaComunicacionDesde(datos)
+    if (resultado.error) return error(resultado.error, 400)
+    const campana = { id: crypto.randomUUID(), ...resultado.campana, estado: 'borrador', creado_por: sesion.correo }
+    await env.BASE.prepare(`INSERT INTO campanas_comunicacion
+      (id, titulo, asunto, contenido_texto, contenido_html, temas_json, estado, creado_por)
+      VALUES (?1, ?2, ?3, ?4, '', ?5, 'borrador', ?6)`)
+      .bind(campana.id, campana.titulo, campana.asunto, campana.contenido_texto, campana.temas_json, sesion.correo).run()
+    await registrar(env.BASE, sesion, 'crear campaña', `campanas-comunicacion/${campana.id}`, campana.titulo)
+    return responder({ campana }, 201)
+  }
+  if (recurso === 'campanas' && id && request.method === 'PATCH' && !accion) {
+    const actual = await env.BASE.prepare('SELECT * FROM campanas_comunicacion WHERE id = ?1').bind(id).first()
+    if (!actual) return error('No encontramos esa campaña.', 404)
+    if (!['borrador', 'revision'].includes(actual.estado)) return error('Solo se puede editar una campaña en borrador o revisión.', 409)
+    let datos; try { datos = await request.json() } catch { return error('La campaña no es válida.', 400) }
+    const resultado = campanaComunicacionDesde(datos, actual)
+    if (resultado.error) return error(resultado.error, 400)
+    await env.BASE.prepare(`UPDATE campanas_comunicacion SET titulo = ?2, asunto = ?3, contenido_texto = ?4,
+      contenido_html = '', temas_json = ?5, estado = 'borrador', aprobado_por = NULL, aprobado_en = NULL, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+      .bind(id, resultado.campana.titulo, resultado.campana.asunto, resultado.campana.contenido_texto, resultado.campana.temas_json).run()
+    await registrar(env.BASE, sesion, 'editar campaña', `campanas-comunicacion/${id}`, resultado.campana.titulo)
+    return responder({ campana: { id, ...resultado.campana, estado: 'borrador' } })
+  }
+  if (recurso === 'campanas' && id && accion && request.method === 'POST') {
+    const campana = await env.BASE.prepare('SELECT * FROM campanas_comunicacion WHERE id = ?1').bind(id).first()
+    if (!campana) return error('No encontramos esa campaña.', 404)
+    if (accion === 'solicitar-revision') {
+      if (campana.estado !== 'borrador') return error('La campaña debe estar en borrador para solicitar revisión.', 409)
+      await env.BASE.prepare("UPDATE campanas_comunicacion SET estado = 'revision', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id).run()
+      await registrar(env.BASE, sesion, 'solicitar revisión de campaña', `campanas-comunicacion/${id}`, campana.titulo)
+      return responder({ estado: 'revision' })
+    }
+    if (accion === 'aprobar') {
+      if (campana.estado !== 'revision') return error('La campaña debe estar en revisión para aprobarla.', 409)
+      if (campana.creado_por === sesion.correo) return error('Otra persona de Dirección o Administración debe aprobar esta campaña.', 409)
+      const ahora = instanteUtcSql()
+      await env.BASE.prepare("UPDATE campanas_comunicacion SET estado = 'aprobada', aprobado_por = ?2, aprobado_en = ?3, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id, sesion.correo, ahora).run()
+      await registrar(env.BASE, sesion, 'aprobar campaña', `campanas-comunicacion/${id}`, campana.titulo)
+      return responder({ estado: 'aprobada' })
+    }
+    if (accion === 'cancelar') {
+      if (['enviada', 'cancelada'].includes(campana.estado)) return error('La campaña ya no se puede cancelar.', 409)
+      await env.BASE.batch([
+        env.BASE.prepare("UPDATE campanas_comunicacion SET estado = 'cancelada', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id),
+        env.BASE.prepare("UPDATE cola_correos SET estado = 'suprimido', actualizado_en = CURRENT_TIMESTAMP WHERE campana_id = ?1 AND estado IN ('pendiente', 'procesando')").bind(id),
+      ])
+      await registrar(env.BASE, sesion, 'cancelar campaña', `campanas-comunicacion/${id}`, campana.titulo)
+      return responder({ estado: 'cancelada' })
+    }
+    if (accion === 'programar') {
+      if (campana.estado !== 'aprobada') return error('La campaña debe estar aprobada antes de programarla.', 409)
+      const controlesCorreo = await env.BASE.prepare("SELECT clave, estado FROM controles_operativos_cms WHERE categoria = 'correo'").all()
+      const preparacion = preparacionCorreoCms(controlesCorreo.results, env)
+      if (!preparacion.lista) return error('Antes de programar envíos, completá la configuración y los controles de correo en Operaciones.', 409)
+      let datos; try { datos = await request.json() } catch { datos = {} }
+      const solicitada = textoCms(datos.programada_para, 40)
+      const fecha = solicitada ? new Date(solicitada) : new Date()
+      if (Number.isNaN(fecha.getTime()) || fecha.getTime() < Date.now() - 60000) return error('Elegí una fecha futura válida.', 400)
+      const programadaPara = instanteUtcSql(fecha)
+      const temas = temasComunicacionValidos(JSON.parse(campana.temas_json || '[]'), [])
+      if (!temas.length) return error('La campaña no tiene una audiencia válida.', 409)
+      const marcadores = temas.map((_, indice) => `?${indice + 1}`).join(', ')
+      const destinatarios = await env.BASE.prepare(`SELECT DISTINCT c.id, c.correo, c.token_baja
+        FROM contactos_comunicacion c JOIN preferencias_comunicacion p ON p.contacto_id = c.id
+        LEFT JOIN supresiones_comunicacion s ON s.correo = c.correo
+        WHERE c.estado = 'activo' AND p.habilitada = 1 AND p.tema IN (${marcadores}) AND s.correo IS NULL`).bind(...temas).all()
+      if (!destinatarios.results.length) return error('No hay contactos confirmados para los temas elegidos. La campaña sigue aprobada y no se creó ningún envío.', 409)
+      const origen = origenPublicoComunicacion(request, env)
+      const consultas = destinatarios.results.map((contacto) => {
+        const enlaceBaja = `${origen}/api/comunicaciones/baja?token=${encodeURIComponent(contacto.token_baja)}`
+        const texto = `${campana.contenido_texto}\n\nDejar de recibir estos correos: ${enlaceBaja}`
+        const html = htmlCampanaDesdeTexto(campana.contenido_texto, enlaceBaja)
+        return env.BASE.prepare(`INSERT INTO cola_correos
+          (id, tipo, contacto_id, campana_id, destinatario, asunto, contenido_texto, contenido_html, estado, clave_idempotencia, proximo_intento)
+          VALUES (?1, 'campana', ?2, ?3, ?4, ?5, ?6, ?7, 'pendiente', ?8, ?9)
+          ON CONFLICT(clave_idempotencia) DO UPDATE SET clave_idempotencia = excluded.clave_idempotencia`)
+          .bind(crypto.randomUUID(), contacto.id, id, contacto.correo, campana.asunto, texto, html, `campana:${id}:${contacto.id}`, programadaPara)
+      })
+      await env.BASE.batch([
+        env.BASE.prepare("UPDATE campanas_comunicacion SET estado = 'programada', programada_para = ?2, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id, programadaPara),
+        ...consultas,
+      ])
+      await registrar(env.BASE, sesion, 'programar campaña', `campanas-comunicacion/${id}`, `${destinatarios.results.length} destinatarios`)
+      return responder({ estado: 'programada', destinatarios: destinatarios.results.length, programada_para: programadaPara })
+    }
+  }
+  return error('No se encontró esa operación de comunicaciones.', 404)
+}
+
+export function puedeVerOperacionesCms(sesion) {
+  return ['administracion', 'direccion'].includes(perfilAccesoDe(sesion))
+}
+
+function correoOperativoVisible(correo, puedeVerDatos) {
+  if (puedeVerDatos) return correo
+  const [usuario = '', dominio = ''] = String(correo || '').split('@')
+  return `${usuario.slice(0, 1) || '*'}***${dominio ? `@${dominio}` : ''}`
+}
+
+async function operacionesCms(contexto, sesion, ruta) {
+  const { request, env } = contexto
+  if (!tienePermiso(sesion, 'cms') || !puedeVerOperacionesCms(sesion)) return error('Solo Dirección o Administración puede abrir el centro de operaciones.', 403)
+  const partes = ruta.split('/').filter(Boolean)
+  const recurso = partes[2] || ''
+  const id = partes[3] || ''
+  const accion = partes[4] || ''
+
+  if (!recurso && request.method === 'GET') {
+    const puedeVerDatos = puedeVerRespuestasCms(sesion)
+    const [ejecuciones, ultimaEjecucion, incidentes, controlesGuardados, cola, correosFallidos, indicadores, paginaPublicada] = await Promise.all([
+      env.BASE.prepare(`SELECT id, trabajo, estado, iniciada_en, finalizada_en, encontrados, procesados, exitos,
+        reintentados, fallidos, suprimidos, detalle, error FROM ejecuciones_sistema ORDER BY iniciada_en DESC LIMIT 50`).all(),
+      env.BASE.prepare("SELECT id, trabajo, estado, iniciada_en, finalizada_en, encontrados, procesados, exitos, reintentados, fallidos, suprimidos, detalle, error FROM ejecuciones_sistema WHERE trabajo = 'cola_correos' ORDER BY iniciada_en DESC LIMIT 1").first(),
+      env.BASE.prepare("SELECT id, clave, tipo, severidad, estado, titulo, detalle, fuente, ocurrencias, detectado_en, ultimo_en, resuelto_en, resuelto_por FROM incidentes_operativos_cms ORDER BY CASE estado WHEN 'abierto' THEN 0 ELSE 1 END, ultimo_en DESC LIMIT 100").all(),
+      env.BASE.prepare('SELECT clave, categoria, estado, detalle, evidencia, actualizado_por, actualizado_en FROM controles_operativos_cms ORDER BY categoria, clave').all(),
+      env.BASE.prepare('SELECT estado, COUNT(*) AS cantidad FROM cola_correos GROUP BY estado').all(),
+      puedeVerDatos
+        ? env.BASE.prepare("SELECT id, tipo, destinatario, asunto, intentos, ultimo_error, actualizado_en FROM cola_correos WHERE estado = 'fallido' ORDER BY actualizado_en DESC LIMIT 50").all()
+        : Promise.resolve({ results: [] }),
+      env.BASE.prepare(`SELECT
+        (SELECT COUNT(*) FROM formularios_cms WHERE estado = 'activa') AS formularios_activos,
+        (SELECT COUNT(*) FROM entradas_cms WHERE estado != 'cerrada') AS entradas_abiertas,
+        (SELECT COUNT(*) FROM contactos_comunicacion WHERE estado = 'activo') AS contactos_activos,
+        (SELECT COUNT(*) FROM contactos_comunicacion WHERE estado = 'pendiente') AS contactos_pendientes,
+        (SELECT COUNT(*) FROM solicitudes_privacidad_cms WHERE estado NOT IN ('cerrada', 'rechazada')) AS privacidad_pendiente`).first(),
+      env.BASE.prepare("SELECT revision, actualizado_en FROM documentos WHERE ruta = 'pagina-web/publicada.json'").first(),
+    ])
+    const controles = controlesOperativosConEstado(controlesGuardados.results)
+    const colaResultados = cola.results || []
+    const pendientes = colaResultados.filter((fila) => ['pendiente', 'procesando'].includes(fila.estado)).reduce((total, fila) => total + Number(fila.cantidad || 0), 0)
+    const smtpConfigurado = env.EMAIL_TRANSPORT === 'smtp' && Boolean(env.EMAIL_FROM && env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASSWORD)
+    const trabajoCorreo = estadoTrabajoCorreo({
+      smtpConfigurado,
+      ultimaEjecucion,
+      pendientes,
+      minutosParaAlerta: Math.max(5, Number(env.EMAIL_JOB_STALE_AFTER_MINUTES || 15)),
+    })
+    const controlPorClave = Object.fromEntries(controles.map((control) => [control.clave, control]))
+    const estadoDeControl = (clave) => controlPorClave[clave]?.estado === 'confirmado' ? 'saludable' : controlPorClave[clave]?.estado === 'bloqueado' ? 'critico' : 'pendiente'
+    const integraciones = [
+      { clave: 'base', nombre: 'Base institucional', estado: 'saludable', detalle: 'MariaDB respondió y las consultas operativas están disponibles.' },
+      { clave: 'formularios', nombre: 'Formularios y seguimiento', estado: Number(indicadores?.formularios_activos || 0) > 0 ? 'saludable' : 'pendiente', detalle: `${Number(indicadores?.formularios_activos || 0)} formularios activos y ${Number(indicadores?.entradas_abiertas || 0)} respuestas abiertas.` },
+      { clave: 'pagina_web', nombre: 'Página pública', estado: paginaPublicada ? 'saludable' : 'pendiente', detalle: paginaPublicada ? `Publicación institucional disponible, revisión ${paginaPublicada.revision}.` : 'Todavía no hay una publicación institucional registrada.' },
+      { clave: 'correo', nombre: 'Correo y campañas', ...trabajoCorreo },
+      { clave: 'dominio', nombre: 'Reputación del dominio', estado: estadoDeControl('correo_dmarc'), detalle: controlPorClave.correo_dmarc?.evidencia || 'Falta registrar la verificación de DMARC.' },
+      { clave: 'privacidad', nombre: 'Privacidad', estado: Number(indicadores?.privacidad_pendiente || 0) > 0 ? 'advertencia' : 'saludable', detalle: `${Number(indicadores?.privacidad_pendiente || 0)} solicitudes requieren seguimiento.` },
+      { clave: 'publicacion', nombre: 'Publicación automática', estado: estadoDeControl('publicacion_sftp'), detalle: controlPorClave.publicacion_sftp?.evidencia || 'Falta registrar una publicación automática verificada.' },
+    ]
+    const datos = {
+      acceso: { puede_administrar: esAdmin(sesion), puede_ver_datos: puedeVerDatos },
+      version: env.VERSION_APLICACION || null,
+      indicadores: {
+        formularios_activos: Number(indicadores?.formularios_activos || 0), entradas_abiertas: Number(indicadores?.entradas_abiertas || 0),
+        contactos_activos: Number(indicadores?.contactos_activos || 0), contactos_pendientes: Number(indicadores?.contactos_pendientes || 0),
+        privacidad_pendiente: Number(indicadores?.privacidad_pendiente || 0),
+      },
+      integraciones, controles, cola: colaResultados,
+      correosFallidos: (correosFallidos.results || []).map((fila) => ({ ...fila, destinatario: correoOperativoVisible(fila.destinatario, puedeVerDatos) })),
+      ejecuciones: ejecuciones.results || [], incidentes: incidentes.results || [],
+    }
+    datos.resumen = resumenOperativo(datos)
+    return responder(datos, 200, { 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow, noarchive' })
+  }
+
+  if (!esAdmin(sesion)) return error('Solo Administración puede ejecutar acciones de recuperación o confirmar controles.', 403)
+  if (recurso === 'controles' && id && request.method === 'PATCH') {
+    let datos
+    try { datos = await request.json() } catch { return error('El estado del control no es válido.', 400) }
+    const resultado = controlOperativoDesde(datos, id)
+    if (resultado.error) return error(resultado.error, 400)
+    const control = resultado.control
+    await env.BASE.prepare(`INSERT INTO controles_operativos_cms
+      (clave, categoria, estado, detalle, evidencia, actualizado_por)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+      ON CONFLICT(clave) DO UPDATE SET categoria = excluded.categoria, estado = excluded.estado,
+        detalle = excluded.detalle, evidencia = excluded.evidencia, actualizado_por = excluded.actualizado_por,
+        actualizado_en = CURRENT_TIMESTAMP`)
+      .bind(control.clave, control.categoria, control.estado, control.detalle, control.evidencia, sesion.correo).run()
+    await registrar(env.BASE, sesion, 'actualizar control operativo', `operaciones/controles/${id}`, `${control.estado}: ${control.evidencia || control.detalle}`)
+    return responder({ control: { ...control, actualizado_por: sesion.correo } })
+  }
+  if (recurso === 'correos' && id && accion === 'reintentar' && request.method === 'POST') {
+    const correo = await env.BASE.prepare('SELECT id, asunto, estado FROM cola_correos WHERE id = ?1').bind(id).first()
+    if (!correo) return error('No encontramos ese correo.', 404)
+    if (correo.estado !== 'fallido') return error('Solo se puede reintentar un correo fallido.', 409)
+    await env.BASE.prepare("UPDATE cola_correos SET estado = 'pendiente', intentos = 0, proximo_intento = CURRENT_TIMESTAMP, ultimo_error = '', actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1").bind(id).run()
+    await registrar(env.BASE, sesion, 'reintentar correo fallido', `operaciones/correos/${id}`, correo.asunto)
+    return responder({ reintentado: true })
+  }
+  if (recurso === 'incidentes' && id && accion === 'resolver' && request.method === 'POST') {
+    const incidente = await env.BASE.prepare('SELECT id, titulo, estado FROM incidentes_operativos_cms WHERE id = ?1').bind(id).first()
+    if (!incidente) return error('No encontramos ese incidente.', 404)
+    if (incidente.estado !== 'abierto') return error('El incidente ya no está abierto.', 409)
+    await env.BASE.prepare("UPDATE incidentes_operativos_cms SET estado = 'resuelto', resuelto_en = CURRENT_TIMESTAMP, resuelto_por = ?2 WHERE id = ?1").bind(id, sesion.correo).run()
+    await registrar(env.BASE, sesion, 'resolver incidente operativo', `operaciones/incidentes/${id}`, incidente.titulo)
+    return responder({ resuelto: true })
+  }
+  return error('No se encontró esa operación del centro de operaciones.', 404)
+}
+
 async function cms(contexto, sesion, ruta) {
   if (!tienePermiso(sesion, 'cms')) return error('Tu cuenta no puede acceder al CMS institucional.', 403)
   const { request, env } = contexto
@@ -2575,7 +3132,8 @@ async function cms(contexto, sesion, ruta) {
   if (recurso === 'pagina-web') return paginaWebCms(contexto, sesion, id)
   if (recurso === 'finanzas-fsb') return finanzasFsbCms(contexto, sesion, partes, alcance)
 
-  if (esSoloConsultaCms(sesion) && request.method !== 'GET') {
+  const intentaCrearTareaDirecta = recurso === 'tareas' && !id && request.method === 'POST'
+  if (esSoloConsultaCms(sesion) && request.method !== 'GET' && !intentaCrearTareaDirecta) {
     return error('El perfil de consulta solo puede leer la agenda y los documentos compartidos.', 403)
   }
   if (alcance.perfil === 'integrante' && request.method !== 'GET'
@@ -2584,11 +3142,55 @@ async function cms(contexto, sesion, ruta) {
       || recurso === 'avisos-manuales'
       || recurso === 'capacidad'
       || (recurso === 'tareas' && id && request.method === 'PATCH')
+      || (recurso === 'tareas' && !id && request.method === 'POST')
       || (recurso === 'tareas' && id && partes[3] === 'comentarios' && request.method === 'POST'))) {
     return error('El perfil de integrante solo puede actualizar sus propias tareas.', 403)
   }
   if (!alcance.global && ['equipos', 'responsabilidades', 'unidades'].includes(recurso) && request.method !== 'GET') {
     return error('Solo Dirección o Administración puede cambiar la estructura institucional.', 403)
+  }
+
+  if (recurso === 'permisos-tareas') {
+    if (!esAdmin(sesion)) return error('Solo Administración puede cambiar quién crea tareas.', 403)
+    if (request.method === 'GET') {
+      const politicas = await env.BASE.prepare(`SELECT capacidad, alcance_tipo, alcance_id, efecto, creado_por, actualizado_en
+        FROM permisos_capacidades_cms WHERE capacidad = ?1
+        ORDER BY alcance_tipo, alcance_id COLLATE NOCASE`).bind(CAPACIDAD_CREAR_TAREAS).all()
+      return responder({ capacidad: CAPACIDAD_CREAR_TAREAS, politicas: politicas.results || [], predeterminados: { administracion: 'permitir', direccion: 'bloquear', coordinacion: 'bloquear', integrante: 'bloquear', consulta: 'bloquear' } })
+    }
+    if (request.method === 'PUT') {
+      let datos
+      try { datos = await request.json() } catch { return error('La regla de creación de tareas no es válida.', 400) }
+      const alcanceTipo = textoCms(datos.alcance_tipo, 30)
+      const alcanceId = textoCms(datos.alcance_id, 191).toLowerCase()
+      const efecto = textoCms(datos.efecto, 30)
+      if (!['perfil', 'equipo', 'usuario'].includes(alcanceTipo) || !alcanceId || !['permitir', 'bloquear', 'heredar'].includes(efecto)) {
+        return error('Elegí un grupo o una persona y una regla válida.', 400)
+      }
+      if (alcanceTipo === 'perfil' && !PERFILES_ACCESO.includes(alcanceId)) return error('El perfil elegido no es válido.', 400)
+      if (alcanceTipo === 'equipo') {
+        const equipo = await env.BASE.prepare('SELECT id FROM equipos WHERE id = ?1 AND activo = 1').bind(alcanceId).first()
+        if (!equipo) return error('El equipo elegido ya no está disponible.', 400)
+      }
+      if (alcanceTipo === 'usuario') {
+        const cuenta = await env.BASE.prepare('SELECT correo FROM usuarios WHERE correo = ?1 AND activo = 1').bind(alcanceId).first()
+        if (!cuenta) return error('La persona elegida ya no tiene un acceso activo.', 400)
+      }
+      if (efecto === 'heredar') {
+        await env.BASE.prepare('DELETE FROM permisos_capacidades_cms WHERE capacidad = ?1 AND alcance_tipo = ?2 AND alcance_id = ?3')
+          .bind(CAPACIDAD_CREAR_TAREAS, alcanceTipo, alcanceId).run()
+      } else {
+        await env.BASE.prepare(`INSERT INTO permisos_capacidades_cms
+          (id, capacidad, alcance_tipo, alcance_id, efecto, creado_por)
+          VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+          ON CONFLICT(capacidad, alcance_tipo, alcance_id) DO UPDATE SET
+            efecto = excluded.efecto, creado_por = excluded.creado_por, actualizado_en = CURRENT_TIMESTAMP`)
+          .bind(crypto.randomUUID(), CAPACIDAD_CREAR_TAREAS, alcanceTipo, alcanceId, efecto, sesion.correo).run()
+      }
+      await registrar(env.BASE, sesion, 'cambiar permiso para crear tareas', `permisos-tareas/${alcanceTipo}/${alcanceId}`, efecto)
+      return responder({ guardada: true, capacidad: CAPACIDAD_CREAR_TAREAS, alcance_tipo: alcanceTipo, alcance_id: alcanceId, efecto })
+    }
+    return error('Método no permitido.', 405)
   }
 
   if (recurso === 'notificaciones' && id === 'resumen' && request.method === 'GET') {
@@ -2666,7 +3268,7 @@ async function cms(contexto, sesion, ruta) {
   }
 
   if (recurso === 'tablero' && request.method === 'GET') {
-    const [tareas, proyectos, equipos, responsables, responsabilidades, reuniones, decisiones, documentos, entradas, formularios, alianzas, programas, eventos, plantillas, riesgos, hitos, gastos, eventosParaConflictos, notificaciones, recurrencias, automatizaciones, alertasPospuestas, comunicados, revisionSemanal, capacidad, metricasTareas] = await Promise.all([
+    const [tareas, proyectos, equipos, responsables, responsabilidades, reuniones, decisiones, documentos, entradas, formularios, alianzas, programas, eventos, plantillas, riesgos, hitos, gastos, eventosParaConflictos, notificaciones, recurrencias, automatizaciones, alertasPospuestas, comunicados, revisionSemanal, capacidad, metricasTareas, politicasTareas] = await Promise.all([
       env.BASE.prepare(`
         SELECT t.*, e.nombre AS equipo_nombre, e.color AS equipo_color, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla, p.titulo AS proyecto_titulo, a.titulo AS evento_titulo,
           u.nombre AS responsable_nombre, s.nombre AS solicitante_nombre,
@@ -2680,9 +3282,12 @@ async function cms(contexto, sesion, ruta) {
         LEFT JOIN eventos_cms a ON a.id = t.evento_id
         LEFT JOIN usuarios u ON u.correo = t.responsable_correo
         LEFT JOIN usuarios s ON s.correo = t.solicitante_correo
-        WHERE t.estado NOT IN ('completada', 'cancelada')
-        ORDER BY CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
-          t.fecha_limite IS NULL, t.fecha_limite, t.actualizado_en DESC LIMIT 60
+        ORDER BY CASE WHEN t.estado IN ('completada', 'cancelada') THEN 1 ELSE 0 END,
+          CASE t.prioridad WHEN 'urgente' THEN 0 WHEN 'alta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END,
+          CASE WHEN t.estado IN ('completada', 'cancelada') THEN COALESCE(t.completado_en, t.actualizado_en) END DESC,
+          CASE WHEN t.estado NOT IN ('completada', 'cancelada') THEN t.fecha_limite IS NULL END,
+          CASE WHEN t.estado NOT IN ('completada', 'cancelada') THEN t.fecha_limite END,
+          t.actualizado_en DESC LIMIT 200
       `).all(),
       env.BASE.prepare(`SELECT p.*, e.nombre AS equipo_nombre, o.nombre AS unidad_nombre, o.sigla AS unidad_sigla, g.nombre AS programa_nombre, u.nombre AS responsable_nombre,
           (SELECT COUNT(*) FROM proyecto_hitos_cms h WHERE h.proyecto_id = p.id AND h.estado != 'cancelado') AS hitos_total,
@@ -2702,7 +3307,7 @@ async function cms(contexto, sesion, ruta) {
         LEFT JOIN proyectos_cms p ON p.id = r.proyecto_id
         WHERE r.estado != 'cancelada'
         ORDER BY r.fecha_hora ASC LIMIT 12`).all(),
-      env.BASE.prepare(`SELECT d.*, r.titulo AS reunion_titulo, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS responsable_nombre
+      env.BASE.prepare(`SELECT d.*, r.titulo AS reunion_titulo, r.equipo_id, r.proyecto_id, e.nombre AS equipo_nombre, p.titulo AS proyecto_titulo, u.nombre AS responsable_nombre
         FROM decisiones_cms d
         JOIN reuniones_cms r ON r.id = d.reunion_id
         LEFT JOIN equipos e ON e.id = r.equipo_id
@@ -2816,6 +3421,8 @@ async function cms(contexto, sesion, ruta) {
         FROM tareas_cms
         WHERE creado_en >= datetime('now', '-180 days') OR estado NOT IN ('completada', 'cancelada')
         ORDER BY creado_en DESC LIMIT 240`).all(),
+      env.BASE.prepare(`SELECT capacidad, alcance_tipo, alcance_id, efecto
+        FROM permisos_capacidades_cms WHERE capacidad = ?1`).bind(CAPACIDAD_CREAR_TAREAS).all(),
     ])
     const [unidades, vistasUnidades] = await Promise.all([
       env.BASE.prepare(`SELECT u.*, e.nombre AS equipo_nombre, p.nombre AS unidad_padre_nombre
@@ -2885,7 +3492,7 @@ async function cms(contexto, sesion, ruta) {
       : eventosParaConflictosPorAlcance.map(eventoCmsSinDatosDeEntrada)
     const notificacionesVisibles = accesoRespuestas ? notificaciones.results : notificaciones.results.map(notificacionCmsSinDatosDeFormulario)
     return responder({
-      alcance: { perfil: alcance.perfil, global: alcance.global, equipos: equiposVisibles.map((fila) => fila.id), puede_gestionar: alcance.global || alcance.perfil === 'coordinacion', nivel_datos_personales: nivelDatosPersonalesDe(sesion), puede_ver_respuestas: accesoRespuestas },
+      alcance: { perfil: alcance.perfil, global: alcance.global, equipos: equiposVisibles.map((fila) => fila.id), puede_gestionar: alcance.global || alcance.perfil === 'coordinacion', capacidades: { crear_tareas: capacidadesCrearTareasCms(alcance, sesion, equiposVisibles, politicasTareas.results || []) }, nivel_datos_personales: nivelDatosPersonalesDe(sesion), puede_ver_respuestas: accesoRespuestas },
       tareas: tareasVisibles, proyectos: proyectosVisibles, equipos: equiposVisibles, responsables: responsablesVisibles,
       responsabilidades: responsabilidadesVisibles, reuniones: reunionesVisibles, decisiones: decisionesVisibles,
       documentos: documentosVisibles, entradas: entradasVisibles, formularios: formulariosVisibles, alianzas: alianzasVisibles, programas: programasVisibles, unidades: unidadesVisibles,
@@ -2960,6 +3567,8 @@ async function cms(contexto, sesion, ruta) {
       let datos; try { datos = await request.json() } catch { return error('Los datos de la tarea recurrente no son válidos.', 400) }
       const resultado = tareaRecurrenteCmsDesde(datos); if (resultado.error) return error(resultado.error, 400)
       if (!puedeGestionarEquipoCms(alcance, resultado.tarea.equipo_id)) return error('Elegí un equipo que coordinás para crear la tarea recurrente.', 403)
+      const politicas = await politicasCrearTareasCms(env.BASE)
+      if (!puedeCrearTareaCms(alcance, sesion, resultado.tarea.equipo_id, politicas)) return error('No tenés permiso para crear tareas en ese equipo.', 403)
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, resultado.tarea); if (referenciaInvalida) return error(referenciaInvalida, 400)
       const recurrente = { id: crypto.randomUUID(), ...resultado.tarea }
       await env.BASE.prepare(`INSERT INTO tareas_recurrentes_cms
@@ -2973,6 +3582,8 @@ async function cms(contexto, sesion, ruta) {
       const recurrente = await env.BASE.prepare('SELECT * FROM tareas_recurrentes_cms WHERE id = ?1 AND activo = 1').bind(id).first()
       if (!recurrente) return error('No encontramos esa tarea recurrente activa.', 404)
       if (!puedeGestionarEquipoCms(alcance, recurrente.equipo_id)) return error('No podés generar esta tarea recurrente.', 403)
+      const politicas = await politicasCrearTareasCms(env.BASE)
+      if (!puedeCrearTareaCms(alcance, sesion, recurrente.equipo_id, politicas)) return error('No tenés permiso para generar tareas en ese equipo.', 403)
       const tarea = { id: crypto.randomUUID(), titulo: recurrente.titulo, descripcion: recurrente.descripcion, tipo: 'tarea', estado: 'pendiente', prioridad: recurrente.prioridad, equipo_id: recurrente.equipo_id, proyecto_id: recurrente.proyecto_id, responsable_correo: recurrente.responsable_correo, fecha_limite: recurrente.proxima_fecha, recurrencia_id: recurrente.id, generada_para: recurrente.proxima_fecha }
       const insercion = await env.BASE.prepare(`INSERT OR IGNORE INTO tareas_cms
         (id, titulo, descripcion, tipo, estado, prioridad, equipo_id, proyecto_id, responsable_correo, fecha_limite, creado_por, recurrencia_id, generada_para)
@@ -3126,7 +3737,13 @@ async function cms(contexto, sesion, ruta) {
       try { datos = await request.json() } catch { return error('Los datos de la tarea no son válidos.', 400) }
       const resultado = tareaCmsDesde(datos)
       if (resultado.error) return error(resultado.error, 400)
-      if (!puedeGestionarEquipoCms(alcance, resultado.tarea.equipo_id)) return error('Elegí un equipo que coordinás para crear la tarea.', 403)
+      const esSolicitud = resultado.tarea.tipo === 'solicitud'
+      if (esSolicitud) {
+        if (!puedeVerEquipoCms(alcance, resultado.tarea.equipo_id)) return error('Elegí un equipo al que pertenezcas para enviar la solicitud.', 403)
+      } else {
+        const politicas = await politicasCrearTareasCms(env.BASE)
+        if (!puedeCrearTareaCms(alcance, sesion, resultado.tarea.equipo_id, politicas)) return error('No tenés permiso para crear tareas en ese equipo. Podés enviar una solicitud para que la revise.', 403)
+      }
       const referenciaInvalida = await referenciasCmsValidas(env.BASE, resultado.tarea)
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const responsableAutomatico = resultado.tarea.tipo === 'solicitud' && !resultado.tarea.responsable_correo
@@ -3155,7 +3772,10 @@ async function cms(contexto, sesion, ruta) {
       let datos
       try { datos = await request.json() } catch { return error('Los cambios de la tarea no son válidos.', 400) }
       const comentarioCierrePedido = datos.comentario_cierre
+      const operacionCierreId = textoCms(datos.operacion_cierre_id, 191)
       delete datos.comentario_cierre
+      delete datos.operacion_cierre_id
+      if (operacionCierreId && !/^[a-zA-Z0-9:_-]{8,191}$/.test(operacionCierreId)) return error('La referencia del cierre no es válida.', 400)
       if (alcance.perfil === 'integrante' && Object.keys(datos).some((campo) => !['estado', 'fecha_seguimiento'].includes(campo))) {
         return error('Como integrante solo podés actualizar el estado y el seguimiento de tu tarea.', 403)
       }
@@ -3189,8 +3809,8 @@ async function cms(contexto, sesion, ruta) {
         WHERE id = ?1
       `).bind(id, tarea.titulo, tarea.descripcion, tarea.tipo, tarea.estado, tarea.prioridad, tarea.equipo_id, tarea.unidad_id, tarea.proyecto_id, tarea.evento_id, tarea.responsable_correo, tarea.solicitante_correo, tarea.fecha_limite, tarea.fecha_seguimiento, tarea.esfuerzo_horas, tarea.seguimiento_personal, tarea.motivo_seguimiento, tarea.seguimiento_personal_por)]
       if (cierre.comentario) {
-        consultasActualizacion.push(env.BASE.prepare('INSERT INTO comentarios_tarea_cms (id, tarea_id, contenido, creado_por) VALUES (?1, ?2, ?3, ?4)')
-          .bind(crypto.randomUUID(), id, cierre.comentario, sesion.correo))
+        consultasActualizacion.push(env.BASE.prepare('INSERT OR IGNORE INTO comentarios_tarea_cms (id, tarea_id, contenido, creado_por) VALUES (?1, ?2, ?3, ?4)')
+          .bind(operacionCierreId || crypto.randomUUID(), id, cierre.comentario, sesion.correo))
       }
       if (cierre.resolver_aviso) {
         consultasActualizacion.push(env.BASE.prepare(`UPDATE notificaciones_cms
@@ -3212,7 +3832,7 @@ async function cms(contexto, sesion, ruta) {
         await notificarAsignacionTareaCms(env.BASE, { id, ...tarea }, sesion.correo, tarea.tipo === 'solicitud' ? 'solicitud_recibida' : 'asignacion_tarea')
       }
       await registrar(env.BASE, sesion, 'modificar tarea CMS', `tareas/${id}`, tarea.titulo)
-      return responder({ tarea: tareaCmsVisiblePara({ id, ...tarea }, sesion) })
+      return responder({ tarea: tareaCmsVisiblePara({ id, ...tarea }, sesion), operacion_cierre_id: operacionCierreId || null })
     }
   }
 
@@ -3305,6 +3925,10 @@ async function cms(contexto, sesion, ruta) {
       const resultado = cierreReunionCmsDesde(datos)
       if (resultado.error) return error(resultado.error, 400)
       const cierre = resultado.cierre
+      if (cierre.acuerdos.some((acuerdo) => acuerdo.crear_tarea)) {
+        const politicas = await politicasCrearTareasCms(env.BASE)
+        if (!puedeCrearTareaCms(alcance, sesion, reunion.equipo_id, politicas)) return error('Podés cerrar la reunión, pero no crear tareas desde sus acuerdos. Desmarcá Crear tarea o pedí el permiso a Administración.', 403)
+      }
       const consultas = [env.BASE.prepare(`UPDATE reuniones_cms SET estado = 'realizada', minuta = ?2, resumen = ?3,
         proxima_revision = ?4, cerrada_en = CURRENT_TIMESTAMP, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
         .bind(id, cierre.minuta, cierre.resumen, cierre.proxima_revision)]
@@ -3370,9 +3994,9 @@ async function cms(contexto, sesion, ruta) {
       if (referenciaInvalida) return error(referenciaInvalida, 400)
       const reuniones = (recurrente ? resultado.reuniones : [resultado.reunion]).map((reunion) => ({ id: crypto.randomUUID(), ...reunion }))
       await env.BASE.batch(reuniones.map((reunion) => env.BASE.prepare(`INSERT INTO reuniones_cms
-        (id, titulo, objetivo, equipo_id, unidad_id, proyecto_id, fecha_hora, lugar, estado, preparacion, minuta, resumen, creado_por, serie_id, generada_para)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`)
-        .bind(reunion.id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen, sesion.correo, reunion.serie_id ?? null, reunion.generada_para ?? null)))
+        (id, titulo, objetivo, equipo_id, unidad_id, proyecto_id, fecha_hora, lugar, estado, preparacion, proxima_revision, minuta, resumen, creado_por, serie_id, generada_para)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`)
+        .bind(reunion.id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.proxima_revision, reunion.minuta, reunion.resumen, sesion.correo, reunion.serie_id ?? null, reunion.generada_para ?? null)))
       await registrar(env.BASE, sesion, recurrente ? 'crear serie de reuniones CMS' : 'crear reunión CMS', recurrente ? `reuniones/serie/${reuniones[0].serie_id}` : `reuniones/${reuniones[0].id}`, recurrente ? `${reuniones[0].titulo}, ${reuniones.length} fechas` : reuniones[0].titulo)
       return responder(recurrente ? { reuniones, cantidad: reuniones.length } : { reunion: reuniones[0] }, 201)
     }
@@ -3389,8 +4013,8 @@ async function cms(contexto, sesion, ruta) {
       const reunion = resultado.reunion
       if (!puedeGestionarEquipoCms(alcance, reunion.equipo_id)) return error('No podés mover esta reunión a otro equipo.', 403)
       await env.BASE.prepare(`UPDATE reuniones_cms SET titulo = ?2, objetivo = ?3, equipo_id = ?4, unidad_id = ?5, proyecto_id = ?6, fecha_hora = ?7,
-        lugar = ?8, estado = ?9, preparacion = ?10, minuta = ?11, resumen = ?12, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.minuta, reunion.resumen).run()
+        lugar = ?8, estado = ?9, preparacion = ?10, proxima_revision = ?11, minuta = ?12, resumen = ?13, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, reunion.titulo, reunion.objetivo, reunion.equipo_id, reunion.unidad_id, reunion.proyecto_id, reunion.fecha_hora, reunion.lugar, reunion.estado, reunion.preparacion, reunion.proxima_revision, reunion.minuta, reunion.resumen).run()
       await registrar(env.BASE, sesion, 'modificar reunión CMS', `reuniones/${id}`, reunion.titulo)
       return responder({ reunion: { id, ...reunion } })
     }
@@ -3473,6 +4097,8 @@ async function cms(contexto, sesion, ruta) {
       if (!plantilla) return error('No encontramos esa checklist.', 404)
       if (!evento) return error('La actividad ya no está disponible para preparar.', 404)
       if (!puedeGestionarEquipoCms(alcance, plantilla.equipo_id || evento.equipo_id) || !puedeGestionarEquipoCms(alcance, evento.equipo_id)) return error('No podés aplicar esta checklist en ese equipo.', 403)
+      const politicas = await politicasCrearTareasCms(env.BASE)
+      if (!puedeCrearTareaCms(alcance, sesion, plantilla.equipo_id || evento.equipo_id, politicas)) return error('No tenés permiso para crear las tareas de esta checklist.', 403)
       if (aplicacion) return error('Esta checklist ya fue aplicada a esa actividad.', 409)
       const items = await env.BASE.prepare('SELECT * FROM plantilla_tareas_items_cms WHERE plantilla_id = ?1 ORDER BY orden, titulo').bind(id).all()
       if (!items.results.length) return error('Esta checklist no tiene tareas para aplicar.', 400)
@@ -3511,6 +4137,8 @@ async function cms(contexto, sesion, ruta) {
         JOIN reuniones_cms r ON r.id = d.reunion_id WHERE d.id = ?1`).bind(id).first()
       if (!decision) return error('No encontramos esa decisión.', 404)
       if (!puedeGestionarEquipoCms(alcance, decision.equipo_id)) return error('No podés crear tareas desde esta decisión.', 403)
+      const politicas = await politicasCrearTareasCms(env.BASE)
+      if (!puedeCrearTareaCms(alcance, sesion, decision.equipo_id, politicas)) return error('No tenés permiso para crear tareas desde esta decisión.', 403)
       if (decision.tarea_id) return error('Esta decisión ya tiene una tarea vinculada.', 409)
       const tarea = { id: crypto.randomUUID(), titulo: decision.titulo, descripcion: decision.motivo, tipo: 'tarea', estado: 'pendiente', prioridad: 'normal', equipo_id: decision.equipo_id, proyecto_id: decision.proyecto_id, responsable_correo: decision.responsable_correo }
       const insertarTarea = env.BASE.prepare(`INSERT INTO tareas_cms
@@ -3885,9 +4513,9 @@ async function cms(contexto, sesion, ruta) {
       const formulario = { id: crypto.randomUUID(), ...resultado.formulario }
       await env.BASE.prepare(`INSERT INTO formularios_cms
         (id, titulo, descripcion, tipo, visibilidad, estado, equipo_id, unidad_id, equipo_solicitante_id, prioridad, proyecto_id, campos_json,
-          finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, creado_por)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)`)
-        .bind(formulario.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta, sesion.correo).run()
+          finalidad, responsable_datos, conservacion_meses, requiere_consentimiento, destino_respuesta, configuracion_publica_json, creado_por)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)`)
+        .bind(formulario.id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta, formulario.configuracion_publica_json, sesion.correo).run()
       await registrar(env.BASE, sesion, 'crear formulario CMS', `formularios/${formulario.id}`, formulario.titulo)
       return responder({ formulario }, 201)
     }
@@ -3903,8 +4531,8 @@ async function cms(contexto, sesion, ruta) {
       await env.BASE.prepare(`UPDATE formularios_cms SET titulo = ?2, descripcion = ?3, tipo = ?4, visibilidad = ?5, estado = ?6,
         equipo_id = ?7, unidad_id = ?8, equipo_solicitante_id = ?9, prioridad = ?10, proyecto_id = ?11, campos_json = ?12,
         finalidad = ?13, responsable_datos = ?14, conservacion_meses = ?15, requiere_consentimiento = ?16,
-        destino_respuesta = ?17, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
-        .bind(id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta).run()
+        destino_respuesta = ?17, configuracion_publica_json = ?18, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?1`)
+        .bind(id, formulario.titulo, formulario.descripcion, formulario.tipo, formulario.visibilidad, formulario.estado, formulario.equipo_id, formulario.unidad_id, formulario.equipo_solicitante_id, formulario.prioridad, formulario.proyecto_id, formulario.campos_json, formulario.finalidad, formulario.responsable_datos, formulario.conservacion_meses, formulario.requiere_consentimiento ? 1 : 0, formulario.destino_respuesta, formulario.configuracion_publica_json).run()
       await registrar(env.BASE, sesion, 'modificar formulario CMS', `formularios/${id}`, formulario.titulo)
       return responder({ formulario: { id, ...formulario } })
     }
@@ -3914,7 +4542,11 @@ async function cms(contexto, sesion, ruta) {
       if (!formulario) return error('Este formulario no está disponible.', 404)
       if (!puedeGestionarEquipoCms(alcance, formulario.equipo_id)) return error('No podés registrar una respuesta para este formulario.', 403)
       let datos; try { datos = await request.json() } catch { return error('La respuesta no es válida.', 400) }
+      const auditoriaAcuerdos = auditoriaAcuerdosFormularioDesde(datos, formulario)
+      if (auditoriaAcuerdos.error) return error(auditoriaAcuerdos.error, 400)
       const resultado = respuestaFormularioCmsDesde(datos, formulario); if (resultado.error) return error(resultado.error, 400)
+      resultado.entrada.respuestas = { ...(resultado.entrada.respuestas || {}), ...auditoriaAcuerdos.respuestas }
+      resultado.entrada.respuestas_json = JSON.stringify(resultado.entrada.respuestas)
       const derivada = await derivarEntradaCms(env.BASE, resultado.entrada, sesion, formulario.id)
       await registrar(env.BASE, sesion, 'recibir formulario interno', `formularios/${id}`, 'Respuesta recibida')
       return responder(derivada, 201)
@@ -4010,11 +4642,17 @@ async function cms(contexto, sesion, ruta) {
 export async function onRequest(contexto) {
   const ruta = new URL(contexto.request.url).pathname.replace(/^\/api\/?/, '')
   if (ruta === 'health' && contexto.request.method === 'GET') {
-    return responder({ ok: true, servicio: 'gestor-aletea' }, 200, { 'cache-control': 'no-store' })
+    try {
+      await contexto.env.BASE.prepare('SELECT 1 AS ok').first()
+      return responder({ ok: true, servicio: 'gestor-aletea', version: contexto.env.VERSION_APLICACION || null }, 200, { 'cache-control': 'no-store' })
+    } catch {
+      return responder({ ok: false, servicio: 'gestor-aletea', version: contexto.env.VERSION_APLICACION || null }, 503, { 'cache-control': 'no-store' })
+    }
   }
   if (ruta === 'ingresar' && contexto.request.method === 'POST') return ingresar(contexto)
   if (ruta === 'cerrar' && contexto.request.method === 'POST') return cerrarSesion()
   if (ruta.startsWith('formularios/')) return formularioPublico(contexto, ruta)
+  if (ruta === 'comunicaciones/confirmar' || ruta === 'comunicaciones/baja') return comunicacionPublica(contexto, ruta)
   if (ruta === 'pagina-web/publicada') return paginaWebPublica(contexto)
   if (ruta.startsWith('pagina-web/medios/')) return medioPaginaWebPublico(contexto, ruta.split('/')[2])
   const sesion = await sesionDe(contexto)
@@ -4031,6 +4669,8 @@ export async function onRequest(contexto) {
   if (ruta === 'listas' && contexto.request.method === 'GET') return listas(contexto, sesion)
   if (ruta === 'foto') return foto(contexto, sesion)
   if (ruta === 'cms/imagen-remota') return imagenRemotaCms(contexto, sesion)
+  if (ruta === 'cms/comunicaciones' || ruta.startsWith('cms/comunicaciones/')) return comunicacionesCms(contexto, sesion, ruta)
+  if (ruta === 'cms/operaciones' || ruta.startsWith('cms/operaciones/')) return operacionesCms(contexto, sesion, ruta)
   if (ruta.startsWith('personas/') && ruta.endsWith('/protegida')) {
     return fichaProtegida(contexto, sesion, ruta.split('/')[1])
   }

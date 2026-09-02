@@ -3,7 +3,8 @@ import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { describirPlan, prepararPaquetes, verificarVivo } from './publicar-cpanel-api.mjs'
+import { CpanelApi } from './cpanel-api.mjs'
+import { asegurarDependenciasPassenger, describirPlan, prepararPaquetes, tokenDesdeKeychain, verificarVivo } from './publicar-cpanel-api.mjs'
 
 const RAIZ = fileURLToPath(new URL('../', import.meta.url))
 const CONFIG_LOCAL = join(homedir(), '.config', 'aletea', 'publicacion.json')
@@ -105,12 +106,63 @@ async function descargarRespaldos(conexion, capas, etapa) {
     capa.respaldo = join(etapa, 'respaldo', capa.clave)
     await mkdir(capa.respaldo, { recursive: true })
     for (const archivo of capa.archivos) {
+      if (!requiereRespaldo(archivo)) continue
       const local = join(capa.respaldo, archivo)
       await mkdir(dirname(local), { recursive: true })
       comandos.push(`-get ${escaparSftp(`${capa.remoto}/${archivo}`)} ${escaparSftp(local)}`)
     }
   }
   await ejecutarBatch(conexion, comandos, etapa, 'respaldar')
+}
+
+function requiereRespaldo(archivo) {
+  return !archivo.startsWith('release/')
+}
+
+async function cambiaronDependencias(capas) {
+  const gestor = capas.find((capa) => capa.clave === 'gestor-root')
+  if (!gestor) return false
+  const nueva = join(gestor.carpeta, 'package-lock.json')
+  const anterior = join(gestor.respaldo, 'package-lock.json')
+  if (!(await existe(anterior))) return true
+  return !(await readFile(nueva)).equals(await readFile(anterior))
+}
+
+async function dependenciasProduccion(capas) {
+  const gestor = capas.find((capa) => capa.clave === 'gestor-root')
+  if (!gestor) return []
+  const lock = JSON.parse(await readFile(join(gestor.carpeta, 'package-lock.json'), 'utf8'))
+  const declaradas = lock.packages?.['']?.dependencies || {}
+  return Object.keys(declaradas).sort().map((nombre) => {
+    const version = lock.packages?.[`node_modules/${nombre}`]?.version
+    if (!version) throw new Error(`package-lock.json no fija la versión de ${nombre}.`)
+    return { nombre, version }
+  })
+}
+
+async function descargarManifiestosDependencias(conexion, capas, etapa) {
+  const dependencias = await dependenciasProduccion(capas)
+  const carpeta = join(etapa, 'dependencias-instaladas')
+  const comandos = []
+  for (const dependencia of dependencias) {
+    const local = join(carpeta, dependencia.nombre, 'package.json')
+    await mkdir(dirname(local), { recursive: true })
+    comandos.push(`-get ${escaparSftp(`/home/aleteaor/gestor.aletea.org/node_modules/${dependencia.nombre}/package.json`)} ${escaparSftp(local)}`)
+  }
+  if (comandos.length) await ejecutarBatch(conexion, comandos, etapa, 'comprobar-dependencias')
+  return { carpeta, dependencias }
+}
+
+async function dependenciasInstaladas({ carpeta, dependencias }) {
+  for (const dependencia of dependencias) {
+    try {
+      const manifiesto = JSON.parse(await readFile(join(carpeta, dependencia.nombre, 'package.json'), 'utf8'))
+      if (manifiesto.version !== dependencia.version) return false
+    } catch {
+      return false
+    }
+  }
+  return true
 }
 
 async function comandosPublicacion(capas, marca) {
@@ -181,9 +233,22 @@ export async function principal(argumentos = process.argv.slice(2)) {
     }
     capas = await expandirPaquetes(plan, etapa)
     await descargarRespaldos(conexion, capas, etapa)
+    const lockCambio = await cambiaronDependencias(capas)
+    const estadoDependencias = lockCambio ? await descargarManifiestosDependencias(conexion, capas, etapa) : null
+    const instalarDependencias = lockCambio && !(await dependenciasInstaladas(estadoDependencias))
+    if (lockCambio && !instalarDependencias) console.log('Dependencias de producción ya instaladas; no se requiere Application Manager.')
+    const api = instalarDependencias ? new CpanelApi({
+      host: process.env.CPANEL_HOST || config.cpanelHost || config.host || 'cpanel.aletea.org',
+      usuario: process.env.CPANEL_USER || config.usuario || 'aleteaor',
+      token: tokenDesdeKeychain(process.env.CPANEL_USER || config.usuario || 'aleteaor'),
+    }) : null
     const marca = Date.now()
     try {
       await ejecutarBatch(conexion, await comandosPublicacion(capas, marca), etapa, 'publicar')
+      if (api) {
+        await asegurarDependenciasPassenger(api)
+        console.log('Dependencias npm confirmadas por Application Manager.')
+      }
       await reiniciar(conexion, etapa, plan.versionGestor, 'publicar')
       await verificarVivo(plan, webRoot)
     } catch (error) {
@@ -205,4 +270,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   })
 }
 
-export const _pruebas = { archivosDe, directoriosDe, escaparSftp, comandosPublicacion }
+export const _pruebas = {
+  archivosDe, directoriosDe, escaparSftp, comandosPublicacion, cambiaronDependencias,
+  dependenciasProduccion, dependenciasInstaladas, requiereRespaldo,
+}

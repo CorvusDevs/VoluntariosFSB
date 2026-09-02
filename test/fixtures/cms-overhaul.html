@@ -28,30 +28,36 @@
     equipos.push({ id: 'e8', nombre: 'Comisión Directiva', clave: 'comision_directiva', categoria: 'comision_directiva' })
     equipos.push({ id: 'e9', nombre: 'Interinstitucional', clave: 'interinstitucional', categoria: 'equipo', descripcion: 'Coordinación y trabajo conjunto con otras instituciones y redes.', color: '#397dba' })
     const tablero = {
-      alcance: { perfil: 'direccion', equipos: equipos.map(({ id }) => id), puede_gestionar: true, global: true },
+      alcance: { perfil: 'direccion', equipos: equipos.map(({ id }) => id), puede_gestionar: true, global: true, capacidades: { crear_tareas: { global: true, equipos: equipos.map(({ id }) => id), puede_crear: true, predeterminado: 'solo_administracion' } } },
       equipos,
       unidades: [
         { id: 'u-gaf', clave: 'gaf', nombre: 'Grupo Apoyo Familias', sigla: 'GAF', tipo: 'programa', equipo_id: 'e1', estado: 'activa', color: '#397dba', vistas: [] },
         { id: 'u-fer', clave: 'fer', nombre: 'Familias en Red', sigla: 'FER', tipo: 'programa', equipo_id: 'e1', estado: 'activa', color: '#ec2b83', vistas: [] },
+        { id: 'u-gwp', clave: 'gwp', nombre: 'Atención a Familias por WhatsApp', sigla: 'GWP', tipo: 'canal', equipo_id: 'e1', estado: 'activa', color: '#5bc9c3', vistas: [] },
+        { id: 'unidad-adultos-autistas', clave: 'adultos_autistas', nombre: 'Adultos autistas', sigla: '', tipo: 'programa', equipo_id: 'e1', estado: 'activa', color: '#662D7D', vistas: [] },
         { id: 'u-fsb', clave: 'fsb', nombre: 'Fútbol sin Barreras', sigla: 'FSB', tipo: 'programa', equipo_id: 'e2', estado: 'activa', color: '#5bc9c3', vistas: [{ equipo_id: 'e5', enfoque: 'financiero' }, { equipo_id: 'e3', enfoque: 'comunicacion' }] },
         { id: 'u-emap', clave: 'emap', nombre: 'Estimulación Motriz a través de la Plástica', sigla: 'EMAP', tipo: 'programa', equipo_id: 'e2', estado: 'activa', color: '#397dba', vistas: [{ equipo_id: 'e5', enfoque: 'financiero' }] },
         { id: 'u-tae', clave: 'tae', nombre: 'Taller Arte y Expresión', sigla: 'TAE', tipo: 'programa', equipo_id: 'e2', estado: 'activa', color: '#f1b83d', vistas: [{ equipo_id: 'e5', enfoque: 'financiero' }] },
-        { id: 'u-daea1', clave: 'daea_1', nombre: 'DAEA 1º', sigla: 'DAEA 1º', tipo: 'formacion', equipo_id: 'e4', estado: 'activa', color: '#19bf43', vistas: [] },
-        { id: 'u-daea2', clave: 'daea_2', nombre: 'DAEA 2º', sigla: 'DAEA 2º', tipo: 'formacion', equipo_id: 'e4', estado: 'activa', color: '#c997ae', vistas: [] },
+        { id: 'u-daea', clave: 'daea', nombre: 'Diplomatura en Acompañamiento en el Espectro Autista', sigla: 'DAEA', tipo: 'formacion', equipo_id: 'e4', estado: 'activa', color: '#19bf43', vistas: [] },
         { id: 'u-fad', clave: 'fad', nombre: 'Formaciones a Demanda para centros educativos', sigla: 'FAD', tipo: 'formacion', equipo_id: 'e4', estado: 'activa', color: '#f1b83d', vistas: [] },
       ],
       tareas: [
         { id: 't1', titulo: 'Confirmar accesibilidad de la sede', descripcion: 'Validar ingreso, baños y apoyos.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 6, fecha_limite: '2026-08-18', equipo_id: 'e6', equipo_nombre: 'Eventos', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', creado_en: '2026-08-16 10:00:00', asignado_en: '2026-08-16 12:00:00' },
         { id: 't2', titulo: 'Cerrar contenidos de campaña', estado: 'esperando_respuesta', prioridad: 'normal', esfuerzo_horas: 4, fecha_limite: '2026-08-22', equipo_id: 'e3', equipo_nombre: 'Comunicación', responsable_nombre: 'Martina', responsable_correo: 'martina@aletea.org', creado_en: '2026-08-17 10:00:00', asignado_en: '2026-08-17 18:00:00' },
         { id: 't3', titulo: 'Asignar referente de familias', estado: 'pendiente', prioridad: 'alta', fecha_limite: '2026-08-20', equipo_id: 'e1', equipo_nombre: 'Familias' },
+        { id: 't4', titulo: 'Llamar por el trámite de RUPE', descripcion: 'Se llamó por RUPE. En la conversación quedó anotado el nuevo contacto con Secretaría de Deportes.', estado: 'completada', prioridad: 'normal', equipo_id: 'e7', equipo_nombre: 'Administración', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', creado_por: 'claudia@aletea.org', completado_en: '2026-09-02T10:30:00Z', comentarios_total: 2 },
       ],
-      proyectos: [{ id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', equipo_id: 'e2', equipo_nombre: 'Deportes' }],
+      proyectos: [
+        { id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', equipo_id: 'e2', unidad_id: 'u-fsb', equipo_nombre: 'Deportes' },
+        { id: 'p-daea-1', titulo: 'Primer año DAEA', estado: 'en_marcha', equipo_id: 'e4', unidad_id: 'u-daea', equipo_nombre: 'Capacitaciones' },
+        { id: 'p-daea-2', titulo: 'Segundo año DAEA', estado: 'en_marcha', equipo_id: 'e4', unidad_id: 'u-daea', equipo_nombre: 'Capacitaciones' },
+      ],
       responsables: [{ correo: 'claudia@aletea.org', nombre: 'Claudia' }, { correo: 'martina@aletea.org', nombre: 'Martina' }],
       responsabilidades: [{ id: 'resp1', equipo_id: 'e1', usuario_correo: 'claudia@aletea.org', usuario_nombre: 'Claudia', tipo: 'coordinacion' }],
       reuniones: [{ id: 'r1', titulo: 'Coordinación mensual', fecha_hora: '2026-08-21T18:30', estado: 'planificada' }],
       decisiones: [{ id: 'd1', titulo: 'Definir sede para el encuentro', estado: 'vigente', reunion_titulo: 'Coordinación mensual', responsable_nombre: 'Claudia' }],
       documentos: [{ id: 'doc1', titulo: 'Guía de accesibilidad', descripcion: 'Criterios para actividades.', tipo: 'guia', sensibilidad: 'interno', equipo_nombre: 'Eventos', url: '#' }],
-      entradas: [{ id: 'en1', tipo: 'voluntariado', nombre: 'Nueva postulación', detalle: 'Interés en colaborar.', estado: 'derivada', equipo_nombre: 'Familias', tarea_titulo: 'Revisar postulación' }],
+      entradas: [{ id: 'en1', formulario_id: 'f1', formulario_titulo: 'Sumate como voluntario', tipo: 'voluntariado', nombre: 'Nueva postulación', contacto: 'persona@example.org', detalle: 'Interés en colaborar y conocer las formas de apoyo disponibles para las familias.', creado_en: '2026-09-01T23:52:39Z', respuestas_json: JSON.stringify({ disponibilidad: ['Mañana', 'Fin de semana'], experiencia: 'Apoyo en actividades comunitarias y acompañamiento durante jornadas abiertas.', _consentimiento_privacidad: 'Aceptado', _consentimiento_privacidad_version: 'privacidad-bbfe46df', _consentimiento_privacidad_fecha: '2026-09-01T23:52:39Z', _compromiso_confidencialidad: 'No requerido', _consentimiento_comunicaciones: 'No solicitado' }), estado: 'derivada', equipo_nombre: 'Familias', tarea_titulo: 'Revisar postulación' }],
       formularios: [{ id: 'f1', titulo: 'Sumate como voluntario', descripcion: 'Formulario público de interés.', tipo: 'voluntariado', visibilidad: 'publica', estado: 'activa', respuestas_total: 12, campos_json: JSON.stringify([{ clave: 'disponibilidad', etiqueta: 'Disponibilidad semanal', tipo: 'seleccion', requerido: true, opciones: ['Mañana', 'Tarde', 'Fin de semana'], ayuda: 'Elegí la franja que mejor te resulte.' }, { clave: 'experiencia', etiqueta: 'Experiencia previa', tipo: 'texto_largo', requerido: false, opciones: [], mostrar_si: null }]) }],
       alianzas: [], programas: [{ id: 'pr1', nombre: 'Fútbol sin Barreras', estado: 'activo', descripcion: 'Programa deportivo inclusivo.', equipo_nombre: 'Deportes' }],
       eventos: [
@@ -84,11 +90,27 @@
         { id: 'cf3', nombre: 'Sofía Rodríguez', grupo: 1, condicion: 'regular', beca_porcentaje: 0, saldo_centavos: 0, vencido_centavos: 0, estado_pago: 'al_dia', ultimo_pago_fecha: '2026-08-18', ultimo_pago_centavos: 250000 },
       ],
     }
-    window.fetch = async (url) => new Response(JSON.stringify(url === '/api/cms/tablero' ? tablero : url === '/api/cms/finanzas-fsb' ? finanzasFsb : {}), { status: 200, headers: { 'content-type': 'application/json' } })
+    window.fetch = async (url) => {
+      if (new URLSearchParams(location.search).has('demora')) await new Promise((resolver) => setTimeout(resolver, 1800))
+      return new Response(JSON.stringify(url === '/api/cms/tablero' ? tablero : url === '/api/cms/finanzas-fsb' ? finanzasFsb : {}), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
     const raiz = document.getElementById('contenido-cms')
     const parametros = new URLSearchParams(location.search)
     const pantalla = parametros.get('area') || 'control'
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, area: pantalla, alIrA: (destino) => { location.search = `?area=${destino.replace(/^cms-/, '').replace('inicio', 'control')}` } })
+    const unidadParaAuditar = parametros.get('abrir-unidad')
+    if (unidadParaAuditar) {
+      let intentosAbrirUnidad = 0
+      const abrirUnidadParaAuditar = () => {
+        const control = [...document.querySelectorAll('button')].find((boton) => boton.getAttribute('aria-label') === `Abrir ${unidadParaAuditar}`)
+        if (control) control.click()
+        else if (intentosAbrirUnidad < 20) {
+          intentosAbrirUnidad += 1
+          setTimeout(abrirUnidadParaAuditar, 50)
+        }
+      }
+      abrirUnidadParaAuditar()
+    }
     if (parametros.has('mobile-audit')) requestAnimationFrame(() => requestAnimationFrame(() => {
       const visible = (control) => {
         const estilo = getComputedStyle(control)

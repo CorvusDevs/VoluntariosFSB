@@ -1,11 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agregarRecursoADescripcion, asistirPegadoEnlace, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
+import { agregarRecursoADescripcion, asistirPegadoEnlace, claseEstadoSemantico, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, etiquetaAtajoBusqueda, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
 
 // La auditoría conserva una superficie completa para probar todos los flujos.
 // La aplicación real abre esos mismos flujos desde la vista de cada equipo.
 const crearPantallaCMS = (raiz, opciones = {}) => crearPantallaCMSReal(raiz, { ...opciones, area: opciones.area ?? 'auditoria' })
 
 const esperar = () => new Promise((resolver) => setTimeout(resolver, 0))
+
+describe('estados semánticos', () => {
+  it('normaliza los estados para compartir una paleta accesible', () => {
+    expect(claseEstadoSemantico('En marcha')).toBe('estado-en_marcha')
+    expect(claseEstadoSemantico('esperando_respuesta')).toBe('estado-esperando_respuesta')
+    expect(claseEstadoSemantico()).toBe('estado-neutral')
+  })
+})
+
+describe('atajo de búsqueda', () => {
+  it('usa la convención del sistema operativo', () => {
+    expect(etiquetaAtajoBusqueda({ platform: 'MacIntel' })).toBe('⌘ K')
+    expect(etiquetaAtajoBusqueda({ userAgentData: { platform: 'Windows' } })).toBe('Ctrl K')
+    expect(etiquetaAtajoBusqueda({ platform: 'Linux x86_64' })).toBe('Ctrl K')
+  })
+})
 
 let raiz
 let alIrA
@@ -17,8 +33,11 @@ let tareaBloqueadaCms
 let tareaCompletadaCms
 let vistaMovilCms
 let accesoRespuestasCms
+let puedeCrearTareasCms
 
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-08-29T12:00:00Z'))
   document.body.innerHTML = '<div id="raiz"></div>'
   window.sessionStorage.clear()
   raiz = document.getElementById('raiz')
@@ -31,6 +50,7 @@ beforeEach(() => {
   tareaCompletadaCms = false
   vistaMovilCms = false
   accesoRespuestasCms = true
+  puedeCrearTareasCms = true
   window.matchMedia = vi.fn(() => ({ matches: vistaMovilCms, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
   const almacenamientoLocal = new Map()
   Object.defineProperty(window, 'localStorage', { configurable: true, value: {
@@ -68,9 +88,12 @@ beforeEach(() => {
       riesgos: [], hitos: [{ id: 'h1', proyecto_id: 'p1', titulo: 'Confirmar equipos', descripcion: 'Equipos de trabajo definidos.', fecha_objetivo: '2026-08-20', estado: 'en_marcha', responsable_nombre: 'Claudia' }], gastos: [{ id: 'g1', proyecto_id: 'p1', concepto: 'Traslado', monto: 2250, fecha: '2026-08-15', notas: 'Jornada inaugural.' }],
     }), { status: 200 })
     if (url === '/api/cms/tablero') return new Response(JSON.stringify({
-      alcance: { perfil: perfilCms, equipos: [], puede_gestionar: true, global: alcanceGlobalCms, nivel_datos_personales: accesoRespuestasCms ? 'operativo' : 'ninguno', puede_ver_respuestas: accesoRespuestasCms },
+      alcance: { perfil: perfilCms, equipos: [], puede_gestionar: true, global: alcanceGlobalCms, nivel_datos_personales: accesoRespuestasCms ? 'operativo' : 'ninguno', puede_ver_respuestas: accesoRespuestasCms, capacidades: { crear_tareas: { global: puedeCrearTareasCms, equipos: puedeCrearTareasCms ? ['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8', 'e9'] : [], puede_crear: puedeCrearTareasCms, predeterminado: 'solo_administracion' } } },
       tareas: [{ id: 't1', titulo: 'Confirmar la sala', descripcion: 'Llamar antes del jueves.', estado: 'pendiente', prioridad: 'alta', esfuerzo_horas: 2, fecha_limite: '2026-08-18', fecha_seguimiento: '2026-08-15', equipo_id: 'e1', evento_id: 'ev1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org', solicitante_correo: 'claudia@aletea.org', creado_por: 'claudia@aletea.org' }, { id: 'td1', titulo: 'Priorizar accesibilidad en actividades', descripcion: 'Aplicar ajustes razonables en toda actividad nueva.', tipo: 'directriz', estado: 'pendiente', prioridad: 'alta', equipo_nombre: 'Dirección', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }, ...(tareaBloqueadaCms ? [{ id: 'tb1', titulo: 'Confirmar accesibilidad de la jornada', descripcion: 'Esperando confirmación del lugar.', estado: 'bloqueada', prioridad: 'alta', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_nombre: 'Claudia', responsable_correo: 'claudia@aletea.org' }] : []), ...(tareaCompletadaCms ? [{ id: 'tc1', titulo: 'Entregar informe a Claudia', descripcion: 'Quedó enviado.', estado: 'completada', prioridad: 'normal', creado_por: 'claudia@aletea.org', responsable_nombre: 'Ale', responsable_correo: 'ale@aletea.org', completado_en: '2026-08-30T16:20:00Z', comentarios_total: 1 }] : [])],
-      proyectos: [{ id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', prioridad: 'alta', fecha_inicio: '2026-08-01', fecha_fin: '2026-10-01', presupuesto: 15000, presupuesto_ejecutado: 2250, hitos_total: 2, hitos_completados: 1, notas: 'Confirmar transporte.', equipo_id: 'e1', responsable_correo: 'claudia@aletea.org', equipo_nombre: 'Familias', responsable_nombre: 'Claudia' }],
+      proyectos: [
+        { id: 'p1', titulo: 'Fútbol sin Barreras', estado: 'en_marcha', prioridad: 'alta', fecha_inicio: '2026-08-01', fecha_fin: '2026-10-01', presupuesto: 15000, presupuesto_ejecutado: 2250, hitos_total: 2, hitos_completados: 1, notas: 'Confirmar transporte.', equipo_id: 'e1', responsable_correo: 'claudia@aletea.org', equipo_nombre: 'Familias', responsable_nombre: 'Claudia' },
+        { id: 'p-daea-1', titulo: 'Primer año DAEA', estado: 'en_marcha', prioridad: 'normal', equipo_id: 'e6', unidad_id: 'uo-daea', equipo_nombre: 'Capacitaciones', responsable_nombre: 'Claudia' },
+      ],
       equipos: [
         { id: 'e1', clave: 'familias', nombre: 'Familias' },
         { id: 'e2', clave: 'comision_directiva', nombre: 'Comisión Directiva', categoria: 'comision_directiva' },
@@ -90,13 +113,16 @@ beforeEach(() => {
         { id: 'doc1', titulo: 'Guía de familias', descripcion: 'Material de bienvenida para las familias.', tipo: 'guia', sensibilidad: 'interno', equipo_nombre: 'Familias', url: 'https://drive.google.com/guia' },
         { id: 'doc2', titulo: 'Plantilla de minuta', descripcion: 'Modelo para las reuniones.', tipo: 'plantilla', sensibilidad: 'compartido', proyecto_titulo: 'Fútbol sin Barreras', url: 'https://drive.google.com/minuta' },
       ],
-      entradas: [{ id: 'en1', tipo: 'voluntariado', nombre: 'Camila Pérez', detalle: 'Quiere colaborar los sábados.', estado: 'derivada', equipo_id: 'e1', equipo_nombre: 'Familias', tarea_id: 't1', tarea_titulo: 'Revisar voluntariado: Camila Pérez' }, { id: 'en2', tipo: 'actividad', nombre: 'Taller de juego', detalle: 'Propuesta para familias.', fecha_propuesta: '2026-09-04T17:30', estado: 'derivada', equipo_id: 'e1', equipo_nombre: 'Familias', tarea_id: 't1', tarea_titulo: 'Revisar propuesta de actividad: Taller de juego' }],
+      entradas: [{ id: 'en1', formulario_id: 'f1', formulario_titulo: 'Sumate como voluntario', tipo: 'voluntariado', nombre: 'Camila Pérez', detalle: 'Quiere colaborar los sábados.', estado: 'derivada', equipo_id: 'e1', equipo_nombre: 'Familias', tarea_id: 't1', tarea_titulo: 'Revisar voluntariado: Camila Pérez' }, { id: 'en2', tipo: 'actividad', nombre: 'Taller de juego', detalle: 'Propuesta para familias.', fecha_propuesta: '2026-09-04T17:30', estado: 'derivada', equipo_id: 'e1', equipo_nombre: 'Familias', tarea_id: 't1', tarea_titulo: 'Revisar propuesta de actividad: Taller de juego' }],
       formularios: [{ id: 'f1', titulo: 'Sumate como voluntario', descripcion: 'Para personas interesadas en colaborar.', tipo: 'voluntariado', visibilidad: 'publica', estado: 'activa', respuestas_total: 2 }],
       alianzas: [{ id: 'a1', nombre: 'Red comunitaria', tipo: 'red', estado: 'activa', descripcion: 'Coordinación de propuestas territoriales.', equipo_id: 'e1', equipo_nombre: 'Familias' }],
       programas: [{ id: 'pr1', nombre: 'Familias y comunidad', estado: 'activo', descripcion: 'Espacios para familias del interior.', equipo_id: 'e1', equipo_nombre: 'Familias' }],
       unidades: [
         { id: 'uo1', clave: 'gaf', nombre: 'Grupo Apoyo Familias', sigla: 'GAF', descripcion: 'Acompañamiento y apoyo para familias.', tipo: 'programa', estado: 'activa', equipo_id: 'e1', equipo_nombre: 'Familias', color: '#397dba', orden: 10, vistas: [] },
+        { id: 'uo-gwp', clave: 'gwp', nombre: 'Atención a Familias por WhatsApp', sigla: 'GWP', descripcion: 'Orientación y acompañamiento a familias por WhatsApp.', tipo: 'canal', estado: 'activa', equipo_id: 'e1', equipo_nombre: 'Familias', color: '#5bc9c3', orden: 30, vistas: [] },
+        { id: 'unidad-adultos-autistas', clave: 'adultos_autistas', nombre: 'Adultos autistas', sigla: '', descripcion: 'Espacio estable de trabajo y acompañamiento para personas adultas autistas.', tipo: 'programa', estado: 'activa', equipo_id: 'e1', equipo_nombre: 'Familias', color: '#662D7D', orden: 40, vistas: [] },
         { id: 'uo2', clave: 'fsb', nombre: 'Fútbol sin Barreras', sigla: 'FSB', descripcion: 'Actividad deportiva inclusiva.', tipo: 'programa', estado: 'activa', equipo_id: 'e3', equipo_nombre: 'Deportes', color: '#5bc9c3', orden: 10, vistas: [{ equipo_id: 'e4', equipo_nombre: 'Finanzas', enfoque: 'financiero' }] },
+        { id: 'uo-daea', clave: 'daea', nombre: 'Diplomatura en Acompañamiento en el Espectro Autista', sigla: 'DAEA', descripcion: 'Formación conjunta con proyectos de primer y segundo año.', tipo: 'formacion', estado: 'activa', equipo_id: 'e6', equipo_nombre: 'Capacitaciones', color: '#19bf43', orden: 10, vistas: [] },
       ],
       eventos: [{ id: 'ev1', titulo: 'Taller de juego', fecha_hora: '2026-08-24T15:00', estado: 'planificado', equipo_id: 'e1', equipo_nombre: 'Familias', responsable_correo: 'claudia@aletea.org', tareas_total: 3, tareas_completadas: 1, tareas_pendientes: 2 }],
       plantillas: [{ id: 'pl1', titulo: 'Preparar jornada', descripcion: 'Pasos habituales.', cantidad_tareas: 3, equipo_nombre: 'Familias' }],
@@ -117,11 +143,16 @@ beforeEach(() => {
     if (url === '/api/cms/proyectos') return new Response(JSON.stringify({ proyecto: { id: 'p2', titulo: 'Escuela de familias', equipo_id: 'e1' } }), { status: 201 })
     if (url === '/api/cms/finanzas-fsb/movimientos' && opciones.method === 'POST') return new Response(JSON.stringify({ movimiento: { id: 'mp1', tipo: 'pago', concepto: 'Pago recibido', importe_centavos: -80000 }, saldo_centavos: 0 }), { status: 201 })
     if (url === '/api/cms/documentos') return new Response(JSON.stringify({ documento: { id: 'doc3', titulo: 'Guía de familias', url: 'https://drive.google.com/guia' } }), { status: 201 })
+    if (url === '/api/cms/tareas-recurrentes' && opciones.method === 'POST') return new Response(JSON.stringify({ recurrente: { id: 'tr-nueva' } }), { status: 201 })
+    if (url === '/api/cms/tareas-recurrentes/tr-nueva/generar') return new Response(JSON.stringify({ tarea: { id: 't-recurrente' } }), { status: 201 })
     return new Response(JSON.stringify({ tarea: { id: 't2' } }), { status: 201 })
   })
 })
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+})
 
 describe('tablero institucional', () => {
   it('muestra el seguimiento de pagos como una lista compacta y accionable', async () => {
@@ -498,15 +529,24 @@ describe('tablero institucional', () => {
     expect(textoResumenManualEquipo({ nombre: 'Familias' }, [tarea], 'https://aletea.pages.dev/#cms-trabajo')).not.toContain('Dato sensible')
   })
 
-  it('orienta a una persona nueva sin ocultar las tareas disponibles', async () => {
+  it('orienta a una persona nueva una sola vez desde el centro de control', async () => {
     window.localStorage.removeItem('aletea:adopcion:v1:persona-nueva@aletea.org')
-    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Persona nueva', correo: 'persona-nueva@aletea.org' }, alIrA, area: 'trabajo' })
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Persona nueva', correo: 'persona-nueva@aletea.org' }, alIrA, area: 'control' })
     await esperar(); await esperar()
     expect(raiz.textContent).toContain('Tus tareas y avisos viven acá')
     expect(raiz.textContent).toContain('no envía mensajes automáticos por WhatsApp')
     expect(raiz.textContent).toContain('Confirmar la sala')
     ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Entendido').click()
     expect(window.localStorage.getItem('aletea:adopcion:v1:persona-nueva@aletea.org')).toBe('vista')
+  })
+
+  it('no repite primeros pasos ni acciones globales dentro de cada módulo', async () => {
+    window.localStorage.removeItem('aletea:adopcion:v1:persona-nueva@aletea.org')
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Persona nueva', correo: 'persona-nueva@aletea.org' }, alIrA, area: 'areas' })
+    await esperar(); await esperar()
+    expect(raiz.textContent).not.toContain('Tus tareas y avisos viven acá')
+    expect([...raiz.querySelectorAll('.cms-encabezado button')].map((control) => control.textContent)).not.toContain('Solicitar a un equipo')
+    expect(raiz.querySelectorAll('.cms-encabezado h1')).toHaveLength(1)
   })
 
   it('copia un aviso de tarea y registra solamente la preparación manual', async () => {
@@ -582,10 +622,12 @@ describe('tablero institucional', () => {
     expect(radar.open).toBe(false)
     expect(resumen.textContent).toContain('Mostrar')
     expect(raiz.querySelector('.cms-centro-control').classList.contains('cms-centro-radar-cerrado')).toBe(true)
+    expect(radar.parentElement.classList.contains('cms-busqueda-acciones')).toBe(true)
     expect(window.localStorage.setItem).toHaveBeenCalledWith(expect.stringContaining('aletea:radar-institucional:v1:'), 'cerrado')
     resumen.click()
     await esperar()
     expect(raiz.querySelector('.cms-centro-control').classList.contains('cms-centro-radar-cerrado')).toBe(false)
+    expect(radar.parentElement.classList.contains('cms-centro-control')).toBe(true)
   })
 
   it('presenta los siete equipos como destinos en el centro de mando', async () => {
@@ -598,9 +640,13 @@ describe('tablero institucional', () => {
     ]))
     expect(raiz.querySelector('details.cms-area')).toBeNull()
     expect(raiz.querySelector('.cms-mapa-gobierno').textContent).toContain('Comisión Directiva')
+    expect(raiz.querySelector('.cms-mapa-gobierno').textContent).toContain('Marco institucional')
     expect(raiz.querySelector('.cms-mapa-transversales').textContent).toContain('Interinstitucional')
     expect(raiz.querySelectorAll('.cms-mapa-area')).toHaveLength(7)
     expect(raiz.querySelector('[aria-label="Abrir Grupo Apoyo Familias, unidad de Familias"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Abrir Atención a Familias por WhatsApp, unidad de Familias"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Abrir Adultos autistas, unidad de Familias"]')).not.toBeNull()
+    expect(raiz.querySelector('[aria-label="Abrir Diplomatura en Acompañamiento en el Espectro Autista, unidad de Capacitaciones"]')).not.toBeNull()
     expect(raiz.querySelector('[aria-label="Abrir Fútbol sin Barreras, unidad de Finanzas"]')).not.toBeNull()
   })
 
@@ -624,6 +670,22 @@ describe('tablero institucional', () => {
     expect(unidades[0].querySelector('[aria-label="Abrir Fútbol sin Barreras"]')).not.toBeNull()
   })
 
+  it('filtra unidades por nombre completo sin interrumpir la escritura y explica el desplazamiento móvil', async () => {
+    vistaMovilCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'areas' })
+    await esperar()
+    const buscar = raiz.querySelector('[aria-label="Buscar áreas y unidades por sigla o nombre"]')
+    buscar.value = 'Grupo Apoyo Familias'
+    buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(document.body.contains(buscar)).toBe(true)
+    buscar.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.querySelector('.cms-areas-resultados').textContent).toBe('1 unidad encontrada')
+    const grilla = raiz.querySelector('.cms-unidades-grilla')
+    expect(grilla.tabIndex).toBe(0)
+    expect(grilla.getAttribute('aria-label')).toContain('deslizables')
+    expect(raiz.querySelector('.cms-deslizamiento-pista').textContent).toBe('Deslizá para ver más')
+  })
+
   it('abre una unidad como espacio de trabajo y conserva su filtro al ir a tareas', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
     await esperar()
@@ -635,6 +697,8 @@ describe('tablero institucional', () => {
     expect(panel.textContent).toContain('Tareas abiertas')
     expect(panel.textContent).toContain('Todo listo para empezar')
     expect([...panel.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(expect.arrayContaining(['Resumen', 'Tareas (0)', 'Personas (1)', 'Historial (0)']))
+    expect([...panel.querySelectorAll('.cms-unidad-selector-pestanas option')].map((opcion) => opcion.textContent)).toEqual(expect.arrayContaining(['Resumen', 'Tareas (0)', 'Personas (1)', 'Historial (0)']))
+    expect(panel.querySelector('.cms-unidad-mas-acciones summary').textContent).toBe('Más acciones')
     ;[...panel.querySelectorAll('[role="tab"]')].find((tab) => tab.textContent.startsWith('Personas')).click()
     expect(raiz.querySelector('.cms-unidad-contenido').textContent).toContain('Claudia')
     expect(raiz.querySelector('.cms-unidad-contenido').textContent).toContain('Coordinación')
@@ -882,31 +946,56 @@ describe('tablero institucional', () => {
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { tareaId: 't1' })
   })
 
-  it('permite a quien asignó una tarea encontrarla en el historial después del cierre', async () => {
+  it('muestra una sección dedicada y explícita para las tareas completadas', async () => {
     tareaCompletadaCms = true
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
     await esperar()
 
     expect(raiz.textContent).not.toContain('Entregar informe a Claudia')
-    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Historial').click()
+    const acceso = [...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Completadas (1)')
+    expect(acceso).not.toBeUndefined()
+    acceso.click()
 
-    expect(raiz.textContent).toContain('Historial de tareas')
+    expect(raiz.textContent).toContain('Tareas completadas')
     expect(raiz.textContent).toContain('Entregar informe a Claudia')
     expect(raiz.textContent).toContain('Completada')
+    expect([...raiz.querySelectorAll('.cms-estado')].find((estado) => estado.textContent === 'Completada').classList.contains('estado-completada')).toBe(true)
     expect(raiz.textContent).toContain('1 comentario de seguimiento')
+    expect(raiz.querySelectorAll('.cms-vistas-guardadas .cms-filtro')).toHaveLength(4)
+    expect(raiz.querySelector('select[aria-label="Más vistas de tareas"]')).not.toBeNull()
+    expect(raiz.querySelector('select[aria-label="Qué tareas completadas mostrar"]').value).toBe('todas')
   })
 
-  it('filtra tareas asignadas por la persona y permite reabrir una cerrada', async () => {
+  it('permite a Administración separar completadas propias, asignadas y todas sin sumar botones', async () => {
+    tareaCompletadaCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
+    await esperar()
+    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Completadas (1)').click()
+    const alcance = raiz.querySelector('select[aria-label="Qué tareas completadas mostrar"]')
+    expect(raiz.textContent).toContain('Entregar informe a Claudia')
+    alcance.value = 'propias'
+    alcance.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.textContent).not.toContain('Entregar informe a Claudia')
+    const alcanceActualizado = raiz.querySelector('select[aria-label="Qué tareas completadas mostrar"]')
+    alcanceActualizado.value = 'asignadas'
+    alcanceActualizado.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.textContent).toContain('Entregar informe a Claudia')
+  })
+
+  it('reactiva una tarea completada con una nueva fecha de seguimiento', async () => {
     tareaCompletadaCms = true
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Claudia', correo: 'claudia@aletea.org' }, alIrA, area: 'trabajo' })
     await esperar()
     ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Asignadas por mí').click()
     expect(raiz.textContent).toContain('Confirmar la sala')
-    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Historial').click()
+    ;[...raiz.querySelectorAll('.cms-filtro')].find((control) => control.textContent === 'Completadas (1)').click()
     const tarea = [...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Entregar informe a Claudia'))
-    ;[...tarea.querySelectorAll('button')].find((control) => control.textContent === 'Reabrir tarea').click()
+    ;[...tarea.querySelectorAll('button')].find((control) => control.textContent === 'Reactivar y agendar').click()
+    expect(raiz.textContent).toContain('La tarea conserva el cierre y todos los comentarios anteriores')
+    raiz.querySelector('input[aria-label="Nueva fecha de seguimiento"]').value = '2026-09-10'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/tareas/tc1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ estado: 'pendiente' }) }))
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/tareas/tc1', expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ estado: 'pendiente', fecha_seguimiento: '2026-09-10' }) }))
   })
 
   it('convierte el contador de notificaciones en un acceso visible y enfocable', async () => {
@@ -915,7 +1004,7 @@ describe('tablero institucional', () => {
     const panel = raiz.querySelector('#notificaciones-tareas')
     panel.scrollIntoView = vi.fn()
     const acceso = raiz.querySelector('.cms-resumen-personal-accion')
-    expect(acceso.textContent).toContain('1notificaciones nuevas')
+    expect(acceso.textContent).toContain('1avisos nuevos')
     acceso.click()
     expect(panel.scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
     expect(document.activeElement).toBe(panel)
@@ -930,7 +1019,13 @@ describe('tablero institucional', () => {
       'cms-navegacion-formularios',
       'cms-formularios',
     ])
-    expect(raiz.querySelectorAll('.cms-navegacion-formularios-boton')).toHaveLength(3)
+    const pestanas = [...raiz.querySelectorAll('.cms-navegacion-formularios-boton')]
+    expect(pestanas).toHaveLength(3)
+    expect(raiz.querySelector('.cms-navegacion-formularios').getAttribute('role')).toBe('tablist')
+    expect(pestanas.map((control) => control.getAttribute('aria-selected'))).toEqual(['true', 'false', 'false'])
+    expect(pestanas.map((control) => control.querySelector('.cms-navegacion-formularios-contador')?.textContent)).toEqual(['1', '2', '0'])
+    pestanas[1].click()
+    expect([...raiz.querySelectorAll('.cms-navegacion-formularios-boton')].map((control) => control.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false'])
   })
 
   it('muestra comunicados internos y permite iniciar uno nuevo', async () => {
@@ -1021,6 +1116,52 @@ describe('tablero institucional', () => {
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Preparar material para el taller', prioridad: 'normal', evento_id: 'ev1' })
   })
 
+  it('crea una tarea mensual desde el formulario habitual y genera la primera', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Crear')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva tarea')).click()
+    raiz.querySelector('input[aria-label="Nueva tarea"]').value = 'Preparar informe mensual'
+    raiz.querySelector('input[aria-label="Fecha límite"]').value = '2026-09-05'
+    const repeticion = raiz.querySelector('select[aria-label="Repetición de la tarea"]')
+    repeticion.value = 'mensual'; repeticion.dispatchEvent(new Event('change', { bubbles: true }))
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await esperar(); await esperar(); await esperar()
+    const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/tareas-recurrentes')
+    expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Preparar informe mensual', frecuencia: 'mensual', proxima_fecha: '2026-09-05' })
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/tareas-recurrentes/tr-nueva/generar', expect.objectContaining({ method: 'POST' }))
+    expect(raiz.textContent).toContain('Tarea recurrente creada')
+  })
+
+  it('oculta la creación de tareas sin permiso y conserva el envío de solicitudes', async () => {
+    puedeCrearTareasCms = false
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'coord@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
+    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent === 'Nueva tarea')).toBe(false)
+    expect(raiz.textContent).toContain('Pedido a un equipo')
+    const consulta = raiz.querySelector('[aria-label="¿Qué necesitás registrar?"]')
+    consulta.value = 'Preparar materiales para el viernes'
+    consulta.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.textContent).toContain('Sugerencia: Enviar pedido a un equipo')
+  })
+
+  it('muestra solo proyectos compatibles con el equipo y la unidad de la tarea', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Crear')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva tarea')).click()
+    const equipo = raiz.querySelector('select[aria-label="Equipo"]')
+    const unidad = raiz.querySelector('select[aria-label="Programa o espacio de trabajo"]')
+    const proyecto = raiz.querySelector('select[aria-label="Proyecto"]')
+    equipo.value = 'e6'; equipo.dispatchEvent(new Event('change', { bubbles: true }))
+    expect([...unidad.options].map((opcion) => opcion.textContent)).toContain('DAEA: Diplomatura en Acompañamiento en el Espectro Autista')
+    expect([...unidad.options].map((opcion) => opcion.textContent)).not.toContain('GWP: Atención a Familias por WhatsApp')
+    unidad.value = 'uo-daea'; unidad.dispatchEvent(new Event('change', { bubbles: true }))
+    expect([...proyecto.options].map((opcion) => opcion.textContent)).toEqual(['Sin proyecto', 'Primer año DAEA'])
+    expect(raiz.textContent).toContain('Solo se muestran proyectos de DAEA')
+  })
+
   it('abre los datos adicionales al editar una tarea con esfuerzo estimado', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
@@ -1095,6 +1236,25 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Sumate como voluntario')
   })
 
+  it('explica el destino, el acceso y la referencia efectiva de cada formulario', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      const respuesta = await respuestaBase(url, opciones)
+      if (url !== '/api/cms/tablero') return respuesta
+      const tablero = await respuesta.json()
+      tablero.formularios[0] = { ...tablero.formularios[0], equipo_id: 'e1', equipo_nombre: 'Familias' }
+      return new Response(JSON.stringify(tablero), { status: 200 })
+    })
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    const destino = raiz.querySelector('[aria-label="Destino y acceso de Sumate como voluntario"]')
+    expect(destino.textContent).toContain('Las respuestas llegan a Familias')
+    expect(destino.textContent).toContain('Administración, Dirección')
+    expect(destino.textContent).toContain('siempre con acceso vigente')
+    expect(destino.textContent).toContain('acceso vigente a datos personales')
+    expect(destino.textContent).toContain('Referencia inicial: Claudia')
+  })
+
   it('busca formularios y permite duplicarlos sin modificar el original', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
     await esperar()
@@ -1109,6 +1269,32 @@ describe('tablero institucional', () => {
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Copia de Sumate como voluntario', tipo: 'voluntariado' })
   })
 
+  it('prioriza una acción por formulario y conserva la densidad elegida', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    const tarjeta = raiz.querySelector('.cms-formulario')
+    expect(tarjeta.querySelector(':scope > .cms-formulario-acciones > .boton').textContent).toBe('Ver respuestas')
+    expect(tarjeta.querySelector('.cms-menu-acciones summary').textContent).toBe('Más acciones')
+    expect(tarjeta.querySelector('.cms-menu-acciones').textContent).toContain('Editar')
+    expect(raiz.querySelector('.cms').classList.contains('cms-vista-compacta')).toBe(true)
+    ;[...raiz.querySelectorAll('.cms-preferencia-vista button')].find((control) => control.textContent === 'Detallada').click()
+    expect(raiz.querySelector('.cms').classList.contains('cms-vista-detallada')).toBe(true)
+    expect(JSON.parse(localStorage.getItem('aletea:vistas-cms:v1:cuenta')).densidad).toBe('detallada')
+  })
+
+  it('mantiene la búsqueda visible y agrupa los filtros secundarios', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    expect(raiz.querySelector('input[aria-label="Buscar formularios"]')).not.toBeNull()
+    const filtrosFormularios = raiz.querySelector('.cms-herramientas-formularios .cms-filtros-secundarios')
+    expect(filtrosFormularios.open).toBe(false)
+    expect(filtrosFormularios.textContent).toContain('Públicos')
+    ;[...raiz.querySelectorAll('[role="tab"]')].find((control) => control.textContent.includes('Respuestas pendientes')).click()
+    expect(raiz.querySelector('input[aria-label="Buscar respuestas"]')).not.toBeNull()
+    expect(raiz.querySelector('.cms-controles-entradas .cms-filtros-secundarios select[aria-label="Ordenar respuestas"]')).not.toBeNull()
+    expect(raiz.querySelector('.cms-exportacion summary').textContent).toBe('Exportar')
+  })
+
   it('busca y ordena respuestas mostrando el próximo paso', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
     await esperar()
@@ -1120,7 +1306,58 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Próximo paso: continuar')
     const orden = raiz.querySelector('select[aria-label="Ordenar respuestas"]')
     orden.value = 'nombre'; orden.dispatchEvent(new Event('change', { bubbles: true }))
-    expect(raiz.querySelector('.cms-entrada strong').textContent).toBe('Camila Pérez')
+    expect(raiz.querySelector('.cms-entrada h4').textContent).toBe('Camila Pérez')
+    expect(raiz.querySelector('select[aria-label="Filtrar por formulario"]')).not.toBeNull()
+    expect([...raiz.querySelectorAll('button')].map((control) => control.textContent)).toEqual(expect.arrayContaining(['Descargar Excel', 'Descargar CSV']))
+  })
+
+  it('presenta cada respuesta con jerarquía semántica y separa la trazabilidad técnica', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      const respuesta = await respuestaBase(url, opciones)
+      if (url !== '/api/cms/tablero') return respuesta
+      const tablero = await respuesta.json()
+      tablero.entradas[0] = {
+        ...tablero.entradas[0], contacto: 'camila@example.org', creado_en: '2026-09-01T23:52:39Z',
+        respuestas_json: JSON.stringify({
+          disponibilidad: ['Mañana', 'Fin de semana'],
+          experiencia: 'Acompañamiento comunitario con familias durante actividades abiertas.',
+          _consentimiento_privacidad: 'Aceptado',
+          _consentimiento_privacidad_version: 'privacidad-bbfe46df',
+          _consentimiento_privacidad_fecha: '2026-09-01T23:52:39Z',
+          _compromiso_confidencialidad: 'No requerido',
+          _consentimiento_comunicaciones: 'No solicitado',
+        }),
+      }
+      tablero.formularios[0].campos_json = JSON.stringify([
+        { clave: 'disponibilidad', etiqueta: 'Disponibilidad semanal' },
+        { clave: 'experiencia', etiqueta: 'Experiencia previa' },
+      ])
+      return new Response(JSON.stringify(tablero), { status: 200 })
+    })
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    ;[...raiz.querySelectorAll('[role="tab"]')].find((control) => control.textContent.includes('Respuestas pendientes')).click()
+    const tarjeta = raiz.querySelector('.cms-entrada')
+    expect(tarjeta.querySelector('h4').textContent).toBe('Camila Pérez')
+    expect(tarjeta.querySelector('.cms-entrada-estado').textContent).toBe('Seguimiento iniciado')
+    expect(tarjeta.querySelector('.cms-entrada-contacto a').getAttribute('href')).toBe('mailto:camila@example.org')
+    expect([...tarjeta.querySelectorAll('.cms-entrada-respuestas h5')].map((titulo) => titulo.textContent)).toEqual(['Respuestas del formulario'])
+    expect(tarjeta.querySelector('.cms-entrada-acuerdos summary').textContent).toBe('Acuerdos y preferencias (3)')
+    expect(tarjeta.querySelector('.cms-entrada-acuerdos').open).toBe(false)
+    expect([...tarjeta.querySelectorAll('dt')].map((campo) => campo.textContent)).toEqual(expect.arrayContaining(['Disponibilidad semanal', 'Experiencia previa', 'Consentimiento de privacidad']))
+    expect(tarjeta.querySelector('.cms-entrada-trazabilidad').open).toBe(false)
+    expect(tarjeta.querySelector('.cms-entrada-trazabilidad summary').textContent).toBe('Consentimientos y trazabilidad (2)')
+    expect(tarjeta.textContent.replaceAll('\u00a0', ' ')).toContain('1 set., 08:52 p. m.')
+  })
+
+  it('abre las respuestas de un formulario desde su tarjeta', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'formularios' })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Ver respuestas').click()
+    expect(raiz.querySelector('select[aria-label="Filtrar por formulario"]').value).toBe('f1')
+    expect(raiz.textContent).toContain('Camila Pérez')
+    expect(raiz.textContent).not.toContain('Taller de juego')
   })
 
   it('permite a Administración preparar los formularios reales de la página de prueba', async () => {
@@ -1248,7 +1485,7 @@ describe('tablero institucional', () => {
   })
 
   it('crea una solicitud para un equipo y la identifica como tal', async () => {
-    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'control' })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Solicitar a un equipo')).click()
     expect(raiz.textContent).toContain('registra quién la creó')
@@ -1363,11 +1600,16 @@ describe('tablero institucional', () => {
 
     ;[...raiz.querySelectorAll('.cms-tarea')].find((fila) => fila.textContent.includes('Confirmar la sala')).querySelector('button').click()
     expect(raiz.textContent).toContain('El comentario es opcional')
+    const cierre = raiz.querySelector('.cms-formulario-completar')
+    expect(cierre).not.toBeNull()
+    expect(cierre.classList.contains('cms-captura')).toBe(true)
+    expect(cierre.getAttribute('role')).toBe('dialog')
+    expect(cierre.getAttribute('aria-modal')).toBe('true')
     raiz.querySelector('textarea[aria-label="Comentario de cierre opcional"]').value = 'La sala quedó confirmada y avisamos al equipo.'
     ;[...raiz.querySelectorAll('form button')].find((boton) => boton.textContent === 'Completar tarea').click()
     await esperar()
     const llamadas = globalThis.fetch.mock.calls.filter(([url]) => url === '/api/cms/tareas/t1')
-    expect(JSON.parse(llamadas.at(-1)[1].body)).toEqual({ estado: 'completada', comentario_cierre: 'La sala quedó confirmada y avisamos al equipo.' })
+    expect(JSON.parse(llamadas.at(-1)[1].body)).toMatchObject({ estado: 'completada', comentario_cierre: 'La sala quedó confirmada y avisamos al equipo.', operacion_cierre_id: expect.stringMatching(/^[0-9a-f-]{36}$/) })
   })
 
   it('crea un proyecto con equipo y responsable elegibles', async () => {
@@ -1576,6 +1818,13 @@ describe('tablero institucional', () => {
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'atrasadas' })
   })
 
+  it('concentra los indicadores en el inicio y no los repite dentro de Mis tareas', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'trabajo' })
+    await esperar()
+    expect(raiz.querySelector('.cms-indicadores')).toBeNull()
+    expect(raiz.querySelector('.cms-trabajo-personal')).not.toBeNull()
+  })
+
   it('busca en la institución y conserva el contexto al abrir un resultado', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'control' })
     await esperar()
@@ -1620,6 +1869,8 @@ describe('tablero institucional', () => {
     await esperar()
     raiz.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, bubbles: true }))
     expect(document.activeElement).toBe(raiz.querySelector('.cms-busqueda-global input'))
+    expect(raiz.querySelector('.cms-busqueda-acciones .cms-atajo')).not.toBeNull()
+    expect(raiz.querySelector('.cms-atajo').getAttribute('aria-label')).toContain('Atajo de teclado')
   })
 
   it('mantiene las acciones fuera del contenido desplazable de un formulario largo', async () => {
@@ -1742,15 +1993,47 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('se asigna automáticamente a su coordinación o referente')
   })
 
+  it('prepara el formulario de WhatsApp Familias con un modelo completo y editable', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo formulario')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'WhatsApp Familias').click()
+
+    expect(raiz.querySelector('[aria-label="Título del formulario"]').value).toBe('Ingreso a los grupos de WhatsApp de Aletea')
+    expect(raiz.querySelector('[aria-label="Visibilidad del formulario"]').value).toBe('publica')
+    expect(raiz.querySelector('[aria-label="Equipo destinatario"]').value).toBe('e1')
+    expect(raiz.querySelector('[aria-label="Programa o espacio relacionado"]').value).toBe('uo-gwp')
+    expect(raiz.querySelector('[aria-label="Modelo de experiencia pública"]').value).toBe('whatsapp_familias')
+    expect(raiz.querySelector('[aria-label="Mensaje o contexto"]').value).toBe('oculto')
+    expect(raiz.textContent).toContain('Acuerdo obligatorio')
+    expect(raiz.querySelector('[aria-label="Uso de los datos"]').value).toContain('grupos de WhatsApp')
+    raiz.querySelector('[aria-label="Uso de los datos"]').value = 'Gestionar el ingreso y coordinar la bienvenida.'
+    raiz.querySelector('[aria-label="Uso de los datos"]').dispatchEvent(new Event('input', { bubbles: true }))
+
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear formulario').click()
+    await esperar()
+    const solicitud = globalThis.fetch.mock.calls.find(([url, opciones]) => url === '/api/cms/formularios' && opciones?.method === 'POST')
+    const cuerpo = JSON.parse(solicitud[1].body)
+    expect(cuerpo).toMatchObject({
+      tipo: 'inscripcion', visibilidad: 'publica', equipo_id: 'e1', unidad_id: 'uo-gwp', destino_respuesta: 'solicitud',
+      configuracion_publica: { modelo: 'whatsapp_familias', contacto_tipo: 'correo', confirmar_contacto: true, detalle: 'oculto', requiere_compromiso: true },
+    })
+    expect(cuerpo.configuracion_publica.privacidad_contenido.uso).toBe('Gestionar el ingreso y coordinar la bienvenida.')
+    expect(cuerpo.configuracion_publica.privacidad_version).toMatch(/^privacidad-[0-9a-f]{8}$/)
+  })
+
   it('agenda una reunión y convierte una decisión en tarea', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva reunión')).click()
     raiz.querySelector('input[aria-label="Título de la reunión"]').value = 'Reunión de familias'
     raiz.querySelector('[data-selector-cms="fecha-hora"]').value = '2026-08-24T18:30'
+    raiz.querySelector('input[aria-label="Fecha de seguimiento de la reunión"]').value = '2026-08-22'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
     expect(globalThis.fetch.mock.calls.some(([url]) => url === '/api/cms/reuniones')).toBe(true)
+    const [, opcionesReunion] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/reuniones')
+    expect(JSON.parse(opcionesReunion.body)).toMatchObject({ proxima_revision: '2026-08-22' })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Crear tarea')).click()
     await esperar()
@@ -1797,12 +2080,13 @@ describe('tablero institucional', () => {
     expect(raiz.querySelector('[data-selector-cms="fecha-hora"]').value).toBe('2026-08-21T18:30')
     raiz.querySelector('textarea[aria-label="Minuta de la reunión"]').value = 'Se acordó confirmar la sala antes del viernes.'
     raiz.querySelector('textarea[aria-label="Resumen de la reunión"]').value = 'Acuerdo de sala'
+    raiz.querySelector('input[aria-label="Fecha de seguimiento de la reunión"]').value = '2026-08-20'
     raiz.querySelector('select[aria-label="Estado de la reunión"]').value = 'realizada'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/reuniones/r1')
     expect(opciones.method).toBe('PATCH')
-    expect(JSON.parse(opciones.body)).toMatchObject({ fecha_hora: '2026-08-21T18:30', estado: 'realizada', minuta: 'Se acordó confirmar la sala antes del viernes.', resumen: 'Acuerdo de sala' })
+    expect(JSON.parse(opciones.body)).toMatchObject({ fecha_hora: '2026-08-21T18:30', proxima_revision: '2026-08-20', estado: 'realizada', minuta: 'Se acordó confirmar la sala antes del viernes.', resumen: 'Acuerdo de sala' })
   })
 
   it('guarda comentarios y dependencias desde el contexto de una tarea', async () => {
@@ -1923,6 +2207,37 @@ describe('tablero institucional', () => {
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Cerrar comunicado').click()
     await esperar()
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/cms/comunicados/c1', expect.objectContaining({ method: 'PATCH' }))
+  })
+
+  it('exige y envía los acuerdos también al registrar una respuesta interna', async () => {
+    const respuestaBase = globalThis.fetch
+    globalThis.fetch = vi.fn(async (url, opciones) => {
+      if (url === '/api/cms/tablero') {
+        const respuesta = await respuestaBase(url, opciones)
+        const tablero = await respuesta.json()
+        tablero.formularios = [{
+          id: 'fa1', titulo: 'Ingreso cuidado', tipo: 'inscripcion', visibilidad: 'publica', estado: 'activa', requiere_consentimiento: 1, campos_json: '[]', respuestas_total: 0,
+          configuracion_publica_json: JSON.stringify({ privacidad_detallada: true, requiere_compromiso: true }),
+        }]
+        return new Response(JSON.stringify(tablero), { status: 200 })
+      }
+      return respuestaBase(url, opciones)
+    })
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Registrar respuesta').click()
+    raiz.querySelector('input[aria-label="Nombre"]').value = 'Andrea Pérez'
+    raiz.querySelector('input[aria-label="Contacto"]').value = 'andrea@example.org'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await esperar()
+    expect(globalThis.fetch.mock.calls.some(([url]) => url === '/api/cms/formularios/fa1/respuestas')).toBe(false)
+    const acuerdos = [...raiz.querySelectorAll('.cms-acuerdos-respuesta input')]
+    expect(acuerdos).toHaveLength(2)
+    acuerdos.forEach((control) => { control.checked = true })
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await esperar()
+    const [, respuesta] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/formularios/fa1/respuestas')
+    expect(JSON.parse(respuesta.body)).toMatchObject({ consentimiento_privacidad: true, compromiso_confidencialidad: true })
   })
 
   it('exige el objetivo antes de derivar una propuesta institucional', async () => {

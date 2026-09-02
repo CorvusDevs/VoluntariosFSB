@@ -31,6 +31,7 @@ describe('ayuda del gestor institucional', () => {
     expect(filtrarPreguntas('pantalla desordenada').map((item) => item.pregunta)).toContain('¿Qué hago si veo una pantalla desordenada después de una actualización?')
     expect(filtrarPreguntas('más grande el título').map((item) => item.pregunta)).toContain('¿Cómo hago más grande el título de una pieza?')
     expect(filtrarPreguntas('publicación de la página web').map((item) => item.pregunta)).toContain('¿Una publicación de la página web cuenta como actualización del gestor?')
+    expect(filtrarPreguntas('recibo transaccional rollback').map((item) => item.pregunta)).toContain('¿Cómo se publica el gestor y la página de prueba en cPanel?')
     expect(filtrarPreguntas('vista previa puede verse distinta').map((item) => item.pregunta)).toContain('¿Por qué la vista previa puede verse distinta de prueba.aletea.org?')
     expect(filtrarPreguntas('carta membretada').map((item) => item.pregunta)).toContain('¿Cómo creo una carta membretada?')
     expect(filtrarPreguntas('hoja blanca').map((item) => item.pregunta)).toContain('¿Cómo creo una carta membretada?')
@@ -57,19 +58,49 @@ describe('ayuda del gestor institucional', () => {
     const raiz = document.getElementById('raiz')
     crearPantallaAyuda(raiz, { alIrA, admin: true })
     expect(raiz.querySelectorAll('.ayuda-pregunta')).toHaveLength(5)
-    expect(raiz.querySelectorAll('.ayuda-atajo')).toHaveLength(6)
+    expect(raiz.querySelectorAll('.ayuda-atajo')).toHaveLength(8)
     ;[...raiz.querySelectorAll('.ayuda-categoria-filtro')].find((control) => control.querySelector('span')?.textContent === 'Equipos').click()
     const control = [...raiz.querySelectorAll('a')].find((enlace) => enlace.textContent.includes('Abrir Áreas'))
     control.click()
     expect(alIrA).toHaveBeenCalledWith('cms-areas')
   })
 
-  it('abre un formulario público como enlace real sin interceptar una pestaña nueva', () => {
+  it('abre la página pública como enlace real sin interceptar una pestaña nueva', () => {
     const raiz = document.getElementById('raiz')
-    crearPantallaAyuda(raiz, { busquedaInicial: 'como pruebo los formularios del sitio nuevo' })
-    const enlace = raiz.querySelector('a[href="https://prueba.aletea.org/contacto/"]')
+    crearPantallaAyuda(raiz, { busquedaInicial: 'contenidos de ejemplo' })
+    const enlace = raiz.querySelector('a[href="https://prueba.aletea.org/"]')
     expect(enlace).not.toBeNull()
-    expect(enlace.textContent).toContain('Probar formularios')
+    expect(enlace.textContent).toContain('Ver sitio de prueba')
+  })
+
+  it('cubre los formularios, las comunicaciones y las operaciones nuevas', () => {
+    expect(filtrarPreguntas('WhatsApp Familias').map((item) => item.pregunta)).toContain('¿Cómo preparo el ingreso a WhatsApp Familias?')
+    expect(filtrarPreguntas('exportar respuestas').map((item) => item.pregunta)).toContain('¿Cómo exporto y trabajo las respuestas recibidas?')
+    expect(filtrarPreguntas('programar campaña').map((item) => item.pregunta)).toContain('¿Cómo creo, reviso y programo una campaña?')
+    expect(filtrarPreguntas('integración interrumpida').map((item) => item.pregunta)).toContain('¿Qué hago si una integración aparece como Revisar o Interrumpida?')
+    expect(filtrarPreguntas('GWP DAEA')).toHaveLength(1)
+    expect(filtrarPreguntas('quién puede crear tareas').map((item) => item.pregunta)).toContain('¿Quién puede crear tareas?')
+    expect(filtrarPreguntas('regla heredada').map((item) => item.pregunta)).toContain('¿Cómo cambio quién puede crear tareas?')
+    expect(filtrarPreguntas('Adultos autistas').map((item) => item.pregunta)).toContain('¿Dónde encuentro Adultos autistas?')
+    expect(filtrarPreguntas('texto desaparece').map((item) => item.pregunta)).toContain('¿Cómo cambio entre Formularios, Respuestas pendientes e Historial cumplido?')
+    expect(filtrarPreguntas('bloque texto trazabilidad').map((item) => item.pregunta)).toContain('¿Cómo leo una respuesta de formulario?')
+
+    const raiz = document.getElementById('raiz')
+    crearPantallaAyuda(raiz, { admin: true })
+    const categorias = [...raiz.querySelectorAll('.ayuda-categoria-filtro')].map((control) => control.querySelector('span')?.textContent)
+    expect(categorias).toContain('Comunicaciones')
+    expect(categorias).toContain('Operaciones')
+    expect(categorias).not.toContain('Navegación')
+  })
+
+  it('explica quién recibe y quién puede abrir respuestas de Familias', () => {
+    const resultado = filtrarPreguntas('compañeras Familias permisos')
+    expect(resultado.map((item) => item.pregunta)).toContain('¿Quién puede ver las respuestas que llegan a Familias?')
+    const respuesta = resultado.find((item) => item.pregunta.includes('Familias')).respuesta
+    expect(respuesta).toContain('No las ve automáticamente todo el equipo')
+    expect(respuesta).toContain('Datos personales básicos o completos')
+    expect(respuesta).toContain('En todos los casos')
+    expect(respuesta).toContain('Integrante y Consulta no pueden abrir respuestas')
   })
 
   it('muestra todos los temas sin desplazamiento horizontal y permite filtrar una categoria', () => {
@@ -151,5 +182,7 @@ describe('ayuda del gestor institucional', () => {
     expect(new Set(preguntas).size).toBe(preguntas.length)
     expect(preguntas).not.toContain('¿La etapa de corto plazo necesita una validación presencial?')
     expect(preguntas).not.toContain('¿Cómo vuelvo rápidamente a una sección que estaba usando?')
+    expect(preguntas).not.toContain('¿Cómo vuelvo a una sección visitada recientemente?')
+    expect(preguntas).not.toContain('¿Cómo pruebo los formularios del sitio nuevo?')
   })
 })

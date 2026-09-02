@@ -1,15 +1,26 @@
-import { boton, enlaceBoton, elemento, icono, vaciar } from './componentes.js'
+import { boton, enlaceBoton, elemento, icono, manejarTecladoDialogo, vaciar } from './componentes.js'
 import { crearSelectorFecha } from './selector-fecha.js'
-import { alertasInstitucionalesCms, clasificarTarea, horizonteInstitucionalCms, metricasOperativasCms, requiereSeguimiento, resumenSemanalCms, resumenTablero } from '../modelo/cms.js'
+import { alertasInstitucionalesCms, clasificarTarea, horizonteInstitucionalCms, metricasOperativasCms, proyectosCompatiblesCms, requiereSeguimiento, resumenSemanalCms, resumenTablero, unidadesCompatiblesCms } from '../modelo/cms.js'
 import { cierreMensualFsb, dineroFsb, estadoCuentaMensualFsb, exportarFinanzasFsb, importeCentavosFsb, prepararCuotasFsb, recargoFsb, textoRecordatorioFsb } from '../modelo/finanzas-fsb.js'
 import { rutaParaPantalla, usaRutasRealesGestor } from '../rutas-gestor.js'
 import { evitarCortesHora, fechaDesdeLocal, fechaDesdeUTC, hoyISO, valorFechaHoraLocal, valorFechaLocal } from '../util/fechas.js'
 import { requisitoDatosPersonales, requisitoEquipo, requisitoPerfil } from '../acceso/requisitos-acceso.js'
 import { crearPanelRequisitosAcceso } from './panel-requisitos-acceso.js'
 import { MENSAJE_ENLACE_INVALIDO, normalizarCampoEnlace, normalizarEnlaceUsuario } from '../util/enlaces.js'
+import { csvRespuestas, excelRespuestas, nombreExportacionRespuestas } from '../modelo/exportar-respuestas.js'
+import { completarMedicionUX, iniciarMedicionUX } from '../modelo/metricas-ux.js'
+import {
+  configuracionPublicaFormulario, configuracionWhatsAppFamilias, MODELO_FORMULARIO_GENERAL,
+  MODELO_WHATSAPP_FAMILIAS, seccionesCompromisoDesdeTexto, textoInvitacionFormulario, textoSeccionesCompromiso,
+} from '../modelo/formularios.js'
 
 const HOY = hoyISO
 const NOMBRES_AREA = Object.freeze({ familias: 'Familias', deportes: 'Deportes y Recreación', comunicacion: 'Comunicación', capacitaciones: 'Capacitaciones', finanzas: 'Finanzas', eventos: 'Eventos', administracion: 'Administración' })
+
+export function etiquetaAtajoBusqueda(navegador = globalThis.navigator) {
+  const plataforma = String(navegador?.userAgentData?.platform || navegador?.platform || '').toLocaleLowerCase('es')
+  return /mac|iphone|ipad|ipod/.test(plataforma) ? '⌘ K' : 'Ctrl K'
+}
 
 export function enlaceWebDesdeTexto(texto) {
   return normalizarEnlaceUsuario(texto)
@@ -100,11 +111,39 @@ function fechaEnDias(dias) {
   return `${fecha.getFullYear()}-${parte(fecha.getMonth() + 1)}-${parte(fecha.getDate())}`
 }
 
+function descargarDatos(contenido, tipo, nombre) {
+  const enlace = document.createElement('a')
+  const url = URL.createObjectURL(new Blob([contenido], { type: tipo }))
+  enlace.href = url
+  enlace.download = nombre
+  enlace.click()
+  setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
 async function pedir(url, opciones = {}) {
-  const respuesta = await fetch(url, {
-    ...opciones,
+  const { timeoutMs = 25_000, signal: signalExterna, ...opcionesFetch } = opciones
+  const controlador = new AbortController()
+  const temporizador = setTimeout(() => controlador.abort('tiempo_agotado'), timeoutMs)
+  const signal = signalExterna && globalThis.AbortSignal?.any
+    ? AbortSignal.any([signalExterna, controlador.signal])
+    : controlador.signal
+  let respuesta
+  try {
+    respuesta = await fetch(url, {
+    ...opcionesFetch,
+    signal,
     headers: { 'content-type': 'application/json', ...(opciones.headers ?? {}) },
-  })
+    })
+  } catch (fallo) {
+    if (controlador.signal.aborted) {
+      const demora = new Error('El servidor tardó demasiado. Podés verificar el estado y volver a intentar sin duplicar el cierre.')
+      demora.codigo = 'tiempo_agotado'
+      throw demora
+    }
+    throw fallo
+  } finally {
+    clearTimeout(temporizador)
+  }
   const datos = await respuesta.json().catch(() => ({}))
   if (!respuesta.ok) {
     const indicador = document.querySelector('[data-estado-guardado]')
@@ -117,12 +156,12 @@ async function pedir(url, opciones = {}) {
     fallo.detalle = datos
     throw fallo
   }
-  if (opciones.method && opciones.method !== 'GET') {
+  if (opcionesFetch.method && opcionesFetch.method !== 'GET') {
     const indicador = document.querySelector('[data-estado-guardado]')
     if (indicador) {
       indicador.hidden = false
       indicador.dataset.estado = 'guardado'
-      indicador.textContent = 'Guardado en Cloudflare'
+      indicador.textContent = 'Guardado en el gestor'
       clearTimeout(indicador._temporizadorCms)
       indicador._temporizadorCms = setTimeout(() => { indicador.hidden = true }, 2600)
     }
@@ -194,6 +233,11 @@ const TEXTO_ESTADO_UNIDAD = {
   activa: 'Activa', borrador: 'Borrador', en_pausa: 'En pausa', archivada: 'Archivada',
 }
 
+export function claseEstadoSemantico(estado) {
+  const clave = String(estado || 'neutral').trim().toLocaleLowerCase('es').replace(/[^a-z0-9áéíóúüñ]+/g, '_')
+  return `estado-${clave || 'neutral'}`
+}
+
 const CATEGORIAS_EQUIPO = [
   ['equipo', 'Equipo'],
   ['comision_directiva', 'Comisión Directiva'],
@@ -220,7 +264,9 @@ const VISTAS_TRABAJO = {
   'sin-responsable': { titulo: 'Tareas sin responsable', descripcion: 'Asigná una persona o equipo para que cada asunto tenga seguimiento.' },
   espera: { titulo: 'Esperando respuesta', descripcion: 'Tareas que dependen de una respuesta externa o interna.' },
   todas: { titulo: 'Todas las tareas abiertas', descripcion: 'Tareas, solicitudes y seguimientos que siguen en curso.' },
-  cerradas: { titulo: 'Historial de tareas', descripcion: 'Tareas completadas o canceladas, con su fecha y el contexto del cierre.' },
+  completadas: { titulo: 'Tareas completadas', descripcion: 'Encontrá lo que ya terminaste, revisá su cierre o reactivá una tarea con una nueva fecha.' },
+  canceladas: { titulo: 'Tareas canceladas', descripcion: 'Consultá tareas que se cancelaron sin mezclarlas con el trabajo completado.' },
+  cerradas: { titulo: 'Tareas completadas', descripcion: 'Encontrá lo que ya terminaste, revisá su cierre o reactivá una tarea con una nueva fecha.' },
 }
 
 export function textoAvisoManualTarea(tarea, enlace) {
@@ -236,20 +282,29 @@ export function textoResumenManualEquipo(equipo, tareas, enlace) {
 }
 
 export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contexto = {}, alCambiarNotificaciones = () => {} }) {
+  if (area === 'areas') iniciarMedicionUX('encontrar_unidad')
+  if (area === 'formularios') iniciarMedicionUX('exportar_respuestas')
   const enlaceA = (destino, etiqueta, clases = [], contextoDestino = {}) => enlaceBoton(
     etiqueta,
     rutaParaPantalla(destino, contextoDestino) || `#${destino}`,
     () => Object.keys(contextoDestino).length ? alIrA(destino, contextoDestino) : alIrA(destino),
     clases,
   )
-  // El servidor reemplaza este valor al cargar. Mientras tanto no inferimos un
-  // perfil restrictivo de una respuesta aún ausente, porque la autorización
-  // efectiva siempre está en la API y la pantalla también se usa con fixtures.
-  let datos = { alcance: { perfil: 'coordinacion', equipos: [], puede_gestionar: true }, tareas: [], metricasTareas: [], proyectos: [], equipos: [], responsables: [], responsabilidades: [], reuniones: [], decisiones: [], documentos: [], entradas: [], formularios: [], alianzas: [], programas: [], unidades: [], eventos: [], plantillas: [], riesgos: [], hitos: [], gastos: [], notificaciones: [], recurrencias: [], automatizaciones: [], alertasPospuestas: [], comunicados: [], conflictos: [], capacidad: [], solicitudesPrivacidad: [], finanzasFsb: null, revisionSemanal: null }
+  let firmaFocoPanel = null
+  const recordarActivadorPanel = (evento) => {
+    const control = evento.target.closest?.('button, a, summary')
+    if (!control || control.closest('.cms-captura')) return
+    firmaFocoPanel = { aria: control.getAttribute('aria-label') || '', texto: control.textContent.trim() }
+  }
+  raiz.addEventListener('click', recordarActivadorPanel, true)
+  // La API reemplaza este valor al cargar. El estado inicial es restrictivo:
+  // una pantalla incompleta nunca debe insinuar que se pueden crear tareas.
+  let datos = { alcance: { perfil: 'coordinacion', equipos: [], puede_gestionar: true, capacidades: { crear_tareas: { global: false, equipos: [], puede_crear: false, predeterminado: 'solo_administracion' } } }, tareas: [], metricasTareas: [], proyectos: [], equipos: [], responsables: [], responsabilidades: [], reuniones: [], decisiones: [], documentos: [], entradas: [], formularios: [], alianzas: [], programas: [], unidades: [], eventos: [], plantillas: [], riesgos: [], hitos: [], gastos: [], notificaciones: [], recurrencias: [], automatizaciones: [], alertasPospuestas: [], comunicados: [], conflictos: [], capacidad: [], solicitudesPrivacidad: [], finanzasFsb: null, revisionSemanal: null }
   let cargando = true
   let error = ''
   let formularioAbierto = null
   let tareaParaCompletar = null
+  let tareaParaReabrir = null
   const claveSeccionesMoviles = `aletea:cms:secciones:${area}`
   let seccionesMovilesAbiertas = new Set()
   try {
@@ -280,23 +335,53 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   let proyectoPreseleccionado = contexto.proyectoId || null
   let confirmacion = null
   let tipoNuevaTarea = 'tarea'
+  const capacidadCrearTareas = () => datos.alcance?.capacidades?.crear_tareas || {
+    global: datos.alcance?.perfil === 'administracion',
+    equipos: [],
+    puede_crear: datos.alcance?.perfil === 'administracion',
+    predeterminado: 'solo_administracion',
+  }
+  const puedeCrearTareaEn = (equipoId = null) => {
+    const capacidad = capacidadCrearTareas()
+    return Boolean(capacidad.global || (equipoId && capacidad.equipos?.includes(equipoId)))
+  }
+  const puedeCrearAlgunaTarea = () => {
+    const capacidad = capacidadCrearTareas()
+    return Boolean(capacidad.puede_crear || capacidad.global || capacidad.equipos?.length)
+  }
   let capturaOrientada = null
-  let filtroTrabajo = contexto.filtroTrabajo || 'mias'
+  const identidadPreferencias = sesion?.usuario || sesion?.correo || 'cuenta'
+  const claveVistasCMS = `aletea:vistas-cms:v1:${identidadPreferencias}`
+  let vistasCMS = {}
+  try { vistasCMS = JSON.parse(window.localStorage.getItem(claveVistasCMS) || '{}') } catch { vistasCMS = {} }
+  const guardarVistaCMS = (clave, valor) => {
+    vistasCMS = { ...vistasCMS, [clave]: valor }
+    try { window.localStorage.setItem(claveVistasCMS, JSON.stringify(vistasCMS)) } catch { /* La vista sigue operativa sin persistencia. */ }
+  }
+  let filtroTrabajo = contexto.filtroTrabajo || vistasCMS.trabajo || 'mias'
+  if (filtroTrabajo === 'cerradas') filtroTrabajo = 'completadas'
+  let alcanceCompletadas = ['propias', 'asignadas', 'todas'].includes(vistasCMS.alcanceCompletadas) ? vistasCMS.alcanceCompletadas : 'todas'
+  let densidadCMS = vistasCMS.densidad === 'detallada' ? 'detallada' : 'compacta'
   let busquedaTrabajo = ''
   let busquedaGlobal = ''
-  let vistaAgenda = 'mes'
+  let vistaAgenda = vistasCMS.agenda || (esVistaMovil() ? 'lista' : 'mes')
   let filtroFormularios = 'todos'
   let busquedaFormularios = ''
-  let vistaFormularios = 'formularios'
+  let vistaFormularios = vistasCMS.formularios || 'formularios'
   let busquedaEntradas = ''
   let filtroEstadoEntradas = 'todas'
+  let filtroFormularioEntradas = 'todos'
   let ordenEntradas = 'recientes'
+  let filtrosEntradasAbiertos = false
+  let filtrosFormulariosAbiertos = false
   let entradaParaCumplir = null
   let entradaParaReabrir = null
+  let operacionCierreTarea = null
   const puedeVerRespuestas = () => datos.alcance?.puede_ver_respuestas !== false
   let modeloRecurrente = null
   let guardando = false
   let filtroDocumentos = { texto: '', tipo: '', sensibilidad: '' }
+  let filtrosAreas = { texto: '', responsable: '', estado: '', ...(vistasCMS.areas || {}) }
   let mostrarResumenSemanal = false
   const claveRadarInstitucional = `aletea:radar-institucional:v1:${sesion?.usuario || sesion?.correo || 'cuenta'}`
   let radarInstitucionalAbierto = true
@@ -548,7 +633,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   }
 
   function formularioTarea(tarea = null) {
-    const esIntegrante = datos.alcance?.perfil === 'integrante'
+    if (!tarea) iniciarMedicionUX('crear_tarea')
+    const esIntegrante = datos.alcance?.perfil === 'integrante' && Boolean(tarea)
     const forma = document.createElement('form')
     forma.className = 'cms-captura'
     forma.appendChild(elemento('h3', [], tarea ? `Editar tarea: ${tarea.titulo}` : 'Nueva tarea'))
@@ -606,6 +692,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     })
     const fecha = inputCms('', 'Fecha límite', 'date'); if (!tarea) fecha.min = HOY(); fecha.value = tarea?.fecha_limite || ''
     const fechaSeguimiento = inputCms('', 'Próximo seguimiento', 'date'); fechaSeguimiento.value = tarea?.fecha_seguimiento || ''
+    const repeticion = selectorCms([['', 'No se repite'], ['semanal', 'Cada semana'], ['mensual', 'Cada mes']], 'Repetición de la tarea')
     const esfuerzo = inputCms('Ej. 2', 'Esfuerzo estimado en horas', 'number'); esfuerzo.min = '0.25'; esfuerzo.max = '168'; esfuerzo.step = '0.25'; esfuerzo.value = tarea?.esfuerzo_horas ?? ''
     const equipo = selectorCms([['', 'Sin equipo'], ...datos.equipos.map((fila) => [fila.id, fila.nombre])], 'Equipo')
     const unidad = selectorCms([['', 'Sin unidad'], ...datos.unidades.map((fila) => [fila.id, `${fila.sigla ? `${fila.sigla}: ` : ''}${fila.nombre}`])], 'Programa o espacio de trabajo')
@@ -628,10 +715,14 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     actividad.addEventListener('change', aplicarContextoActividad)
     aplicarContextoActividad()
+    const ayudaClasificacion = vincularClasificacion({ equipo, unidad, proyecto })
     detalles.append(
-      campoCms('Tipo', tipo), campoCms('Estado', estado), campoCms('Prioridad', prioridad), campoCms('Fecha límite', fecha), campoCms('Próximo seguimiento', fechaSeguimiento),
+      campoCms('Tipo', tipo), campoCms('Estado', estado), campoCms('Prioridad', prioridad), campoCms('Fecha límite', fecha),
+      ...(!tarea ? [campoCms('Repetición', repeticion, 'La primera tarea se crea ahora. Al completar cada período, el gestor conserva su historial y prepara la siguiente por separado.')] : []),
+      campoCms('Próximo seguimiento', fechaSeguimiento),
       campoCms('Equipo', equipo), campoCms('Programa o espacio', unidad), campoCms('Proyecto', proyecto), campoCms('Actividad relacionada', actividad), campoCms('Responsable', responsable),
     )
+    detalles.appendChild(ayudaClasificacion)
     const datosAdicionales = elemento('details', ['cms-datos-adicionales'])
     datosAdicionales.open = tarea?.esfuerzo_horas !== null && tarea?.esfuerzo_horas !== undefined && tarea?.esfuerzo_horas !== ''
     const seguimientoPersonalCaja = elemento('label', ['cms-configurador-requerido'])
@@ -650,12 +741,24 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     )
     const ayudaActividad = elemento('p', ['ayuda'], 'Al elegir una actividad, se propone su equipo, proyecto, responsable y fecha. Podés modificarlos si la tarea necesita otro contexto.')
     const ayudaSolicitud = elemento('p', ['ayuda'], 'La solicitud queda asignada al equipo elegido y registra quién la creó. Si no elegís responsable, se asigna primero a Coordinación, Referente o Sustitución del equipo. Si no hay esos roles, se asigna a un integrante activo. Después se sigue como una tarea normal.')
+    const ayudaPermiso = elemento('p', ['ayuda', 'cms-aviso-permiso'], 'La creación de tareas depende del permiso efectivo de tu perfil, equipo o cuenta. Siempre podés enviar una solicitud a un equipo.')
     const actualizarSolicitud = () => {
       const esSolicitud = tipo.value === 'solicitud'
+      repeticion.disabled = esSolicitud
+      if (esSolicitud) repeticion.value = ''
+      fecha.required = Boolean(repeticion.value)
       equipo.required = esSolicitud
       ayudaSolicitud.hidden = !esSolicitud
+      ayudaPermiso.hidden = Boolean(tarea || esSolicitud || puedeCrearTareaEn(equipo.value))
+      ;[...equipo.options].forEach((opcion) => {
+        if (!opcion.value) return
+        opcion.disabled = Boolean(!tarea && !esSolicitud && !puedeCrearTareaEn(opcion.value))
+      })
+      if (!tarea && !esSolicitud && equipo.value && !puedeCrearTareaEn(equipo.value)) equipo.value = ''
     }
     tipo.addEventListener('change', actualizarSolicitud)
+    repeticion.addEventListener('change', actualizarSolicitud)
+    equipo.addEventListener('change', actualizarSolicitud)
     actualizarSolicitud()
     if (esIntegrante) {
       ;[titulo, descripcion, nombreRecurso, enlaceRecurso, agregarRecurso, usarGuia, tipo, prioridad, esfuerzo, fecha, equipo, unidad, proyecto, actividad, responsable].forEach((control) => { control.disabled = true })
@@ -664,6 +767,10 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const cancelar = boton('Cancelar', () => { formularioAbierto = null; tareaAEditar = null; actividadPreseleccionada = null; capturaOrientada = null; tipoNuevaTarea = 'tarea'; dibujar() })
     const guardar = boton(tarea ? 'Guardar tarea' : 'Agregar', async () => {
       if (!forma.reportValidity() || guardando) return
+      if (!tarea && tipo.value !== 'solicitud' && !puedeCrearTareaEn(equipo.value || null)) {
+        error = 'No tenés permiso para crear tareas en ese equipo. Podés enviar una solicitud para que el equipo la revise.'
+        actualizarSolicitud(); dibujar(); return
+      }
       if (enlaceRecurso.value.trim()) {
         try { descripcion.value = agregarRecursoADescripcion(descripcion.value, nombreRecurso.value, enlaceRecurso.value) } catch (fallo) {
           enlaceRecurso.setCustomValidity(fallo.message); enlaceRecurso.reportValidity(); return
@@ -674,21 +781,26 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         const cuerpo = esIntegrante
           ? { estado: estado.value, fecha_seguimiento: fechaSeguimiento.value || null }
           : { titulo: titulo.value, descripcion: descripcion.value, tipo: tipo.value, estado: estado.value, prioridad: prioridad.value, esfuerzo_horas: esfuerzo.value, fecha_limite: fecha.value || null, fecha_seguimiento: fechaSeguimiento.value || null, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, evento_id: actividad.value || null, responsable_correo: responsable.value || null, seguimiento_personal: seguimientoPersonal.checked, motivo_seguimiento: seguimientoPersonal.checked ? motivoSeguimiento.value : '' }
-        const respuesta = await pedir(tarea ? `/api/cms/tareas/${tarea.id}` : '/api/cms/tareas', { method: tarea ? 'PATCH' : 'POST', body: JSON.stringify(cuerpo) })
+        let respuesta
+        if (!tarea && repeticion.value) {
+          const creada = await pedir('/api/cms/tareas-recurrentes', { method: 'POST', body: JSON.stringify({ titulo: titulo.value, descripcion: descripcion.value, frecuencia: repeticion.value, prioridad: prioridad.value, proxima_fecha: fecha.value, equipo_id: equipo.value || null, proyecto_id: proyecto.value || null, responsable_correo: responsable.value || null }) })
+          respuesta = await pedir(`/api/cms/tareas-recurrentes/${creada.recurrente.id}/generar`, { method: 'POST' })
+        } else respuesta = await pedir(tarea ? `/api/cms/tareas/${tarea.id}` : '/api/cms/tareas', { method: tarea ? 'PATCH' : 'POST', body: JSON.stringify(cuerpo) })
         formularioAbierto = null; tareaAEditar = null; actividadPreseleccionada = null; capturaOrientada = null; tipoNuevaTarea = 'tarea'
         await cargar()
         if (!tarea) confirmacion = {
-          titulo: 'Tarea creada',
-          detalle: responsable.value ? `Quedó asignada a ${datos.responsables.find((fila) => fila.correo === responsable.value)?.nombre || responsable.value}. La persona la verá en su bandeja interna.` : 'Quedó registrada en la bandeja interna. Podés asignarle una persona desde la tarea.',
+          titulo: repeticion.value ? 'Tarea recurrente creada' : 'Tarea creada',
+          detalle: repeticion.value ? `La primera tarea ya está visible y se repetirá ${repeticion.value === 'mensual' ? 'cada mes' : 'cada semana'}, sin mezclar el historial de cada período.` : responsable.value ? `Quedó asignada a ${datos.responsables.find((fila) => fila.correo === responsable.value)?.nombre || responsable.value}. La persona la verá en su bandeja interna.` : 'Quedó registrada en la bandeja interna. Podés asignarle una persona desde la tarea.',
           acciones: [{ etiqueta: 'Abrir tarea', principal: true, alPulsar: () => abrirContextoTarea(respuesta.tarea.id) }],
         }
+        if (!tarea) completarMedicionUX('crear_tarea')
         proyectoPreseleccionado = null
         dibujar()
       } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
     }, ['boton-principal'])
     guardar.type = 'submit'
     acciones.append(cancelar, guardar)
-    forma.append(titulo, descripcion, guiaEntrega, detalles, datosAdicionales, ayudaActividad, ayudaSolicitud, acciones)
+    forma.append(titulo, descripcion, guiaEntrega, detalles, datosAdicionales, ayudaActividad, ayudaSolicitud, ayudaPermiso, acciones)
     forma.addEventListener('submit', (evento) => { evento.preventDefault(); guardar.click() })
     return forma
   }
@@ -706,14 +818,20 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const prioridad = selectorCms([['normal', 'Prioridad normal'], ['alta', 'Prioridad alta'], ['urgente', 'Urgente'], ['baja', 'Prioridad baja']], 'Prioridad de tarea recurrente'); prioridad.value = modeloRecurrente?.prioridad || 'normal'
     const fecha = inputCms('', 'Próxima fecha de tarea recurrente', 'date'); fecha.required = true; fecha.value = HOY()
     const equipo = selectorCms([['', 'Sin equipo'], ...datos.equipos.map((fila) => [fila.id, fila.nombre])], 'Equipo de tarea recurrente')
+    ;[...equipo.options].forEach((opcion) => { if (opcion.value) opcion.disabled = !puedeCrearTareaEn(opcion.value) })
     const proyecto = selectorCms([['', 'Sin proyecto'], ...datos.proyectos.map((fila) => [fila.id, fila.titulo])], 'Proyecto de tarea recurrente')
+    proyecto.value = modeloRecurrente?.proyecto_id || ''
+    const proyectoRecurrente = datos.proyectos.find((fila) => fila.id === proyecto.value)
+    equipo.value = modeloRecurrente?.equipo_id || proyectoRecurrente?.equipo_id || ''
     const responsable = selectorCms([['', 'Sin responsable'], ...datos.responsables.map((fila) => [fila.correo, fila.nombre || fila.correo])], 'Responsable de tarea recurrente')
     const detalles = elemento('div', ['cms-captura-detalles'])
     detalles.append(campoCms('Frecuencia', frecuencia), campoCms('Prioridad', prioridad), campoCms('Próxima fecha', fecha), campoCms('Equipo', equipo), campoCms('Proyecto', proyecto), campoCms('Responsable', responsable))
+    detalles.appendChild(vincularClasificacion({ equipo, proyecto }))
     const acciones = elemento('div', ['cms-captura-acciones'])
     const cancelar = boton('Cancelar', () => { formularioAbierto = null; modeloRecurrente = null; dibujar() })
     const guardar = boton('Crear tarea recurrente', async () => {
       if (!forma.reportValidity() || guardando) return
+      if (!puedeCrearTareaEn(equipo.value || null)) { error = 'Elegí un equipo donde tengas permiso para crear tareas.'; dibujar(); return }
       guardando = true; guardar.disabled = true
       try {
         await pedir('/api/cms/tareas-recurrentes', { method: 'POST', body: JSON.stringify({ titulo: titulo.value, descripcion: descripcion.value, frecuencia: frecuencia.value, prioridad: prioridad.value, proxima_fecha: fecha.value, equipo_id: equipo.value || null, proyecto_id: proyecto.value || null, responsable_correo: responsable.value || null }) })
@@ -728,11 +846,12 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
 
   function filaTarea(tarea) {
     const estado = clasificarTarea(tarea)
+    const etiquetaEstado = tarea.estado === 'completada' ? 'Completada' : tarea.estado === 'cancelada' ? 'Cancelada' : TEXTO_ESTADO[estado]
     const fila = elemento('article', ['cms-tarea', `cms-tarea-${estado}`])
     const encabezado = elemento('div', ['cms-tarea-encabezado'])
     encabezado.append(
       elemento('strong', [], tarea.titulo),
-      elemento('span', ['cms-estado'], TEXTO_ESTADO[estado]),
+      elemento('span', ['cms-estado', claseEstadoSemantico(['completada', 'cancelada'].includes(tarea.estado) ? tarea.estado : estado)], etiquetaEstado),
     )
     const meta = [
       tarea.proyecto_titulo,
@@ -749,18 +868,20 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     ].filter(Boolean).join(' · ')
     const acciones = elemento('div', ['cms-tarea-acciones'])
     if (!['completada', 'cancelada'].includes(tarea.estado) && (datos.alcance?.puede_gestionar || datos.alcance?.perfil === 'integrante')) {
-      acciones.appendChild(boton('Completar tarea', () => { tareaParaCompletar = tarea.id; formularioAbierto = 'completar-tarea'; dibujar() }))
-    }
-    if (['completada', 'cancelada'].includes(tarea.estado) && datos.alcance?.puede_gestionar) {
-      acciones.appendChild(boton('Reabrir tarea', async () => {
-        if (guardando) return
-        guardando = true
-        try {
-          await pedir(`/api/cms/tareas/${tarea.id}`, { method: 'PATCH', body: JSON.stringify({ estado: 'pendiente' }) })
-          confirmacion = { titulo: 'Tarea reabierta', detalle: 'Volvió a la bandeja de trabajo. El cierre anterior y sus comentarios siguen disponibles en el historial.', acciones: [] }
-          await cargar()
-        } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
+      acciones.appendChild(boton('Completar tarea', () => {
+        tareaParaCompletar = tarea.id
+        operacionCierreTarea = crypto.randomUUID()
+        formularioAbierto = 'completar-tarea'
+        dibujar()
       }))
+    }
+    const puedeActualizarTarea = datos.alcance?.puede_gestionar || tarea.responsable_correo === (sesion?.usuario || sesion?.correo)
+    if (['completada', 'cancelada'].includes(tarea.estado) && puedeActualizarTarea) {
+      acciones.appendChild(boton('Reactivar y agendar', () => {
+        tareaParaReabrir = tarea.id
+        formularioAbierto = 'reabrir-tarea'
+        dibujar()
+      }, ['boton-principal']))
     }
     if (datos.alcance?.puede_gestionar || datos.alcance?.perfil === 'integrante') acciones.appendChild(boton('Editar tarea', () => { tareaAEditar = tarea.id; formularioAbierto = 'editar-tarea'; dibujar() }))
     acciones.appendChild(boton('Abrir tarea', () => abrirContextoTarea(tarea.id)))
@@ -778,19 +899,42 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   function formularioCompletarTarea() {
     const tarea = datos.tareas.find((fila) => fila.id === tareaParaCompletar)
     if (!tarea) return null
-    const forma = elemento('form', ['cms-formulario', 'cms-formulario-completar'])
+    const forma = elemento('form', ['cms-captura', 'cms-formulario', 'cms-formulario-completar'])
     const comentario = areaCms('Qué se hizo, qué resultado quedó o qué debería saber quien asignó la tarea.', 'Comentario de cierre opcional')
+    const estadoCierre = elemento('p', ['cms-estado-operacion'])
+    estadoCierre.setAttribute('role', 'status')
+    estadoCierre.setAttribute('aria-live', 'polite')
     const acciones = elemento('div', ['cms-formulario-acciones'])
-    const cancelar = boton('Cancelar', () => { formularioAbierto = null; tareaParaCompletar = null; dibujar() })
+    const cancelar = boton('Cancelar', () => { formularioAbierto = null; tareaParaCompletar = null; operacionCierreTarea = null; dibujar() })
     cancelar.type = 'button'
     const completar = boton('Completar tarea', async () => {
       if (guardando) return
       guardando = true
+      completar.disabled = true
+      cancelar.disabled = true
+      completar.textContent = 'Completando...'
+      estadoCierre.textContent = 'Guardando el cierre. No cierres esta ventana.'
       try {
-        await pedir(`/api/cms/tareas/${tarea.id}`, { method: 'PATCH', body: JSON.stringify({ estado: 'completada', comentario_cierre: comentario.value }) })
-        formularioAbierto = null; tareaParaCompletar = null
-        await cargar()
-      } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
+        const resultado = await pedir(`/api/cms/tareas/${tarea.id}`, {
+          method: 'PATCH', timeoutMs: 20_000,
+          body: JSON.stringify({ estado: 'completada', comentario_cierre: comentario.value, operacion_cierre_id: operacionCierreTarea }),
+        })
+        Object.assign(tarea, resultado.tarea || {}, { estado: 'completada' })
+        formularioAbierto = null
+        tareaParaCompletar = null
+        operacionCierreTarea = null
+        guardando = false
+        confirmacion = { titulo: 'Tarea completada', detalle: 'El cierre quedó guardado y la persona que la asignó podrá verlo en su historial y sus avisos.', acciones: [] }
+        dibujar()
+        await cargar({ silencioso: true })
+      } catch (fallo) {
+        error = fallo.message
+        guardando = false
+        completar.disabled = false
+        cancelar.disabled = false
+        completar.textContent = 'Volver a intentar'
+        estadoCierre.textContent = `${fallo.message} El reintento conserva la misma operación y no duplicará el comentario.`
+      }
     }, ['boton-principal'])
     completar.type = 'submit'
     acciones.append(cancelar, completar)
@@ -799,9 +943,71 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       elemento('h3', [], `Completar: ${tarea.titulo}`),
       elemento('p', ['ayuda'], 'El comentario es opcional. Si agregás contexto, quedará en la conversación con tu nombre y la fecha.'),
       campoCms('Comentario de cierre', comentario),
+      estadoCierre,
       acciones,
     )
     forma.addEventListener('submit', (evento) => { evento.preventDefault(); completar.click() })
+    return forma
+  }
+
+  function formularioReabrirTarea() {
+    const tarea = datos.tareas.find((fila) => fila.id === tareaParaReabrir)
+    if (!tarea) return null
+    const forma = elemento('form', ['cms-captura', 'cms-formulario', 'cms-formulario-reactivar'])
+    const fechaSeguimiento = inputCms('', 'Nueva fecha de seguimiento', 'date')
+    fechaSeguimiento.required = true
+    fechaSeguimiento.min = HOY()
+    const estado = selectorCms([['pendiente', 'Pendiente'], ['en_marcha', 'En marcha'], ['esperando_respuesta', 'Esperando respuesta']], 'Estado al reactivar')
+    const aviso = elemento('p', ['cms-estado-operacion'])
+    aviso.setAttribute('role', 'status')
+    aviso.setAttribute('aria-live', 'polite')
+    const acciones = elemento('div', ['cms-formulario-acciones'])
+    const cancelar = boton('Cancelar', () => { formularioAbierto = null; tareaParaReabrir = null; dibujar() })
+    cancelar.type = 'button'
+    const reactivar = boton('Reactivar y agendar', async () => {
+      if (!forma.reportValidity() || guardando) return
+      guardando = true
+      reactivar.disabled = true
+      cancelar.disabled = true
+      aviso.textContent = 'Guardando la nueva fecha de seguimiento...'
+      try {
+        await pedir(`/api/cms/tareas/${tarea.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estado: estado.value, fecha_seguimiento: fechaSeguimiento.value }),
+        })
+        formularioAbierto = null
+        tareaParaReabrir = null
+        guardando = false
+        const vistaDestino = tarea.responsable_correo === (sesion?.usuario || sesion?.correo) ? 'mias' : 'asignadas'
+        filtroTrabajo = vistaDestino
+        guardarVistaCMS('trabajo', vistaDestino)
+        confirmacion = {
+          titulo: 'Tarea reactivada y agendada',
+          detalle: `Volvió a ${vistaDestino === 'mias' ? 'Mis pendientes' : 'Asignadas por mí'} con seguimiento para ${fechaHumana(fechaSeguimiento.value)}. El cierre y los comentarios anteriores siguen en la conversación.`,
+          acciones: [],
+        }
+        await cargar()
+      } catch (fallo) {
+        error = fallo.message
+        guardando = false
+        reactivar.disabled = false
+        cancelar.disabled = false
+        aviso.textContent = fallo.message
+      }
+    }, ['boton-principal'])
+    reactivar.type = 'submit'
+    acciones.append(cancelar, reactivar)
+    const detalles = elemento('div', ['cms-captura-detalles'])
+    detalles.append(campoCms('Nueva fecha de seguimiento', fechaSeguimiento, 'Esta fecha crea el próximo aviso en Mis tareas.'), campoCms('Estado', estado))
+    forma.append(
+      elemento('span', ['cms-panel-etiqueta'], 'NUEVO PASO'),
+      elemento('h3', [], `Reactivar: ${tarea.titulo}`),
+      elemento('p', ['ayuda'], 'Elegí cuándo querés volver a verla. La tarea conserva el cierre y todos los comentarios anteriores.'),
+      detalles,
+      acciones,
+      aviso,
+    )
+    forma.addEventListener('submit', (evento) => { evento.preventDefault(); reactivar.click() })
     return forma
   }
 
@@ -815,7 +1021,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       elemento('p', ['ayuda'], 'Decisiones de Dirección que siguen activas. Quedan a la vista hasta que se completen o cancelen.'),
     )
     encabezado.appendChild(texto)
-    if (datos.alcance?.puede_gestionar) encabezado.appendChild(boton('Nueva directriz', () => { tipoNuevaTarea = 'directriz'; formularioAbierto = 'tarea'; dibujar() }, ['boton-principal']))
+    if (puedeCrearAlgunaTarea()) encabezado.appendChild(boton('Nueva directriz', () => { tipoNuevaTarea = 'directriz'; formularioAbierto = 'tarea'; dibujar() }, ['boton-principal']))
     const lista = elemento('div', ['cms-directrices-lista'])
     if (directrices.length) lista.append(...directrices.map(filaTarea))
     else lista.appendChild(elemento('p', ['ayuda'], 'No hay directrices institucionales vigentes.'))
@@ -962,6 +1168,62 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     return campo
   }
 
+  function reemplazarOpciones(select, opciones, valor = '') {
+    select.replaceChildren()
+    opciones.forEach(([id, texto]) => {
+      const opcion = document.createElement('option')
+      opcion.value = id; opcion.textContent = texto; select.appendChild(opcion)
+    })
+    select.value = opciones.some(([id]) => id === valor) ? valor : ''
+  }
+
+  function vincularClasificacion({ equipo, unidad = null, proyecto }) {
+    const ayuda = elemento('p', ['ayuda', 'cms-ayuda-clasificacion'])
+    const actualizarUnidades = (conservar = true) => {
+      if (!unidad) return
+      const previo = conservar ? unidad.value : ''
+      const compatibles = unidadesCompatiblesCms(datos.unidades, equipo.value)
+      reemplazarOpciones(unidad, [['', 'Sin programa o espacio'], ...compatibles.map((fila) => [fila.id, `${fila.sigla ? `${fila.sigla}: ` : ''}${fila.nombre}`])], previo)
+    }
+    const actualizarProyectos = (conservar = true) => {
+      const previo = conservar ? proyecto.value : ''
+      const compatibles = proyectosCompatiblesCms(datos.proyectos, { equipoId: equipo.value, unidadId: unidad?.value || '' })
+      const seleccionado = datos.proyectos.find((fila) => fila.id === previo)
+      const opciones = [['', 'Sin proyecto'], ...compatibles.map((fila) => [fila.id, fila.titulo])]
+      const fueraDeContexto = seleccionado && !compatibles.some((fila) => fila.id === seleccionado.id)
+      if (fueraDeContexto) opciones.push([seleccionado.id, `Revisar vínculo: ${seleccionado.titulo}`])
+      reemplazarOpciones(proyecto, opciones, previo)
+      proyecto.setCustomValidity(fueraDeContexto ? 'El proyecto no pertenece al equipo o a la unidad elegidos. Elegí uno compatible o dejá Sin proyecto.' : '')
+      if (fueraDeContexto) {
+        proyecto.setAttribute('aria-invalid', 'true')
+        ayuda.textContent = 'Este registro conserva un vínculo anterior que ya no coincide con su equipo o unidad. Corregilo antes de guardar.'
+        ayuda.setAttribute('role', 'alert')
+      } else {
+        proyecto.removeAttribute('aria-invalid')
+        ayuda.removeAttribute('role')
+        const unidadElegida = unidad?.value ? datos.unidades.find((fila) => fila.id === unidad.value) : null
+        const contexto = unidadElegida?.sigla || unidadElegida?.nombre || datos.equipos.find((fila) => fila.id === equipo.value)?.nombre
+        ayuda.textContent = contexto
+          ? `Solo se muestran proyectos de ${contexto}. También podés guardar sin proyecto.`
+          : 'Elegí un equipo o una unidad para ver únicamente sus proyectos.'
+      }
+    }
+    equipo.addEventListener('change', () => { actualizarUnidades(false); actualizarProyectos(false) })
+    unidad?.addEventListener('change', () => actualizarProyectos(false))
+    proyecto.addEventListener('change', () => {
+      const elegido = datos.proyectos.find((fila) => fila.id === proyecto.value)
+      if (elegido) {
+        equipo.value = elegido.equipo_id || equipo.value
+        actualizarUnidades(false)
+        if (unidad) unidad.value = elegido.unidad_id || ''
+      }
+      actualizarProyectos(true)
+    })
+    actualizarUnidades(true)
+    actualizarProyectos(true)
+    return ayuda
+  }
+
   function iconoDeCampo(etiqueta) {
     const texto = etiqueta.toLocaleLowerCase('es')
     if (texto.includes('fecha') || texto.includes('inicio') || texto.includes('final')) return 'agenda'
@@ -1068,9 +1330,9 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
           await cargar()
           if (!proyecto) confirmacion = {
             titulo: 'Proyecto creado',
-            detalle: `${titulo.value} quedó en ${datos.equipos.find((fila) => fila.id === equipo.value)?.nombre || 'la estructura institucional'}. Ahora podés agregar la primera tarea o material.`,
+            detalle: `${titulo.value} quedó en ${datos.equipos.find((fila) => fila.id === equipo.value)?.nombre || 'la estructura institucional'}. Ahora podés agregar material${puedeCrearTareaEn(equipo.value) ? ' o la primera tarea' : ''}.`,
             acciones: [
-              { etiqueta: 'Agregar primera tarea', principal: true, alPulsar: () => { proyectoPreseleccionado = respuesta.proyecto.id; formularioAbierto = 'tarea'; confirmacion = null; dibujar() } },
+              ...(puedeCrearTareaEn(equipo.value) ? [{ etiqueta: 'Agregar primera tarea', principal: true, alPulsar: () => { proyectoPreseleccionado = respuesta.proyecto.id; formularioAbierto = 'tarea'; confirmacion = null; dibujar() } }] : []),
               { etiqueta: 'Agregar recurso', alPulsar: () => { proyectoPreseleccionado = respuesta.proyecto.id; formularioAbierto = 'documento'; confirmacion = null; dibujar() } },
             ],
           }
@@ -1195,6 +1457,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     equipo.value = proyectoContextual?.equipo_id || ''
     unidad.value = proyectoContextual?.unidad_id || ''
     const detalles = elemento('div', ['cms-captura-detalles']); detalles.append(tipo, sensibilidad, equipo, unidad, proyecto)
+    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
     forma.append(elemento('h3', [], 'Agregar recurso o documento'), elemento('p', ['ayuda'], 'Pegá un enlace de Canva, Drive u otra herramienta. El recurso quedará disponible dentro del proyecto y la biblioteca.'), titulo, ingresoEnlace, detalles, elemento('label', ['cms-etiqueta-campo'], 'Descripción'), descripcion, accionesFormulario(() => {
       normalizarCampoEnlace(url)
       if (!forma.reportValidity() || guardando) return; guardando = true
@@ -1220,6 +1483,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const proyecto = selectorCms([['', 'Sin proyecto'], ...datos.proyectos.map((fila) => [fila.id, fila.titulo])], 'Proyecto de la alianza')
     tipo.value = alianza?.tipo || 'aliado'; estado.value = alianza?.estado || 'activa'; equipo.value = alianza?.equipo_id || ''; proyecto.value = alianza?.proyecto_id || ''
     const detalles = elemento('div', ['cms-captura-detalles']); detalles.append(tipo, estado, equipo, proyecto)
+    detalles.appendChild(vincularClasificacion({ equipo, proyecto }))
     forma.append(
       elemento('h3', [], alianza ? `Editar alianza: ${alianza.nombre}` : 'Nueva alianza institucional'),
       elemento('p', ['ayuda'], 'Podés registrar la web, un correo general o un canal institucional. Evitá datos personales sensibles.'),
@@ -1255,6 +1519,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const revisarPedido = () => { const esPedido = tipo.value === 'pedido'; const proponeFecha = ['actividad', 'evento'].includes(tipo.value); equipo.required = esPedido; equipoSolicitante.required = esPedido; equipoSolicitante.hidden = !esPedido; prioridad.hidden = !esPedido; fechaPropuestaCampo.hidden = !proponeFecha; ayuda.textContent = esPedido ? 'Indicá qué equipo solicita, cuál recibe y con qué prioridad. El pedido se asigna automáticamente según las responsabilidades del equipo destinatario. No cargues datos sensibles.' : proponeFecha ? 'La fecha es una propuesta. La coordinación decide si la prepara en la agenda después de revisarla.' : 'La entrada crea una tarea trazable para el equipo. No cargues datos de salud, documentos personales ni otra información sensible en este resumen.' }
     tipo.addEventListener('change', revisarPedido); revisarPedido()
     const detalles = elemento('div', ['cms-captura-detalles']); detalles.append(fechaPropuestaCampo, equipo, equipoSolicitante, prioridad, proyecto)
+    detalles.appendChild(vincularClasificacion({ equipo, proyecto }))
     forma.append(elemento('h3', [], 'Registrar entrada'), tipo, nombre, contacto, elemento('label', ['cms-etiqueta-campo'], 'Detalle'), detalle, detalles, ayuda, accionesFormulario(() => {
       if (!forma.reportValidity() || guardando) return
       guardando = true
@@ -1278,11 +1543,13 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       formularioAbierto = ['directriz', 'nota'].includes(destino) ? 'tarea' : destino
       dibujar()
     }
-    opciones.append(
+    if (puedeCrearAlgunaTarea()) opciones.append(
       boton('Nueva tarea', () => abrir('tarea'), ['boton-principal']),
       boton('Nueva directriz', () => abrir('directriz')),
       boton('Nota para ordenar', () => abrir('nota')),
-      boton('Pedido a un equipo', () => abrir('entrada')),
+    )
+    opciones.append(
+      boton('Pedido a un equipo', () => abrir('entrada'), puedeCrearAlgunaTarea() ? [] : ['boton-principal']),
       boton('Actividad o evento', () => abrir('evento')),
       boton('Proyecto', () => abrir('proyecto')),
       boton('Entrada para revisar', () => abrir('entrada')),
@@ -1293,12 +1560,12 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const sugerir = () => {
       const texto = consulta.value.toLocaleLowerCase('es')
       if (texto.length < 3) { sugerencia.replaceChildren(elemento('p', ['ayuda'], 'Escribí una idea y te propondremos dónde registrarla.')); return }
-      let destino = 'tarea'; let etiqueta = 'Crear tarea'; let razon = 'Tiene un próximo paso que necesita seguimiento.'
+      let destino = puedeCrearAlgunaTarea() ? 'tarea' : 'entrada'; let etiqueta = puedeCrearAlgunaTarea() ? 'Crear tarea' : 'Enviar pedido a un equipo'; let razon = puedeCrearAlgunaTarea() ? 'Tiene un próximo paso que necesita seguimiento.' : 'El equipo podrá revisarlo y convertirlo en trabajo asignado.'
       if (/reuni|acuerdo|decid/.test(texto)) { destino = 'reunion'; etiqueta = 'Preparar reunión'; razon = 'Las decisiones deben conservar el contexto del encuentro.' }
       else if (/evento|actividad|curso|taller|fecha/.test(texto)) { destino = 'evento'; etiqueta = 'Preparar actividad'; razon = 'Tiene una fecha o una actividad institucional asociada.' }
       else if (/proyecto|programa|objetivo/.test(texto)) { destino = 'proyecto'; etiqueta = 'Crear proyecto'; razon = 'Describe un resultado amplio con varias acciones.' }
       else if (/pedir|solicitar|necesito que|otro equipo/.test(texto)) { destino = 'entrada'; etiqueta = 'Enviar pedido a un equipo'; razon = 'Necesita derivación y una respuesta de otra área.' }
-      else if (/orden|recordar|idea|nota/.test(texto)) { destino = 'nota'; etiqueta = 'Guardar nota para ordenar'; razon = 'Todavía no parece requerir una ejecución definida.' }
+      else if (/orden|recordar|idea|nota/.test(texto) && puedeCrearAlgunaTarea()) { destino = 'nota'; etiqueta = 'Guardar nota para ordenar'; razon = 'Todavía no parece requerir una ejecución definida.' }
       const equipo = datos.equipos.find((fila) => texto.includes(String(fila.nombre || '').toLocaleLowerCase('es')))
       const responsable = equipo && datos.responsabilidades.find((fila) => fila.equipo_id === equipo.id && ['coordinacion', 'referente'].includes(fila.tipo))
       sugerencia.replaceChildren(elemento('strong', [], equipo ? `Sugerencia: ${etiqueta} en ${equipo.nombre}` : `Sugerencia: ${etiqueta}`), elemento('p', ['ayuda'], responsable ? `${razon} La referencia inicial sería ${responsable.usuario_nombre || responsable.usuario_correo}.` : razon), boton(etiqueta, () => { capturaOrientada = { texto: consulta.value.trim().slice(0, 180), equipo_id: equipo?.id || null, responsable_correo: responsable?.usuario_correo || null }; abrir(destino, true) }, ['boton-principal']))
@@ -1349,6 +1616,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const proyectoContextual = datos.proyectos.find((fila) => fila.id === proyecto.value)
     descripcion.value = evento?.descripcion || ''; fin.value = evento?.fecha_fin || ''; equipo.value = evento?.equipo_id || capturaOrientada?.equipo_id || proyectoContextual?.equipo_id || ''; unidad.value = evento?.unidad_id || proyectoContextual?.unidad_id || ''; responsable.value = evento?.responsable_correo || capturaOrientada?.responsable_correo || proyectoContextual?.responsable_correo || ''; estado.value = evento?.estado || 'planificado'
     const detalles = elemento('div', ['cms-captura-detalles']); detalles.append(tipo, inicio, fin, lugar, equipo, unidad, proyecto, responsable, estado)
+    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
     if (!evento) detalles.append(campoCms('Repetición', frecuencia, 'Crea todas las fechas de la serie en una sola acción. Después podés editar cada actividad por separado.'), repetirHasta)
     forma.append(elemento('h3', [], evento ? `Editar actividad: ${evento.titulo}` : 'Nueva actividad o evento'), elemento('p', ['ayuda'], 'Agendá actividades, reuniones, cursos, publicaciones, vencimientos, pagos, renovaciones, trámites, certificaciones o asambleas.'), titulo, detalles, elemento('p', ['ayuda'], 'La finalización indica cuánto dura cada encuentro. Si se repite, la fecha final de la serie se elige en Repetición.'), elemento('label', ['cms-etiqueta-campo'], 'Descripción'), descripcion, accionesFormulario(() => {
       if (!forma.reportValidity() || guardando) return; guardando = true
@@ -1493,6 +1761,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const unidad = selectorCms([['', 'Sin programa o espacio'], ...datos.unidades.map((fila) => [fila.id, `${fila.sigla ? `${fila.sigla}: ` : ''}${fila.nombre}`])], 'Programa o espacio de la reunión')
     const proyecto = selectorCms([['', 'Sin proyecto'], ...datos.proyectos.map((fila) => [fila.id, fila.titulo])], 'Proyecto de la reunión')
     const preparacion = areaCms('Temas, datos o materiales a preparar', 'Preparación de la reunión')
+    const seguimiento = inputCms('', 'Fecha de seguimiento de la reunión', 'date')
     const frecuencia = selectorCms([['', 'No se repite'], ['semanal', 'Cada semana'], ['quincenal', 'Cada 2 semanas'], ['mensual', 'El mismo día de cada mes'], ['mensual_ordinal', 'La misma semana y día, por ejemplo segundo jueves']], 'Repetición de la reunión')
     const repetirHasta = inputCms('', 'Repetir reunión hasta', 'date')
     let fechaSugerida = ''
@@ -1511,7 +1780,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     fechaHora.addEventListener('input', revisarRecurrencia)
     revisarRecurrencia()
     const detalles = elemento('div', ['cms-captura-detalles'])
-    detalles.append(fechaHora, lugar, equipo, unidad, proyecto, campoCms('Repetición', frecuencia, 'Crea todas las reuniones de la serie. La minuta y las decisiones se registran por separado en cada fecha.'), repetirHasta)
+    detalles.append(fechaHora, campoCms('Seguimiento previo', seguimiento, 'Elegí cuándo querés volver a verla para preparar materiales, una presentación o confirmar avances.'), lugar, equipo, unidad, proyecto, campoCms('Repetición', frecuencia, 'Crea todas las reuniones de la serie. La minuta y las decisiones se registran por separado en cada fecha.'), repetirHasta)
+    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
     forma.append(
       elemento('h3', [], 'Nueva reunión'),
       titulo,
@@ -1521,7 +1791,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       accionesFormulario(() => {
         if (!forma.reportValidity() || guardando) return
         guardando = true
-        pedir('/api/cms/reuniones', { method: 'POST', body: JSON.stringify({ titulo: titulo.value, objetivo: objetivo.value, fecha_hora: fechaHora.value, lugar: lugar.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, preparacion: preparacion.value, frecuencia_reunion: frecuencia.value || null, repetir_hasta: repetirHasta.value || null }) })
+        pedir('/api/cms/reuniones', { method: 'POST', body: JSON.stringify({ titulo: titulo.value, objetivo: objetivo.value, fecha_hora: fechaHora.value, proxima_revision: seguimiento.value || null, lugar: lugar.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, preparacion: preparacion.value, frecuencia_reunion: frecuencia.value || null, repetir_hasta: repetirHasta.value || null }) })
           .then(() => { formularioAbierto = null; return cargar() })
           .catch((fallo) => { error = fallo.message; guardando = false; dibujar() })
       }, 'Agendar reunión'),
@@ -1544,10 +1814,12 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const proyecto = selectorCms([['', 'Sin proyecto'], ...datos.proyectos.map((fila) => [fila.id, fila.titulo])], 'Proyecto de la reunión'); proyecto.value = reunion.proyecto_id || ''
     const estado = selectorCms(Object.entries(TEXTO_ESTADO_REUNION), 'Estado de la reunión'); estado.value = reunion.estado || 'planificada'
     const preparacion = areaCms('Temas, datos o materiales a preparar', 'Preparación de la reunión'); preparacion.value = reunion.preparacion || ''
+    const seguimiento = inputCms('', 'Fecha de seguimiento de la reunión', 'date'); seguimiento.value = reunion.proxima_revision || ''
     const minuta = areaCms('Qué pasó, quién estuvo y qué se acordó', 'Minuta de la reunión'); minuta.value = reunion.minuta || ''
     const resumen = areaCms('Resumen para encontrar esta reunión más adelante', 'Resumen de la reunión'); resumen.value = reunion.resumen || ''
     const detalles = elemento('div', ['cms-captura-detalles'])
-    detalles.append(fechaHora, lugar, equipo, unidad, proyecto, estado)
+    detalles.append(fechaHora, campoCms('Seguimiento previo', seguimiento, 'Usalo para volver a esta reunión antes del encuentro y preparar materiales o revisar avances.'), lugar, equipo, unidad, proyecto, estado)
+    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
     forma.append(
       elemento('h3', [], `Editar reunión: ${reunion.titulo}`),
       elemento('p', ['ayuda'], 'Dejá la preparación antes del encuentro y, al terminar, registrá la minuta, el resumen y los acuerdos.'),
@@ -1560,7 +1832,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       accionesFormulario(() => {
         if (!forma.reportValidity() || guardando) return
         guardando = true
-        pedir(`/api/cms/reuniones/${reunion.id}`, { method: 'PATCH', body: JSON.stringify({ titulo: titulo.value, objetivo: objetivo.value, fecha_hora: fechaHora.value, lugar: lugar.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, estado: estado.value, preparacion: preparacion.value, minuta: minuta.value, resumen: resumen.value }) })
+        pedir(`/api/cms/reuniones/${reunion.id}`, { method: 'PATCH', body: JSON.stringify({ titulo: titulo.value, objetivo: objetivo.value, fecha_hora: fechaHora.value, proxima_revision: seguimiento.value || null, lugar: lugar.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, estado: estado.value, preparacion: preparacion.value, minuta: minuta.value, resumen: resumen.value }) })
           .then(() => { formularioAbierto = null; reunionAEditar = null; return cargar() })
           .catch((fallo) => { error = fallo.message; guardando = false; dibujar() })
       }, 'Guardar reunión'),
@@ -1609,6 +1881,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const proximaRevision = inputCms('', 'Próxima fecha de revisión', 'date')
     const lista = elemento('div', ['cms-checklist-items'])
     const acuerdos = []
+    const puedeCrearAcuerdos = puedeCrearTareaEn(reunion.equipo_id || null)
     const actualizarEstadoAcuerdos = () => {
       const vacio = lista.querySelector('.cms-acuerdos-vacio')
       if (acuerdos.length) vacio?.remove()
@@ -1622,6 +1895,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const responsable = selectorCms([['', 'Sin responsable'], ...datos.responsables.map((persona) => [persona.correo, persona.nombre || persona.correo])], 'Responsable del acuerdo')
       const fecha = inputCms('', 'Fecha límite de la tarea', 'date')
       const crearCaja = elemento('label', ['cms-configurador-requerido']); const crear = document.createElement('input'); crear.type = 'checkbox'; crear.checked = true
+      crear.checked = puedeCrearAcuerdos; crear.disabled = !puedeCrearAcuerdos
       crearCaja.append(crear, document.createTextNode(' Crear una tarea para ejecutar este acuerdo'))
       const quitar = boton('Quitar acuerdo', () => { acuerdos.splice(acuerdos.indexOf(acuerdo), 1); fila.remove(); actualizarEstadoAcuerdos() })
       Object.assign(acuerdo, { titulo, motivo, responsable, fecha, crear })
@@ -1638,7 +1912,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       try { await pedir(`/api/cms/reuniones/${reunion.id}/cierre`, { method: 'POST', body: JSON.stringify(cuerpo) }); formularioAbierto = null; reunionDeCierre = null; await cargar() } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
     }, ['boton-principal']); guardar.type = 'submit'
     acciones.append(cancelar, guardar)
-    forma.append(elemento('h3', [], `Cerrar reunión: ${reunion.titulo}`), elemento('p', ['ayuda'], 'Registrá la memoria del encuentro. Cada acuerdo queda como decisión y, si corresponde, también como tarea con responsable y fecha.'), minuta, resumen, campoCms('Próxima revisión', proximaRevision), elemento('h4', [], 'Acuerdos y decisiones'), lista, agregar, acciones)
+    forma.append(elemento('h3', [], `Cerrar reunión: ${reunion.titulo}`), elemento('p', ['ayuda'], 'Registrá la memoria del encuentro. Cada acuerdo queda como decisión y, si corresponde, también como tarea con responsable y fecha.'), !puedeCrearAcuerdos ? elemento('p', ['ayuda', 'cms-aviso-permiso'], 'Podés registrar los acuerdos, pero no crear tareas en este equipo. Administración puede habilitar ese permiso.') : document.createDocumentFragment(), minuta, resumen, campoCms('Próxima revisión', proximaRevision), elemento('h4', [], 'Acuerdos y decisiones'), lista, agregar, acciones)
     forma.addEventListener('submit', (evento) => { evento.preventDefault(); guardar.click() })
     return forma
   }
@@ -1764,7 +2038,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     const acciones = elemento('div', ['cms-captura-acciones'])
     acciones.appendChild(boton('Cerrar', () => { formularioAbierto = null; equipoAbiertoId = null; dibujar() }))
-    if (datos.alcance?.puede_gestionar) acciones.appendChild(boton('Crear tarea en esta rama', () => { capturaOrientada = { equipo_id: equipo.id }; formularioAbierto = 'tarea'; dibujar() }, ['boton-principal']))
+    if (puedeCrearTareaEn(equipo.id)) acciones.appendChild(boton('Crear tarea en esta rama', () => { capturaOrientada = { equipo_id: equipo.id }; formularioAbierto = 'tarea'; dibujar() }, ['boton-principal']))
     if (datos.alcance?.global) acciones.appendChild(boton('Configurar rama', () => { equipoAEditar = equipo.id; formularioAbierto = 'equipo'; dibujar() }))
     panel.appendChild(acciones)
     return panel
@@ -1787,7 +2061,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     riesgos.forEach((riesgo) => {
       const tarjeta = elemento('article', ['cms-riesgo', `cms-riesgo-${riesgo.nivel}`])
       const superior = elemento('div', ['cms-riesgo-encabezado'])
-      superior.append(elemento('strong', [], riesgo.titulo), elemento('span', ['cms-estado'], `${riesgo.nivel} · ${riesgo.estado}`))
+      superior.append(elemento('strong', [], riesgo.titulo), elemento('span', ['cms-estado', claseEstadoSemantico(riesgo.estado === 'mitigado' ? 'completada' : riesgo.nivel)], `${riesgo.nivel} · ${riesgo.estado}`))
       const meta = [riesgo.responsable_nombre || riesgo.responsable_correo || 'Sin responsable', riesgo.fecha_revision ? `Revisar ${fechaHumana(riesgo.fecha_revision)}` : 'Sin fecha de revisión'].join(' · ')
       const acciones = elemento('div', ['cms-riesgo-acciones'])
       if (riesgo.estado === 'abierto') acciones.appendChild(boton('Marcar mitigado', async () => {
@@ -1858,7 +2132,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       }
       vinculos.appendChild(bloque)
     }
-    agregarVinculo('Tareas', (contexto.tareas || []).filter((tarea) => tarea.proyecto_id === proyecto.id), (tarea) => tarjetaVinculo(tarea.titulo, [tarea.estado.replace('_', ' '), tarea.fecha_limite ? fechaHumana(tarea.fecha_limite) : 'Sin fecha', tarea.responsable_nombre || 'Sin responsable'].join(' · '), tarea.descripcion), { etiqueta: 'Agregar primera tarea', alPulsar: () => { proyectoPreseleccionado = proyecto.id; formularioAbierto = 'tarea'; dibujar() } })
+    agregarVinculo('Tareas', (contexto.tareas || []).filter((tarea) => tarea.proyecto_id === proyecto.id), (tarea) => tarjetaVinculo(tarea.titulo, [tarea.estado.replace('_', ' '), tarea.fecha_limite ? fechaHumana(tarea.fecha_limite) : 'Sin fecha', tarea.responsable_nombre || 'Sin responsable'].join(' · '), tarea.descripcion), puedeCrearTareaEn(proyecto.equipo_id) ? { etiqueta: 'Agregar primera tarea', alPulsar: () => { proyectoPreseleccionado = proyecto.id; formularioAbierto = 'tarea'; dibujar() } } : null)
     agregarVinculo('Actividades', (contexto.eventos || []).filter((evento) => evento.proyecto_id === proyecto.id), (evento) => tarjetaVinculo(evento.titulo, [evento.estado, fechaHoraProgramadaHumana(evento.fecha_hora), evento.lugar].filter(Boolean).join(' · '), evento.descripcion), { etiqueta: 'Agregar actividad', alPulsar: () => { proyectoPreseleccionado = proyecto.id; formularioAbierto = 'evento'; dibujar() } })
     agregarVinculo('Decisiones', contexto.decisiones || [], (decision) => tarjetaVinculo(decision.titulo, [decision.estado, decision.reunion_titulo || 'Sin reunión', decision.responsable_nombre || 'Sin responsable'].join(' · '), decision.motivo))
     agregarVinculo('Recursos y documentos', (contexto.documentos || []).filter((documento) => documento.proyecto_id === proyecto.id), (documento) => {
@@ -1988,6 +2262,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   }
 
   function abrirUnidad(unidad) {
+    completarMedicionUX('encontrar_unidad')
     if (['fsb', 'futbol_sin_barreras'].includes(String(unidad.clave || '').toLocaleLowerCase('es'))) {
       alIrA('operacion')
       return
@@ -2048,18 +2323,46 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       ['personas', `Personas (${personas.length})`], ['formularios', `Formularios (${formularios.length})`],
       ['documentos', `Documentos (${documentos.length})`], ['historial', `Historial (${cerradas.length})`],
     ]
+    const cantidadPestana = { personas: personas.length, formularios: formularios.length, documentos: documentos.length, historial: cerradas.length }
+    const selectorPestanas = document.createElement('select')
+    selectorPestanas.className = 'cms-unidad-selector-pestanas'
+    selectorPestanas.setAttribute('aria-label', `Sección visible de ${unidad.nombre}`)
+    pestanas.forEach(([clave, etiqueta]) => {
+      const opcion = document.createElement('option')
+      opcion.value = clave
+      opcion.textContent = etiqueta
+      selectorPestanas.appendChild(opcion)
+    })
+    selectorPestanas.value = pestanaUnidad
+    selectorPestanas.addEventListener('change', () => { pestanaUnidad = selectorPestanas.value; dibujar() })
     const navegacionPestanas = elemento('div', ['cms-unidad-pestanas'])
     navegacionPestanas.setAttribute('role', 'tablist')
     navegacionPestanas.setAttribute('aria-label', `Secciones de ${unidad.nombre}`)
-    pestanas.forEach(([clave, etiqueta]) => {
+    const agregarControlPestana = (destino, clave, etiqueta) => {
       const control = boton(etiqueta, () => { pestanaUnidad = clave; dibujar() }, ['cms-unidad-pestana'])
       control.setAttribute('role', 'tab')
       control.setAttribute('aria-selected', String(pestanaUnidad === clave))
       control.setAttribute('aria-controls', 'cms-unidad-contenido')
       if (pestanaUnidad === clave) control.classList.add('activa')
-      navegacionPestanas.appendChild(control)
-    })
-    panel.appendChild(navegacionPestanas)
+      destino.appendChild(control)
+    }
+    pestanas.filter(([clave]) => ['resumen', 'tareas', 'proyectos'].includes(clave) || cantidadPestana[clave] > 0).forEach(([clave, etiqueta]) => agregarControlPestana(navegacionPestanas, clave, etiqueta))
+    const pestanasVacias = pestanas.filter(([clave]) => Object.hasOwn(cantidadPestana, clave) && cantidadPestana[clave] === 0)
+    if (pestanasVacias.length) {
+      const masPestanas = document.createElement('details')
+      masPestanas.className = 'cms-unidad-mas-pestanas'
+      masPestanas.setAttribute('role', 'presentation')
+      masPestanas.open = pestanasVacias.some(([clave]) => clave === pestanaUnidad)
+      const resumenMas = elemento('summary', ['cms-unidad-pestana'], 'Más')
+      resumenMas.setAttribute('aria-label', 'Mostrar secciones sin contenido')
+      masPestanas.appendChild(resumenMas)
+      const opciones = elemento('div', ['cms-unidad-mas-pestanas-menu'])
+      opciones.setAttribute('role', 'presentation')
+      pestanasVacias.forEach(([clave, etiqueta]) => agregarControlPestana(opciones, clave, etiqueta))
+      masPestanas.appendChild(opciones)
+      navegacionPestanas.appendChild(masPestanas)
+    }
+    panel.append(selectorPestanas, navegacionPestanas)
     const contenido = elemento('section', ['cms-unidad-contenido'])
     contenido.id = 'cms-unidad-contenido'
     contenido.setAttribute('role', 'tabpanel')
@@ -2083,9 +2386,9 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     if (pestanaUnidad === 'resumen') {
       const recientes = [...tareas.map((fila) => ['Tarea', fila.titulo]), ...proyectos.map((fila) => ['Proyecto', fila.titulo]), ...eventos.map((fila) => ['Actividad', fila.titulo])].slice(0, 6)
-      listaSimple('Actividad reciente', recientes, (fila) => fila[1], (fila) => fila[0], datos.alcance?.puede_gestionar ? boton('Crear primera tarea', () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }) : null)
+      listaSimple('Actividad reciente', recientes, (fila) => fila[1], (fila) => fila[0], puedeCrearTareaEn(unidad.equipo_id) ? boton('Crear primera tarea', () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }) : null)
     } else if (pestanaUnidad === 'tareas') {
-      listaSimple('Tareas abiertas', tareas, (fila) => fila.titulo, (fila) => [TEXTO_ESTADO[clasificarTarea(fila)], fila.responsable_nombre || fila.responsable_correo || 'Sin responsable'].join(' · '), datos.alcance?.puede_gestionar ? boton('Crear tarea aquí', () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }) : null)
+      listaSimple('Tareas abiertas', tareas, (fila) => fila.titulo, (fila) => [TEXTO_ESTADO[clasificarTarea(fila)], fila.responsable_nombre || fila.responsable_correo || 'Sin responsable'].join(' · '), puedeCrearTareaEn(unidad.equipo_id) ? boton('Crear tarea aquí', () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }) : null)
     } else if (pestanaUnidad === 'proyectos') {
       listaSimple('Proyectos', proyectos, (fila) => fila.titulo, (fila) => TEXTO_ESTADO_PROYECTO[fila.estado] || fila.estado || 'Sin estado')
     } else if (pestanaUnidad === 'personas') {
@@ -2099,24 +2402,74 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       listaSimple('Tareas cerradas', cerradas, (fila) => fila.titulo, (fila) => [fila.estado === 'completada' ? 'Completada' : 'Cancelada', fila.completado_en ? fechaHoraHumana(fila.completado_en) : ''].filter(Boolean).join(' · '))
     }
     panel.appendChild(contenido)
-    const acciones = elemento('div', ['cms-captura-acciones'])
-    acciones.appendChild(enlaceA('cms-trabajo', 'Ver trabajo de la unidad', [], { filtroTrabajo: 'todas', unidadId: unidad.id }))
-    if (datos.alcance?.global || datos.alcance?.perfil === 'administracion') acciones.appendChild(boton('Editar unidad', () => { unidadAEditar = unidad.id; formularioAbierto = 'editar-unidad'; dibujar() }))
-    if (datos.alcance?.puede_gestionar) acciones.appendChild(boton('Crear tarea aquí', () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }, ['boton-principal']))
+    const acciones = elemento('div', ['cms-captura-acciones', 'cms-unidad-acciones-modal'])
+    const crearTarea = () => { capturaOrientada = { equipo_id: unidad.equipo_id, unidad_id: unidad.id }; formularioAbierto = 'tarea'; dibujar() }
+    const accionPrincipal = puedeCrearTareaEn(unidad.equipo_id)
+      ? boton('Crear tarea aquí', crearTarea, ['boton-principal'])
+      : enlaceA('cms-trabajo', 'Ver trabajo de la unidad', ['boton-principal'], { filtroTrabajo: 'todas', unidadId: unidad.id })
+    acciones.appendChild(accionPrincipal)
+    const masAcciones = document.createElement('details')
+    masAcciones.className = 'cms-unidad-mas-acciones'
+    masAcciones.appendChild(elemento('summary', ['boton'], 'Más acciones'))
+    const menuAcciones = elemento('div', ['cms-unidad-menu-acciones'])
+    if (datos.alcance?.puede_gestionar) menuAcciones.appendChild(enlaceA('cms-trabajo', 'Ver trabajo de la unidad', [], { filtroTrabajo: 'todas', unidadId: unidad.id }))
+    if (datos.alcance?.global || datos.alcance?.perfil === 'administracion') menuAcciones.appendChild(boton('Editar unidad', () => { unidadAEditar = unidad.id; formularioAbierto = 'editar-unidad'; dibujar() }))
+    if (menuAcciones.childElementCount) {
+      masAcciones.appendChild(menuAcciones)
+      acciones.appendChild(masAcciones)
+    }
     panel.appendChild(acciones)
     return panel
   }
 
   function panelUnidadesArea(claveArea = '') {
-    const unidades = claveArea ? unidadesDeArea(claveArea) : datos.unidades
+    const unidadesBase = claveArea ? unidadesDeArea(claveArea) : datos.unidades
     const panel = elemento('section', ['cms-unidades'])
     const encabezado = elemento('div', ['cms-seccion-encabezado'])
     const texto = elemento('div', [])
     texto.append(elemento('span', ['cms-panel-etiqueta'], claveArea ? 'Dentro del área' : 'Estructura operativa'), elemento('h3', [], claveArea ? 'Programas y espacios de trabajo' : 'Unidades operativas'), elemento('p', ['ayuda'], claveArea ? 'Entrá por la actividad que querés gestionar.' : 'Cada unidad tiene un único origen y puede aparecer en otras áreas con una vista específica.'))
     encabezado.appendChild(texto)
     if (datos.alcance?.global || datos.alcance?.perfil === 'administracion') encabezado.appendChild(boton('Nueva unidad', () => { unidadAEditar = null; formularioAbierto = 'unidad'; dibujar() }))
+    const responsables = [...new Map(datos.responsabilidades.filter((fila) => fila.activo !== false).map((fila) => {
+      const clave = fila.usuario_correo || fila.correo || fila.usuario_id || fila.id
+      return [clave, { clave, nombre: fila.usuario_nombre || fila.nombre || fila.usuario_correo || fila.correo || 'Responsable' }]
+    })).values()].filter((fila) => fila.clave).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    const controles = elemento('div', ['cms-areas-filtros'])
+    const buscar = inputCms('Buscar por sigla o nombre completo', 'Buscar áreas y unidades por sigla o nombre')
+    buscar.value = filtrosAreas.texto
+    const responsable = selectorCms([['', 'Todas las personas responsables'], ...responsables.map((fila) => [fila.clave, fila.nombre])], 'Filtrar áreas y unidades por responsable')
+    responsable.value = filtrosAreas.responsable
+    const estado = selectorCms([['', 'Todos los estados'], ['activa', 'Activas'], ['en_pausa', 'En pausa'], ['cerrada', 'Cerradas']], 'Filtrar áreas y unidades por estado')
+    estado.value = filtrosAreas.estado
+    const aplicarFiltros = () => {
+      filtrosAreas = { texto: buscar.value, responsable: responsable.value, estado: estado.value }
+      guardarVistaCMS('areas', filtrosAreas)
+      dibujar()
+    }
+    buscar.addEventListener('change', aplicarFiltros)
+    buscar.addEventListener('keydown', (evento) => {
+      if (evento.key !== 'Enter') return
+      evento.preventDefault()
+      aplicarFiltros()
+    })
+    responsable.addEventListener('change', aplicarFiltros)
+    estado.addEventListener('change', aplicarFiltros)
+    const limpiar = boton('Limpiar filtros', () => { filtrosAreas = { texto: '', responsable: '', estado: '' }; guardarVistaCMS('areas', filtrosAreas); dibujar() })
+    controles.append(buscar, responsable, estado, limpiar)
+    const textoBuscado = filtrosAreas.texto.trim().toLocaleLowerCase('es')
+    const unidades = unidadesBase.filter((unidad) => {
+      const personasUnidad = datos.responsabilidades.filter((fila) => fila.equipo_id === unidad.equipo_id && fila.activo !== false)
+      return (!textoBuscado || `${unidad.sigla || ''} ${unidad.nombre || ''}`.toLocaleLowerCase('es').includes(textoBuscado))
+        && (!filtrosAreas.estado || unidad.estado === filtrosAreas.estado)
+        && (!filtrosAreas.responsable || personasUnidad.some((fila) => [fila.usuario_correo, fila.correo, fila.usuario_id, fila.id].includes(filtrosAreas.responsable)))
+    })
+    const resultado = elemento('p', ['cms-areas-resultados'], `${unidades.length} ${unidades.length === 1 ? 'unidad encontrada' : 'unidades encontradas'}`)
+    resultado.setAttribute('aria-live', 'polite')
     const grilla = elemento('div', ['cms-unidades-grilla'])
-    if (!unidades.length) grilla.appendChild(elemento('p', ['ayuda'], 'Todavía no hay unidades configuradas para esta área.'))
+    grilla.tabIndex = 0
+    grilla.setAttribute('aria-label', 'Unidades operativas, deslizables en pantallas pequeñas')
+    grilla.dataset.mobileScroll = ''
+    if (!unidades.length) grilla.appendChild(elemento('p', ['ayuda'], unidadesBase.length ? 'No hay unidades que coincidan con estos filtros. Limpiá los filtros para volver a verlas todas.' : 'Todavía no hay unidades configuradas para esta área.'))
     unidades.forEach((unidad) => {
       const tarjeta = elemento('article', ['cms-unidad'])
       tarjeta.style.setProperty('--unidad-color', unidad.color || '#6d3087')
@@ -2139,7 +2492,9 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       tarjeta.appendChild(acciones)
       grilla.appendChild(tarjeta)
     })
-    panel.append(encabezado, grilla)
+    const pistaDesplazamiento = elemento('p', ['cms-deslizamiento-pista'], 'Deslizá para ver más')
+    pistaDesplazamiento.setAttribute('aria-hidden', 'true')
+    panel.append(encabezado, controles, resultado, pistaDesplazamiento, grilla)
     if (!claveArea && (datos.alcance?.global || datos.alcance?.perfil === 'administracion')) panel.appendChild(panelClasificacionUnidades())
     return panel
   }
@@ -2166,6 +2521,11 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const filtroArea = selectorCms([['', 'Todas las áreas'], ...areas], 'Filtrar por área')
       controles.append(buscar, filtroTipo, filtroArea)
       const lista = elemento('div', ['cms-clasificacion-unidades-lista'])
+      lista.tabIndex = 0
+      lista.setAttribute('aria-label', 'Pendientes de clasificar, deslizables en pantallas pequeñas')
+      lista.dataset.mobileScroll = ''
+      const pistaDesplazamiento = elemento('p', ['cms-deslizamiento-pista'], 'Deslizá para ver más')
+      pistaDesplazamiento.setAttribute('aria-hidden', 'true')
       const contador = elemento('p', ['cms-clasificacion-contador'])
       const verMas = boton('Ver todos', () => { limite = Infinity; pintar() })
       let limite = 12
@@ -2191,7 +2551,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       }
       ;[buscar, filtroTipo, filtroArea].forEach((control) => control.addEventListener('input', () => { limite = 12; pintar() }))
       pintar()
-      panel.append(controles, contador, lista, verMas)
+      panel.append(controles, contador, pistaDesplazamiento, lista, verMas)
     }
     return panel
   }
@@ -2267,14 +2627,28 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   function panelNavegacionFormularios() {
     const navegacion = elemento('nav', ['cms-navegacion-formularios'])
     navegacion.setAttribute('aria-label', 'Vistas de Formularios')
+    navegacion.setAttribute('role', 'tablist')
     const opciones = [
       ['formularios', 'Formularios', datos.formularios.length],
       ['pendientes', 'Respuestas pendientes', datos.entradas.filter((entrada) => entrada.estado !== 'cerrada').length],
       ['historial', 'Historial cumplido', datos.entradas.filter((entrada) => entrada.estado === 'cerrada').length],
     ]
     opciones.forEach(([valor, etiqueta, cantidad]) => {
-      const control = boton(`${etiqueta} (${cantidad})`, () => { vistaFormularios = valor; filtroEstadoEntradas = 'todas'; formularioAbierto = null; dibujar() }, ['cms-navegacion-formularios-boton'])
-      control.setAttribute('aria-pressed', String(vistaFormularios === valor))
+      const activa = vistaFormularios === valor
+      const control = boton(etiqueta, () => { vistaFormularios = valor; filtroEstadoEntradas = 'todas'; guardarVistaCMS('formularios', valor); formularioAbierto = null; dibujar() }, ['cms-navegacion-formularios-boton'])
+      control.appendChild(elemento('span', ['cms-navegacion-formularios-contador'], String(cantidad)))
+      control.setAttribute('role', 'tab')
+      control.setAttribute('aria-selected', String(activa))
+      control.tabIndex = activa ? 0 : -1
+      control.addEventListener('keydown', (evento) => {
+        const controles = [...navegacion.querySelectorAll('[role="tab"]')]
+        const indice = controles.indexOf(control)
+        const siguiente = evento.key === 'ArrowRight' ? controles[(indice + 1) % controles.length]
+          : evento.key === 'ArrowLeft' ? controles[(indice - 1 + controles.length) % controles.length]
+            : evento.key === 'Home' ? controles[0] : evento.key === 'End' ? controles.at(-1) : null
+        if (!siguiente) return
+        evento.preventDefault(); siguiente.focus(); siguiente.click()
+      })
       navegacion.appendChild(control)
     })
     return navegacion
@@ -2322,8 +2696,23 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     })
     const lista = elemento('div', ['cms-estructura-lista'])
     if (documentos.length) documentos.forEach((documento) => {
-      const tarjeta = elemento('article', ['cms-proyecto']); const vinculo = document.createElement('a'); vinculo.href = documento.url; vinculo.target = '_blank'; vinculo.rel = 'noreferrer'; vinculo.textContent = documento.titulo
-      tarjeta.append(vinculo, elemento('span', ['cms-proyecto-meta'], [documento.tipo, documento.sensibilidad, documento.equipo_nombre || documento.proyecto_titulo].filter(Boolean).join(' · ')), documento.descripcion ? elemento('span', ['cms-proyecto-notas'], documento.descripcion) : document.createDocumentFragment()); lista.appendChild(tarjeta)
+      const esExterno = /^https?:\/\//i.test(documento.url || '')
+      const claseDestino = documento.sensibilidad === 'interno' || documento.sensibilidad === 'restringido'
+        ? ['Documento interno', 'copiar']
+        : esExterno ? ['Enlace externo', 'adelante'] : ['Recurso público', 'vista']
+      const tarjeta = elemento('article', ['cms-proyecto', 'cms-documento-clasificado'])
+      const vinculo = document.createElement('a')
+      vinculo.href = documento.url
+      if (esExterno) {
+        vinculo.target = '_blank'
+        vinculo.rel = 'noreferrer'
+        vinculo.setAttribute('aria-label', `${documento.titulo}, abre en una pestaña nueva`)
+      }
+      vinculo.textContent = documento.titulo
+      const destino = elemento('span', ['cms-documento-destino'])
+      destino.append(icono(claseDestino[1]), elemento('strong', [], claseDestino[0]))
+      tarjeta.append(destino, vinculo, elemento('span', ['cms-proyecto-meta'], [documento.tipo, documento.sensibilidad, documento.equipo_nombre || documento.proyecto_titulo].filter(Boolean).join(' · ')), documento.descripcion ? elemento('span', ['cms-proyecto-notas'], documento.descripcion) : document.createDocumentFragment())
+      lista.appendChild(tarjeta)
     })
     else lista.appendChild(elemento('p', ['ayuda'], datos.documentos.length ? 'No hay documentos que coincidan con estos filtros.' : 'Todavía no hay documentos. Agregá enlaces de Drive, guías o plantillas de trabajo.'))
     seccion.append(encabezado, filtros, lista); return seccion
@@ -2437,7 +2826,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const superior = elemento('div', ['cms-privacidad-superior'])
       const identidad = elemento('div', [])
       identidad.append(elemento('span', ['cms-panel-etiqueta'], solicitud.tipo === 'copia' ? 'Solicitud de copia' : 'Solicitud de eliminación'), elemento('strong', [], solicitud.solicitante_nombre), elemento('span', ['cms-proyecto-meta'], [solicitud.contacto, solicitud.responsable_nombre || 'Sin responsable', solicitud.fecha_objetivo ? `Objetivo ${fechaHumana(solicitud.fecha_objetivo)}` : 'Sin fecha objetivo'].join(' · ')))
-      superior.append(identidad, elemento('span', ['cms-privacidad-estado'], ETIQUETAS_ESTADO_PRIVACIDAD[solicitud.estado] || solicitud.estado))
+      superior.append(identidad, elemento('span', ['cms-privacidad-estado', 'cms-estado', claseEstadoSemantico(solicitud.estado)], ETIQUETAS_ESTADO_PRIVACIDAD[solicitud.estado] || solicitud.estado))
       const pasos = elemento('div', ['cms-privacidad-pasos'])
       const indice = { recibida: 0, identidad_verificada: 1, en_revision: 2, lista_para_entrega: 3, lista_para_decision: 3, cerrada: 4, rechazada: 4 }[solicitud.estado] ?? 0
       ;['Recibida', 'Identidad', 'Revisión', solicitud.tipo === 'copia' ? 'Entrega' : 'Decisión'].forEach((etiqueta, paso) => pasos.appendChild(elemento('span', ['cms-privacidad-paso', ...(paso < indice ? ['completo'] : paso === indice ? ['actual'] : [])], etiqueta)))
@@ -2479,7 +2868,17 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const orden = selectorCms([['recientes', 'Más recientes primero'], ['antiguas', 'Más antiguas primero'], ['nombre', 'Orden alfabético']], 'Ordenar respuestas')
     orden.value = ordenEntradas
     orden.addEventListener('change', () => { ordenEntradas = orden.value; dibujar() })
-    controles.append(buscar, estado, orden)
+    const formulario = selectorCms([['todos', 'Todos los formularios'], ...datos.formularios.map((fila) => [fila.id, fila.titulo])], 'Filtrar por formulario')
+    formulario.value = filtroFormularioEntradas
+    formulario.addEventListener('change', () => { filtroFormularioEntradas = formulario.value; dibujar() })
+    const filtros = elemento('details', ['cms-filtros-secundarios'])
+    filtros.open = filtrosEntradasAbiertos || filtroFormularioEntradas !== 'todos' || filtroEstadoEntradas !== 'todas' || ordenEntradas !== 'recientes'
+    filtros.addEventListener('toggle', () => { filtrosEntradasAbiertos = filtros.open })
+    const cantidadFiltros = Number(filtroFormularioEntradas !== 'todos') + Number(filtroEstadoEntradas !== 'todas') + Number(ordenEntradas !== 'recientes')
+    const contenidoFiltros = elemento('div', ['cms-filtros-contenido'])
+    contenidoFiltros.append(formulario, estado, orden)
+    filtros.append(elemento('summary', [], cantidadFiltros ? `Más filtros (${cantidadFiltros} activos)` : 'Más filtros'), contenidoFiltros)
+    controles.append(buscar, filtros)
     const lista = elemento('div', ['cms-entradas-lista'])
     if (!puedeVerRespuestas()) {
       const avisoAcceso = crearPanelRequisitosAcceso({
@@ -2495,6 +2894,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const consulta = busquedaEntradas.trim().toLocaleLowerCase('es')
     const entradasVisibles = datos.entradas
       .filter((entrada) => esHistorial ? entrada.estado === 'cerrada' : entrada.estado !== 'cerrada')
+      .filter((entrada) => filtroFormularioEntradas === 'todos' || entrada.formulario_id === filtroFormularioEntradas)
       .filter((entrada) => {
         if (filtroEstadoEntradas === 'todas') return true
         if (esHistorial) return entrada.cumplida_medio === filtroEstadoEntradas
@@ -2508,6 +2908,52 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         const derecha = String(b.cumplida_en || b.creado_en || '')
         return ordenEntradas === 'antiguas' ? izquierda.localeCompare(derecha) : derecha.localeCompare(izquierda)
       })
+    if (entradasVisibles.length) {
+      const formularioActivo = filtroFormularioEntradas === 'todos' ? null : datos.formularios.find((fila) => fila.id === filtroFormularioEntradas)
+      const exportar = elemento('details', ['cms-menu-acciones', 'cms-exportacion'])
+      const opcionesExportacion = elemento('div', ['cms-menu-acciones-contenido'])
+      opcionesExportacion.append(
+        boton('Descargar Excel', () => { descargarDatos(excelRespuestas(entradasVisibles, datos.formularios), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', nombreExportacionRespuestas(formularioActivo, 'xlsx')); completarMedicionUX('exportar_respuestas') }),
+        boton('Descargar CSV', () => { descargarDatos(csvRespuestas(entradasVisibles, datos.formularios), 'text/csv;charset=utf-8', nombreExportacionRespuestas(formularioActivo, 'csv')); completarMedicionUX('exportar_respuestas') }),
+      )
+      exportar.append(elemento('summary', [], 'Exportar'), opcionesExportacion)
+      encabezado.appendChild(exportar)
+    }
+    const etiquetasEspeciales = {
+      _consentimiento_privacidad: 'Consentimiento de privacidad',
+      _consentimiento_privacidad_version: 'Versión de privacidad',
+      _consentimiento_privacidad_fecha: 'Aceptación de privacidad',
+      _compromiso_confidencialidad: 'Compromiso de convivencia',
+      _compromiso_confidencialidad_version: 'Versión del compromiso',
+      _compromiso_confidencialidad_fecha: 'Aceptación del compromiso',
+      _consentimiento_comunicaciones: 'Novedades por correo',
+    }
+    const clavesTrazabilidad = new Set([
+      '_consentimiento_privacidad_version', '_consentimiento_privacidad_fecha',
+      '_compromiso_confidencialidad_version', '_compromiso_confidencialidad_fecha',
+    ])
+    const clavesAcuerdos = new Set(['_consentimiento_privacidad', '_compromiso_confidencialidad', '_consentimiento_comunicaciones'])
+    const textoRespuesta = (clave, valor) => {
+      if (Array.isArray(valor)) return valor.join(', ')
+      if (valor === true) return 'Sí'
+      if (valor === false) return 'No'
+      if (clave.endsWith('_fecha')) return fechaHoraHumana(valor)
+      return String(valor)
+    }
+    const campoRespuesta = ({ etiqueta, valor, amplio = false, estado = false }) => {
+      const campo = elemento('div', ['cms-entrada-campo', amplio ? 'cms-entrada-campo-amplio' : '', estado ? 'cms-entrada-campo-estado' : ''].filter(Boolean))
+      campo.append(elemento('dt', [], etiqueta), elemento('dd', [], valor))
+      return campo
+    }
+    const grupoRespuestas = (titulo, campos, clase = '', plegable = false) => {
+      if (!campos.length) return document.createDocumentFragment()
+      const grupo = elemento(plegable ? 'details' : 'section', ['cms-entrada-respuestas', clase, plegable ? 'cms-entrada-respuestas-plegables' : ''].filter(Boolean))
+      grupo.appendChild(elemento(plegable ? 'summary' : 'h5', [], plegable ? `${titulo} (${campos.length})` : titulo))
+      const listaCampos = elemento('dl', ['cms-entrada-campos'])
+      campos.forEach((campo) => listaCampos.appendChild(campoRespuesta(campo)))
+      grupo.appendChild(listaCampos)
+      return grupo
+    }
     if (entradasVisibles.length) entradasVisibles.forEach((entrada) => {
       const tarjeta = elemento('article', ['cms-entrada'])
       const acciones = elemento('div', ['cms-entrada-acciones'])
@@ -2520,7 +2966,18 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       else acciones.appendChild(boton('Reabrir respuesta', () => { entradaParaReabrir = entrada.id; formularioAbierto = 'reabrir-entrada'; dibujar() }))
       let respuestas = {}
       try { respuestas = JSON.parse(entrada.respuestas_json || '{}') } catch { /* Una respuesta histórica puede no tener campos configurables. */ }
-      const resumenRespuestas = Object.entries(respuestas).filter(([, valor]) => valor !== '' && valor !== false).map(([clave, valor]) => elemento('span', ['cms-entrada-respuesta'], `${clave === '_consentimiento_privacidad' ? 'Consentimiento de privacidad' : clave.replaceAll('_', ' ')}: ${valor === true ? 'Sí' : valor}`))
+      const formularioEntrada = datos.formularios.find((fila) => fila.id === entrada.formulario_id)
+      let camposFormulario = []
+      try { camposFormulario = JSON.parse(formularioEntrada?.campos_json || '[]') } catch { camposFormulario = [] }
+      const etiquetasCampos = new Map(camposFormulario.map((campo) => [campo.clave, campo.etiqueta]))
+      const respuestasPreparadas = Object.entries(respuestas).filter(([, valor]) => valor !== '' && !(Array.isArray(valor) && !valor.length)).map(([clave, valor]) => {
+        const etiqueta = etiquetasEspeciales[clave] || etiquetasCampos.get(clave) || clave.replaceAll('_', ' ')
+        const visible = textoRespuesta(clave, valor)
+        return { clave, etiqueta, valor: visible, amplio: visible.length > 68 || Array.isArray(valor), estado: clavesAcuerdos.has(clave) }
+      })
+      const respuestasPrincipales = respuestasPreparadas.filter(({ clave }) => !clavesAcuerdos.has(clave) && !clavesTrazabilidad.has(clave))
+      const acuerdos = respuestasPreparadas.filter(({ clave }) => clavesAcuerdos.has(clave))
+      const trazabilidad = respuestasPreparadas.filter(({ clave }) => clavesTrazabilidad.has(clave))
       const cumplimiento = entrada.estado === 'cerrada' ? elemento('div', ['cms-cumplimiento-resumen']) : document.createDocumentFragment()
       if (entrada.estado === 'cerrada') cumplimiento.append(
         elemento('strong', [], `Cumplida el ${fechaHumana(entrada.cumplida_en)}`),
@@ -2529,7 +2986,40 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         elemento('small', [], `Registró: ${entrada.cumplida_por_nombre || entrada.cumplida_por || 'Sin registro'}`),
       )
       const proximaAccion = entrada.estado === 'cerrada' ? '' : entrada.tarea_titulo ? `Próximo paso: continuar “${entrada.tarea_titulo}”` : entrada.evento_id ? 'Próximo paso: revisar la actividad preparada' : 'Próximo paso: asignar seguimiento o registrar el resultado'
-      tarjeta.append(elemento('strong', [], entrada.nombre), elemento('span', ['cms-proyecto-meta'], [entrada.formulario_titulo || entrada.tipo, entrada.equipo_solicitante_nombre && `De ${entrada.equipo_solicitante_nombre}`, entrada.equipo_nombre || entrada.proyecto_titulo, entrada.tipo === 'pedido' && `Prioridad ${entrada.prioridad}`, entrada.creado_en && `Recibida ${fechaHoraHumana(entrada.creado_en)}`].filter(Boolean).join(' · ')), proximaAccion ? elemento('span', ['cms-entrada-proxima'], proximaAccion) : document.createDocumentFragment(), entrada.fecha_propuesta ? elemento('span', ['cms-entrada-tarea'], `Fecha propuesta: ${fechaHoraProgramadaHumana(entrada.fecha_propuesta)}`) : document.createDocumentFragment(), entrada.detalle ? elemento('span', ['cms-proyecto-notas'], entrada.detalle) : document.createDocumentFragment(), ...resumenRespuestas, entrada.tarea_titulo ? elemento('span', ['cms-entrada-tarea'], `Tarea: ${entrada.tarea_titulo}`) : document.createDocumentFragment(), cumplimiento, acciones)
+      const cabecera = elemento('header', ['cms-entrada-cabecera'])
+      const identidad = elemento('div', ['cms-entrada-identidad'])
+      identidad.append(elemento('h4', [], entrada.nombre), elemento('span', ['cms-entrada-estado', `cms-entrada-estado-${entrada.estado || 'nueva'}`], entrada.estado === 'cerrada' ? 'Cumplida' : entrada.estado === 'derivada' ? 'Seguimiento iniciado' : 'Recibida'))
+      const metadatos = elemento('ul', ['cms-entrada-metadatos'])
+      ;[entrada.formulario_titulo || entrada.tipo, entrada.equipo_solicitante_nombre && `Origen: ${entrada.equipo_solicitante_nombre}`, (entrada.equipo_nombre || entrada.proyecto_titulo) && `Destino: ${entrada.equipo_nombre || entrada.proyecto_titulo}`, entrada.tipo === 'pedido' && `Prioridad ${entrada.prioridad}`, entrada.creado_en && `Recibida ${fechaHoraHumana(entrada.creado_en)}`].filter(Boolean).forEach((texto) => metadatos.appendChild(elemento('li', [], texto)))
+      cabecera.append(identidad, metadatos)
+
+      let contacto = document.createDocumentFragment()
+      if (entrada.contacto) {
+        contacto = elemento('div', ['cms-entrada-contacto'])
+        contacto.appendChild(elemento('span', [], 'Contacto'))
+        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entrada.contacto)) {
+          const enlaceContacto = document.createElement('a')
+          enlaceContacto.href = `mailto:${entrada.contacto}`
+          enlaceContacto.textContent = entrada.contacto
+          contacto.appendChild(enlaceContacto)
+        } else contacto.appendChild(elemento('strong', [], entrada.contacto))
+      }
+
+      const resumen = entrada.detalle ? elemento('section', ['cms-entrada-resumen']) : document.createDocumentFragment()
+      if (entrada.detalle) resumen.append(elemento('h5', [], 'Resumen inicial'), elemento('p', [], entrada.detalle))
+      const bloquePrincipal = grupoRespuestas('Respuestas del formulario', respuestasPrincipales)
+      const bloqueAcuerdos = grupoRespuestas('Acuerdos y preferencias', acuerdos, 'cms-entrada-acuerdos', densidadCMS === 'compacta')
+      let bloqueTrazabilidad = document.createDocumentFragment()
+      if (trazabilidad.length) {
+        bloqueTrazabilidad = elemento('details', ['cms-entrada-trazabilidad'])
+        bloqueTrazabilidad.appendChild(elemento('summary', [], `Consentimientos y trazabilidad (${trazabilidad.length})`))
+        const listaTrazabilidad = elemento('dl', ['cms-entrada-campos'])
+        trazabilidad.forEach((campo) => listaTrazabilidad.appendChild(campoRespuesta(campo)))
+        bloqueTrazabilidad.appendChild(listaTrazabilidad)
+      }
+      const seguimiento = entrada.tarea_titulo ? elemento('div', ['cms-entrada-seguimiento']) : document.createDocumentFragment()
+      if (entrada.tarea_titulo) seguimiento.append(elemento('span', [], 'Tarea vinculada'), elemento('strong', [], entrada.tarea_titulo))
+      tarjeta.append(cabecera, contacto, proximaAccion ? elemento('div', ['cms-entrada-proxima'], proximaAccion) : document.createDocumentFragment(), entrada.fecha_propuesta ? elemento('span', ['cms-entrada-tarea'], `Fecha propuesta: ${fechaHoraProgramadaHumana(entrada.fecha_propuesta)}`) : document.createDocumentFragment(), resumen, bloquePrincipal, bloqueAcuerdos, bloqueTrazabilidad, seguimiento, cumplimiento, acciones)
       lista.appendChild(tarjeta)
     })
     else {
@@ -2587,6 +3077,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     if (!esEdicion && !duplicando) {
       try { borrador = JSON.parse(window.localStorage.getItem(claveBorrador) || 'null') } catch { borrador = null }
     }
+    let configuracionPublica = configuracionPublicaFormulario(borrador?.configuracion_publica ?? formulario?.configuracion_publica_json ?? {})
     const forma = document.createElement('form'); forma.className = 'cms-captura'
     forma.append(elemento('span', ['cms-panel-etiqueta'], esEdicion ? 'Editar flujo' : duplicando ? 'Duplicar y adaptar' : 'Creación guiada'), elemento('h3', [], esEdicion ? `Editar formulario: ${formulario.titulo}` : duplicando ? `Duplicar formulario: ${formulario.titulo}` : 'Nuevo formulario'), elemento('p', ['ayuda'], duplicando ? 'Revisá el título, el destino y las preguntas. La copia se crea como un formulario independiente y no modifica el original.' : 'Definí el propósito, el recorrido de la respuesta y las preguntas. La configuración avanzada queda agrupada para evitar errores.'))
     const titulo = inputCms('Ej. Inscripción a Fútbol sin Barreras', 'Título del formulario'); titulo.required = true; titulo.maxLength = 180; titulo.value = borrador?.titulo ?? (duplicando ? `Copia de ${formulario?.titulo || ''}` : formulario?.titulo || '')
@@ -2599,6 +3090,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const equipoSolicitante = selectorCms([['', 'Sin equipo solicitante'], ...datos.equipos.map((fila) => [fila.id, fila.nombre])], 'Equipo solicitante'); equipoSolicitante.value = borrador?.equipo_solicitante_id || formulario?.equipo_solicitante_id || ''
     const prioridad = selectorCms([['baja', 'Prioridad baja'], ['normal', 'Prioridad normal'], ['alta', 'Prioridad alta'], ['urgente', 'Prioridad urgente']], 'Prioridad del pedido'); prioridad.value = borrador?.prioridad || formulario?.prioridad || 'normal'
     const proyecto = selectorCms([['', 'Sin proyecto'], ...datos.proyectos.map((fila) => [fila.id, fila.titulo])], 'Proyecto'); proyecto.value = borrador?.proyecto_id || formulario?.proyecto_id || ''
+    const ayudaClasificacion = vincularClasificacion({ equipo, unidad, proyecto })
     const destinoRespuesta = selectorCms([
       ['tarea', 'Crear tarea de seguimiento'], ['solicitud', 'Crear solicitud para el equipo'], ['actividad', 'Preparar actividad para revisar'],
       ['alta_persona', 'Preparar alta de persona'], ['contacto', 'Preparar contacto institucional'], ['archivo', 'Archivar sin crear tarea'],
@@ -2616,6 +3108,27 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       if (!descripcion.value) descripcion.value = descripcionValor
       tipo.dispatchEvent(new Event('change', { bubbles: true })); titulo.dispatchEvent(new Event('input', { bubbles: true })); titulo.focus()
     }, ['cms-formulario-modelo'])))
+    inicioRapido.appendChild(boton('WhatsApp Familias', () => {
+      titulo.value = 'Ingreso a los grupos de WhatsApp de Aletea'
+      descripcion.value = 'Completá tus datos, conocé cómo los cuidamos y aceptá las pautas de convivencia antes de solicitar el ingreso.'
+      tipo.value = 'inscripcion'; destinoRespuesta.value = 'solicitud'; visibilidad.value = 'publica'
+      const familias = datos.equipos.find((fila) => fila.clave === 'familias')
+      const whatsappFamilias = datos.unidades.find((fila) => fila.id === 'unidad-gwp' || fila.clave === 'gwp')
+      if (familias) {
+        equipo.value = familias.id
+        equipo.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+      if (whatsappFamilias) {
+        unidad.value = whatsappFamilias.id
+        unidad.dispatchEvent(new Event('change', { bubbles: true }))
+      }
+      finalidad.value = 'Gestionar el ingreso y la participación en los grupos de WhatsApp de familias de Aletea.'
+      responsableDatos.value = 'Aletea Asociación Civil'
+      conservacion.value = '12'; consentimiento.checked = true
+      aplicarConfiguracionPublica(configuracionWhatsAppFamilias())
+      ;[tipo, visibilidad, destinoRespuesta, titulo, descripcion].forEach((control) => control.dispatchEvent(new Event('change', { bubbles: true })))
+      titulo.focus()
+    }, ['cms-formulario-modelo', 'cms-formulario-modelo-familias']))
     const privacidad = elemento('details', ['cms-datos-adicionales', 'cms-privacidad-formulario'])
     privacidad.appendChild(elemento('summary', [], 'Uso de datos y privacidad'))
     const finalidad = areaCms('Ej. Responder esta consulta y derivarla al equipo correspondiente.', 'Finalidad de los datos'); finalidad.value = borrador?.finalidad || formulario?.finalidad || 'Responder la consulta y realizar su seguimiento.'; finalidad.maxLength = 500
@@ -2628,6 +3141,132 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       elemento('p', ['ayuda'], 'Este resumen se muestra antes del botón de envío. La política completa se edita en Página web > Privacidad.'),
       finalidad, responsableDatos, conservacion, consentimientoCaja,
     )
+    const experienciaPublica = elemento('details', ['cms-datos-adicionales', 'cms-experiencia-formulario'])
+    experienciaPublica.appendChild(elemento('summary', [], 'Experiencia del formulario público'))
+    const modeloPublico = selectorCms([[MODELO_FORMULARIO_GENERAL, 'Formulario general'], [MODELO_WHATSAPP_FAMILIAS, 'Ingreso a WhatsApp Familias']], 'Modelo de experiencia pública')
+    const nombreBase = selectorCms([['obligatorio', 'Obligatorio'], ['opcional', 'Opcional'], ['oculto', 'No pedir']], 'Nombre o referencia')
+    const contactoBase = selectorCms([['obligatorio', 'Obligatorio'], ['opcional', 'Opcional'], ['oculto', 'No pedir']], 'Contacto para responder')
+    const tipoContacto = selectorCms([['libre', 'Correo, teléfono u otro medio'], ['correo', 'Solo correo electrónico']], 'Tipo de contacto')
+    const confirmarContactoCaja = elemento('label', ['cms-configurador-requerido'])
+    const confirmarContacto = document.createElement('input'); confirmarContacto.type = 'checkbox'
+    confirmarContactoCaja.append(confirmarContacto, document.createTextNode(' Pedir que repita el correo para evitar errores'))
+    const detalleBase = selectorCms([['obligatorio', 'Obligatorio'], ['opcional', 'Opcional'], ['oculto', 'No pedir']], 'Mensaje o contexto')
+    const mostrarLogoCaja = elemento('label', ['cms-configurador-requerido'])
+    const mostrarLogo = document.createElement('input'); mostrarLogo.type = 'checkbox'
+    mostrarLogoCaja.append(mostrarLogo, document.createTextNode(' Mostrar el logo de Aletea'))
+    const contactoInstitucional = inputCms('Ej. info@aletea.org o 099 29 44 21', 'Contacto institucional visible')
+    const privacidadDetalladaCaja = elemento('label', ['cms-configurador-requerido'])
+    const privacidadDetallada = document.createElement('input'); privacidadDetallada.type = 'checkbox'
+    privacidadDetalladaCaja.append(privacidadDetallada, document.createTextNode(' Mostrar el aviso detallado dentro del formulario'))
+    const compromisoCaja = elemento('label', ['cms-configurador-requerido'])
+    const compromiso = document.createElement('input'); compromiso.type = 'checkbox'
+    compromisoCaja.append(compromiso, document.createTextNode(' Exigir el compromiso de confidencialidad y convivencia'))
+    const edicionPrivacidad = elemento('details', ['cms-datos-adicionales', 'cms-contenido-legal-formulario'])
+    edicionPrivacidad.appendChild(elemento('summary', [], 'Editar el aviso detallado'))
+    const privacidadTitulo = inputCms('Título del aviso', 'Título del aviso de privacidad'); privacidadTitulo.maxLength = 180
+    const privacidadIntroduccion = areaCms('Presentación del cuidado de datos.', 'Introducción del aviso'); privacidadIntroduccion.maxLength = 1200
+    const privacidadUso = areaCms('Explicá para qué se usarán los datos.', 'Uso de los datos'); privacidadUso.maxLength = 1200
+    const privacidadConfidencialidad = areaCms('Explicá cómo se cuidará la información.', 'Confidencialidad'); privacidadConfidencialidad.maxLength = 1200
+    const privacidadDerechos = areaCms('Explicá cómo ejercer los derechos sobre los datos.', 'Derechos sobre los datos'); privacidadDerechos.maxLength = 1200
+    const privacidadAceptacion = areaCms('Texto que acompaña la casilla obligatoria.', 'Aceptación de privacidad'); privacidadAceptacion.maxLength = 600
+    edicionPrivacidad.append(elemento('p', ['ayuda'], 'La versión de auditoría cambia automáticamente cuando editás este contenido.'), privacidadTitulo, privacidadIntroduccion, privacidadUso, privacidadConfidencialidad, privacidadDerechos, privacidadAceptacion)
+    const edicionCompromiso = elemento('details', ['cms-datos-adicionales', 'cms-contenido-legal-formulario'])
+    edicionCompromiso.appendChild(elemento('summary', [], 'Editar el acuerdo requerido'))
+    const compromisoTitulo = inputCms('Título del acuerdo', 'Título del acuerdo'); compromisoTitulo.maxLength = 180
+    const compromisoIntroduccion = areaCms('Presentación breve del acuerdo.', 'Introducción del acuerdo'); compromisoIntroduccion.maxLength = 1200
+    const compromisoSecciones = areaCms('## Tema\n- Compromiso\n- Otro compromiso', 'Temas y compromisos'); compromisoSecciones.maxLength = 12000; compromisoSecciones.rows = 12
+    const compromisoAceptacion = areaCms('Texto que acompaña la casilla obligatoria.', 'Aceptación del acuerdo'); compromisoAceptacion.maxLength = 600
+    edicionCompromiso.append(elemento('p', ['ayuda'], 'Usá una línea con ## para cada tema y una línea con - para cada compromiso. La versión de auditoría se actualiza sola.'), compromisoTitulo, compromisoIntroduccion, compromisoSecciones, compromisoAceptacion)
+    const textoCierre = areaCms('Mensaje breve antes de enviar.', 'Texto de cierre'); textoCierre.maxLength = 800
+    const invitacionTitulo = inputCms('Título para el mensaje que acompaña al enlace', 'Título de la invitación'); invitacionTitulo.maxLength = 180
+    const invitacionTexto = areaCms('Texto listo para copiar y compartir.', 'Texto de la invitación'); invitacionTexto.maxLength = 1000
+    const enlaceContactoDesde = (valor) => {
+      const limpio = String(valor || '').trim()
+      if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(limpio)) return `mailto:${limpio}`
+      const telefono = limpio.replace(/[^+\d]/g, '')
+      return telefono.length >= 7 ? `tel:${telefono}` : ''
+    }
+    const actualizarControlesDependientes = () => {
+      confirmarContactoCaja.hidden = tipoContacto.value !== 'correo' || contactoBase.value === 'oculto'
+      confirmarContacto.disabled = confirmarContactoCaja.hidden
+      edicionPrivacidad.hidden = !privacidadDetallada.checked
+      edicionCompromiso.hidden = !compromiso.checked
+    }
+    const sincronizarConfiguracionPublica = () => {
+      configuracionPublica = configuracionPublicaFormulario({
+        ...configuracionPublica,
+        modelo: modeloPublico.value,
+        nombre: nombreBase.value,
+        contacto: contactoBase.value,
+        contacto_tipo: tipoContacto.value,
+        confirmar_contacto: confirmarContacto.checked,
+        detalle: detalleBase.value,
+        mostrar_logo: mostrarLogo.checked,
+        contacto_institucional: contactoInstitucional.value,
+        contacto_institucional_enlace: enlaceContactoDesde(contactoInstitucional.value),
+        privacidad_detallada: privacidadDetallada.checked,
+        privacidad_contenido: {
+          titulo: privacidadTitulo.value,
+          introduccion: privacidadIntroduccion.value,
+          uso: privacidadUso.value,
+          confidencialidad: privacidadConfidencialidad.value,
+          derechos: privacidadDerechos.value,
+          aceptacion: privacidadAceptacion.value,
+        },
+        requiere_compromiso: compromiso.checked,
+        compromiso_contenido: {
+          ...configuracionPublica.compromiso_contenido,
+          titulo: compromisoTitulo.value,
+          introduccion: compromisoIntroduccion.value,
+          secciones: seccionesCompromisoDesdeTexto(compromisoSecciones.value),
+          aceptacion: compromisoAceptacion.value,
+        },
+        texto_cierre: textoCierre.value,
+        invitacion_titulo: invitacionTitulo.value,
+        invitacion_texto: invitacionTexto.value,
+      })
+      actualizarControlesDependientes()
+    }
+    const aplicarConfiguracionPublica = (valor) => {
+      configuracionPublica = configuracionPublicaFormulario(valor)
+      modeloPublico.value = configuracionPublica.modelo
+      nombreBase.value = configuracionPublica.nombre
+      contactoBase.value = configuracionPublica.contacto
+      tipoContacto.value = configuracionPublica.contacto_tipo
+      confirmarContacto.checked = configuracionPublica.confirmar_contacto
+      detalleBase.value = configuracionPublica.detalle
+      mostrarLogo.checked = configuracionPublica.mostrar_logo
+      contactoInstitucional.value = configuracionPublica.contacto_institucional
+      privacidadDetallada.checked = configuracionPublica.privacidad_detallada
+      compromiso.checked = configuracionPublica.requiere_compromiso
+      privacidadTitulo.value = configuracionPublica.privacidad_contenido.titulo
+      privacidadIntroduccion.value = configuracionPublica.privacidad_contenido.introduccion
+      privacidadUso.value = configuracionPublica.privacidad_contenido.uso
+      privacidadConfidencialidad.value = configuracionPublica.privacidad_contenido.confidencialidad
+      privacidadDerechos.value = configuracionPublica.privacidad_contenido.derechos
+      privacidadAceptacion.value = configuracionPublica.privacidad_contenido.aceptacion
+      compromisoTitulo.value = configuracionPublica.compromiso_contenido.titulo
+      compromisoIntroduccion.value = configuracionPublica.compromiso_contenido.introduccion
+      compromisoSecciones.value = textoSeccionesCompromiso(configuracionPublica.compromiso_contenido.secciones)
+      compromisoAceptacion.value = configuracionPublica.compromiso_contenido.aceptacion
+      textoCierre.value = configuracionPublica.texto_cierre
+      invitacionTitulo.value = configuracionPublica.invitacion_titulo
+      invitacionTexto.value = configuracionPublica.invitacion_texto
+      actualizarControlesDependientes()
+    }
+    modeloPublico.addEventListener('change', () => aplicarConfiguracionPublica(modeloPublico.value === MODELO_WHATSAPP_FAMILIAS ? configuracionWhatsAppFamilias() : { modelo: MODELO_FORMULARIO_GENERAL }))
+    ;[nombreBase, contactoBase, tipoContacto, confirmarContacto, detalleBase, mostrarLogo, contactoInstitucional, privacidadDetallada, privacidadTitulo, privacidadIntroduccion, privacidadUso, privacidadConfidencialidad, privacidadDerechos, privacidadAceptacion, compromiso, compromisoTitulo, compromisoIntroduccion, compromisoSecciones, compromisoAceptacion, textoCierre, invitacionTitulo, invitacionTexto].forEach((control) => {
+      control.addEventListener('input', sincronizarConfiguracionPublica)
+      control.addEventListener('change', sincronizarConfiguracionPublica)
+    })
+    experienciaPublica.append(
+      elemento('p', ['ayuda'], 'Podés simplificar las tres preguntas base, validar un correo repetido y preparar el texto que acompaña al enlace.'),
+      campoCms('Modelo', modeloPublico), campoCms('Nombre o referencia', nombreBase), campoCms('Contacto', contactoBase),
+      campoCms('Validación del contacto', tipoContacto), confirmarContactoCaja, campoCms('Mensaje o contexto', detalleBase),
+      mostrarLogoCaja, campoCms('Contacto institucional', contactoInstitucional), privacidadDetalladaCaja, edicionPrivacidad, compromisoCaja, edicionCompromiso,
+      campoCms('Cierre del recorrido', textoCierre), campoCms('Título para compartir', invitacionTitulo), campoCms('Mensaje para compartir', invitacionTexto),
+    )
+    aplicarConfiguracionPublica(configuracionPublica)
     let campos = []
     try { campos = Array.isArray(borrador?.campos) ? borrador.campos : JSON.parse(formulario?.campos_json || '[]') } catch { campos = [] }
     const configurador = elemento('section', ['cms-configurador-campos'])
@@ -2638,31 +3277,32 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       campos.forEach((campo, indice) => {
         const fila = elemento('article', ['cms-configurador-campo'])
         const etiqueta = inputCms('Ej. Preferencia de horario', `Título del campo ${indice + 1}`); etiqueta.value = campo.etiqueta || ''; etiqueta.required = true
-        const tipoCampo = selectorCms([['texto', 'Texto breve'], ['texto_largo', 'Texto largo'], ['seleccion', 'Lista de opciones'], ['casilla', 'Casilla de confirmación'], ['fecha', 'Fecha']], `Tipo del campo ${indice + 1}`); tipoCampo.value = campo.tipo || 'texto'
+        const tipoCampo = selectorCms([['texto', 'Texto breve'], ['correo', 'Correo electrónico'], ['numero', 'Número o importe'], ['texto_largo', 'Texto largo'], ['seleccion', 'Una opción de una lista'], ['seleccion_multiple', 'Varias opciones de una lista'], ['casilla', 'Casilla de confirmación'], ['fecha', 'Fecha']], `Tipo del campo ${indice + 1}`); tipoCampo.value = campo.tipo || 'texto'
         const ayuda = inputCms('Ayuda opcional para responder', `Ayuda del campo ${indice + 1}`); ayuda.value = campo.ayuda || ''
         const opciones = inputCms('Opción 1, Opción 2', `Opciones del campo ${indice + 1}`); opciones.value = (campo.opciones || []).join(', ')
         const requeridoCaja = elemento('label', ['cms-configurador-requerido']); const requerido = document.createElement('input'); requerido.type = 'checkbox'; requerido.checked = Boolean(campo.requerido); requeridoCaja.append(requerido, document.createTextNode(' Respuesta obligatoria'))
+        const confirmarCorreoCaja = elemento('label', ['cms-configurador-requerido']); const confirmarCorreo = document.createElement('input'); confirmarCorreo.type = 'checkbox'; confirmarCorreo.checked = Boolean(campo.confirmar_correo); confirmarCorreoCaja.append(confirmarCorreo, document.createTextNode(' Pedir que repita este correo'))
         const condicion = selectorCms([['', 'Siempre visible'], ...campos.slice(0, indice).map((anterior, anteriorIndice) => [anterior.clave || normalizarClave(anterior.etiqueta || '', anteriorIndice), `Mostrar según: ${anterior.etiqueta || `Campo ${anteriorIndice + 1}`}`])], `Condición del campo ${indice + 1}`); condicion.value = campo.mostrar_si?.campo || ''
         const valorCondicion = inputCms('Valor que muestra este campo', `Valor de condición del campo ${indice + 1}`); valorCondicion.value = campo.mostrar_si?.valor || ''; valorCondicion.hidden = !condicion.value
         const sincronizar = () => {
           campo.etiqueta = etiqueta.value; campo.clave = normalizarClave(etiqueta.value, indice); campo.tipo = tipoCampo.value; campo.ayuda = ayuda.value
-          campo.opciones = opciones.value.split(',').map((valor) => valor.trim()).filter(Boolean); campo.requerido = requerido.checked
+          campo.opciones = opciones.value.split(',').map((valor) => valor.trim()).filter(Boolean); campo.requerido = requerido.checked; campo.confirmar_correo = tipoCampo.value === 'correo' && confirmarCorreo.checked
           campo.mostrar_si = condicion.value ? { campo: condicion.value, valor: valorCondicion.value } : null
-          opciones.hidden = tipoCampo.value !== 'seleccion'; valorCondicion.hidden = !condicion.value
+          opciones.hidden = !['seleccion', 'seleccion_multiple'].includes(tipoCampo.value); confirmarCorreoCaja.hidden = tipoCampo.value !== 'correo'; valorCondicion.hidden = !condicion.value
         }
-        ;[etiqueta, tipoCampo, ayuda, opciones, requerido, condicion, valorCondicion].forEach((control) => control.addEventListener('input', sincronizar))
+        ;[etiqueta, tipoCampo, ayuda, opciones, requerido, confirmarCorreo, condicion, valorCondicion].forEach((control) => control.addEventListener('input', sincronizar))
         tipoCampo.addEventListener('change', sincronizar); condicion.addEventListener('change', sincronizar); sincronizar()
         const quitar = boton('Quitar campo', () => { campos.splice(indice, 1); dibujarCampos(); guardarBorrador() })
-        fila.append(elemento('strong', [], `Campo ${indice + 1}`), etiqueta, tipoCampo, opciones, ayuda, requeridoCaja, condicion, valorCondicion, quitar)
+        fila.append(elemento('strong', [], `Campo ${indice + 1}`), etiqueta, tipoCampo, opciones, ayuda, requeridoCaja, confirmarCorreoCaja, condicion, valorCondicion, quitar)
         listaCampos.appendChild(fila)
       })
-      if (!campos.length) listaCampos.appendChild(elemento('p', ['ayuda'], 'Todavía no agregaste preguntas propias. Nombre, contacto y mensaje se incluyen siempre.'))
+      if (!campos.length) listaCampos.appendChild(elemento('p', ['ayuda'], 'Todavía no agregaste preguntas propias. Nombre, contacto y mensaje se configuran en Experiencia del formulario público.'))
     }
-    const agregarCampo = boton('Agregar pregunta', () => { if (campos.length >= 20) return; campos.push({ clave: `campo_${campos.length + 1}`, etiqueta: '', tipo: 'texto', requerido: false, ayuda: '', opciones: [], mostrar_si: null }); dibujarCampos(); guardarBorrador() })
+    const agregarCampo = boton('Agregar pregunta', () => { if (campos.length >= 20) return; campos.push({ clave: `campo_${campos.length + 1}`, etiqueta: '', tipo: 'texto', requerido: false, confirmar_correo: false, ayuda: '', opciones: [], mostrar_si: null }); dibujarCampos(); guardarBorrador() })
     configurador.append(elemento('h4', [], 'Preguntas configurables'), elemento('p', ['ayuda'], 'Agregá hasta 20 preguntas. Una pregunta condicional puede depender de una respuesta anterior.'), listaCampos, agregarCampo)
     dibujarCampos()
-    const aviso = elemento('p', ['ayuda'], 'Un formulario público solo pide nombre, contacto y mensaje. Si elegís un equipo, la tarea se asigna automáticamente a su coordinación o referente. Las respuestas nunca crean perfiles de personas automáticamente.')
-    const revisarPedido = () => { const esPedido = tipo.value === 'pedido'; const esPropuesta = tipo.value === 'propuesta'; equipo.required = esPedido || esPropuesta; equipoSolicitante.required = esPedido; equipoSolicitante.hidden = !esPedido; prioridad.hidden = !esPedido; aviso.textContent = esPropuesta ? 'Una propuesta pide objetivo, pasos, recursos y personas necesarias. Se deriva automáticamente al equipo elegido para su evaluación.' : esPedido ? 'Un pedido necesita equipo solicitante, equipo destinatario y prioridad. Cada respuesta se asigna automáticamente a la coordinación o referente del equipo destinatario.' : 'Un formulario público solo pide nombre, contacto y mensaje. Si elegís un equipo, la tarea se asigna automáticamente a su coordinación o referente. Las respuestas nunca crean perfiles de personas automáticamente.' }
+    const aviso = elemento('p', ['ayuda'], 'Las preguntas base se pueden simplificar. Si elegís un equipo, la respuesta se asigna automáticamente a su coordinación o referente. Nunca se crean perfiles sensibles automáticamente.')
+    const revisarPedido = () => { const esPedido = tipo.value === 'pedido'; const esPropuesta = tipo.value === 'propuesta'; equipo.required = esPedido || esPropuesta; equipoSolicitante.required = esPedido; equipoSolicitante.hidden = !esPedido; prioridad.hidden = !esPedido; aviso.textContent = esPropuesta ? 'Una propuesta pide objetivo, pasos, recursos y personas necesarias. Se deriva automáticamente al equipo elegido para su evaluación.' : esPedido ? 'Un pedido necesita equipo solicitante, equipo destinatario y prioridad. Cada respuesta se asigna automáticamente a la coordinación o referente del equipo destinatario.' : 'Las preguntas base se pueden simplificar. Si elegís un equipo, la respuesta se asigna automáticamente a su coordinación o referente. Nunca se crean perfiles sensibles automáticamente.' }
     tipo.addEventListener('change', revisarPedido); revisarPedido()
     const revisarVisibilidad = () => {
       const esPublico = visibilidad.value === 'publica'
@@ -2681,12 +3321,14 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         elemento('p', [], descripcion.value.trim() || 'La descripción ayudará a entender para qué sirve y qué ocurrirá después.'),
       )
       const resumenVista = elemento('div', ['cms-formulario-vista-previa-meta'])
+      const preguntasBase = [configuracionPublica.nombre, configuracionPublica.contacto, configuracionPublica.detalle].filter((estado) => estado !== 'oculto').length
       ;[
         visibilidad.value === 'publica' ? 'Enlace público' : 'Uso interno',
-        `${campos.length + 3} preguntas`,
+        `${campos.length + preguntasBase} preguntas`,
+        configuracionPublica.requiere_compromiso && 'Acuerdo obligatorio',
         `Destino: ${equipoNombre}`,
         destinoNombre,
-      ].forEach((texto) => resumenVista.appendChild(elemento('span', [], texto)))
+      ].filter(Boolean).forEach((texto) => resumenVista.appendChild(elemento('span', [], texto)))
       vistaPrevia.appendChild(resumenVista)
     }
     const datosDelBorrador = () => ({
@@ -2694,7 +3336,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       equipo_id: equipo.value, unidad_id: unidad.value, equipo_solicitante_id: equipoSolicitante.value, prioridad: prioridad.value,
       proyecto_id: proyecto.value, destino_respuesta: destinoRespuesta.value, finalidad: finalidad.value,
       responsable_datos: responsableDatos.value, conservacion_meses: Number(conservacion.value),
-      requiere_consentimiento: consentimiento.checked, campos,
+      requiere_consentimiento: consentimiento.checked, configuracion_publica: configuracionPublica, campos,
     })
     const guardarBorrador = () => {
       actualizarVistaPrevia()
@@ -2707,7 +3349,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const guardar = boton(esEdicion ? 'Guardar formulario' : duplicando ? 'Crear copia' : 'Crear formulario', async () => {
       if (guardando || !forma.reportValidity()) return
       guardando = true
-      const datosFormulario = { titulo: titulo.value, descripcion: descripcion.value, tipo: tipo.value, visibilidad: visibilidad.value, estado: estado.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, equipo_solicitante_id: equipoSolicitante.value || null, prioridad: prioridad.value, proyecto_id: proyecto.value || null, finalidad: finalidad.value, responsable_datos: responsableDatos.value, conservacion_meses: Number(conservacion.value), requiere_consentimiento: consentimiento.checked, destino_respuesta: destinoRespuesta.value, campos }
+      sincronizarConfiguracionPublica()
+      const datosFormulario = { titulo: titulo.value, descripcion: descripcion.value, tipo: tipo.value, visibilidad: visibilidad.value, estado: estado.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, equipo_solicitante_id: equipoSolicitante.value || null, prioridad: prioridad.value, proyecto_id: proyecto.value || null, finalidad: finalidad.value, responsable_datos: responsableDatos.value, conservacion_meses: Number(conservacion.value), requiere_consentimiento: consentimiento.checked, destino_respuesta: destinoRespuesta.value, configuracion_publica: configuracionPublica, campos }
       try {
         await pedir(esEdicion ? `/api/cms/formularios/${formulario.id}` : '/api/cms/formularios', { method: esEdicion ? 'PATCH' : 'POST', body: JSON.stringify(datosFormulario) })
         if (!esEdicion && !duplicando) { try { window.localStorage.removeItem(claveBorrador) } catch {} }
@@ -2726,8 +3369,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     acciones.append(cancelar, guardar)
     const proposito = elemento('fieldset', ['cms-formulario-paso']); proposito.append(elemento('legend', [], '1. Propósito y acceso'), inicioRapido, campoCms('Título', titulo), campoCms('Descripción breve', descripcion), campoCms('Tipo de formulario', tipo), campoCms('Quién puede responder', visibilidad), campoCms('Estado', estado))
-    const recorrido = elemento('fieldset', ['cms-formulario-paso']); recorrido.append(elemento('legend', [], '2. Recorrido de cada respuesta'), campoCms('Equipo que la recibe', equipo), campoCms('Programa o espacio relacionado, opcional', unidad), equipoSolicitante, prioridad, campoCms('Proyecto relacionado, opcional', proyecto), campoCms('Al recibir una respuesta', destinoRespuesta, 'Las altas de personas, contactos y actividades quedan siempre como borradores para revisar. Nunca modifican fichas sensibles automáticamente.'))
-    const preguntas = elemento('fieldset', ['cms-formulario-paso']); preguntas.append(elemento('legend', [], '3. Preguntas y revisión'), configurador, privacidad, aviso, vistaPrevia)
+    const recorrido = elemento('fieldset', ['cms-formulario-paso']); recorrido.append(elemento('legend', [], '2. Recorrido de cada respuesta'), campoCms('Equipo que la recibe', equipo), campoCms('Programa o espacio relacionado, opcional', unidad), equipoSolicitante, prioridad, campoCms('Proyecto relacionado, opcional', proyecto), ayudaClasificacion, campoCms('Al recibir una respuesta', destinoRespuesta, 'Las altas de personas, contactos y actividades quedan siempre como borradores para revisar. Nunca modifican fichas sensibles automáticamente.'))
+    const preguntas = elemento('fieldset', ['cms-formulario-paso']); preguntas.append(elemento('legend', [], '3. Preguntas y revisión'), experienciaPublica, configurador, privacidad, aviso, vistaPrevia)
     forma.append(proposito, recorrido, preguntas, acciones)
     forma.addEventListener('input', guardarBorrador)
     forma.addEventListener('change', guardarBorrador)
@@ -2738,9 +3381,13 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   function formularioRespuestaFormulario(formulario) {
     const forma = document.createElement('form'); forma.className = 'cms-captura'
     forma.appendChild(elemento('h3', [], `Registrar respuesta: ${formulario.titulo}`))
-    const nombre = inputCms('Nombre o referencia', 'Nombre'); nombre.required = true; nombre.maxLength = 180
-    const contacto = inputCms('Correo, teléfono o quien responde', 'Contacto'); contacto.required = true; contacto.maxLength = 180
-    const detalle = areaCms('Mensaje o contexto para quien hará el seguimiento', 'Mensaje')
+    const configuracion = configuracionPublicaFormulario(formulario.configuracion_publica_json)
+    const nombre = inputCms('Nombre o referencia', 'Nombre'); nombre.required = configuracion.nombre === 'obligatorio'; nombre.maxLength = 180
+    const contacto = inputCms(configuracion.contacto_tipo === 'correo' ? 'Correo electrónico' : 'Correo, teléfono o quien responde', 'Contacto'); contacto.type = configuracion.contacto_tipo === 'correo' ? 'email' : 'text'; contacto.required = configuracion.contacto === 'obligatorio'; contacto.maxLength = 180
+    const confirmarContacto = inputCms('Repetí el correo electrónico', 'Confirmar correo'); confirmarContacto.type = 'email'; confirmarContacto.required = configuracion.confirmar_contacto
+    const validarConfirmacion = () => confirmarContacto.setCustomValidity(configuracion.confirmar_contacto && contacto.value.trim().toLocaleLowerCase('es') !== confirmarContacto.value.trim().toLocaleLowerCase('es') ? 'Los correos electrónicos no coinciden.' : '')
+    contacto.addEventListener('input', validarConfirmacion); confirmarContacto.addEventListener('input', validarConfirmacion)
+    const detalle = areaCms('Mensaje o contexto para quien hará el seguimiento', 'Mensaje'); detalle.required = configuracion.detalle === 'obligatorio'
     const objetivo = areaCms('Qué busca lograr la propuesta', 'Objetivo de la propuesta'); objetivo.required = formulario.tipo === 'propuesta'
     const pasos = areaCms('Pasos o actividades principales', 'Pasos de la propuesta')
     const recursos = areaCms('Recursos necesarios', 'Recursos de la propuesta')
@@ -2748,29 +3395,77 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     let campos = []
     try { campos = JSON.parse(formulario.campos_json || '[]') } catch { campos = [] }
     const respuestas = {}
+    const confirmacionesCorreo = {}
     const camposPersonalizados = campos.map((campo) => {
-      const contenedor = elemento('label', ['cms-campo-personalizado'])
+      const confirmaCorreo = campo.tipo === 'correo' && Boolean(campo.confirmar_correo)
+      const contenedor = elemento(confirmaCorreo ? 'div' : 'label', ['cms-campo-personalizado'])
       contenedor.appendChild(elemento('span', [], `${campo.etiqueta}${campo.requerido ? ' *' : ''}`))
       let control
       if (campo.tipo === 'texto_largo') control = areaCms(campo.ayuda || 'Escribí la respuesta', campo.etiqueta)
       else if (campo.tipo === 'seleccion') control = selectorCms([['', 'Elegir'], ...(campo.opciones || []).map((opcion) => [opcion, opcion])], campo.etiqueta)
-      else { control = document.createElement('input'); control.type = campo.tipo === 'casilla' ? 'checkbox' : campo.tipo === 'fecha' ? 'date' : 'text'; control.setAttribute('aria-label', campo.etiqueta) }
+      else if (campo.tipo === 'seleccion_multiple') {
+        control = selectorCms((campo.opciones || []).map((opcion) => [opcion, opcion]), campo.etiqueta)
+        control.multiple = true; control.size = Math.min(6, Math.max(2, (campo.opciones || []).length))
+      } else {
+        control = document.createElement('input')
+        control.type = campo.tipo === 'casilla' ? 'checkbox' : campo.tipo === 'fecha' ? 'date' : campo.tipo === 'correo' ? 'email' : campo.tipo === 'numero' ? 'number' : 'text'
+        if (campo.tipo === 'numero') control.step = 'any'
+        control.setAttribute('aria-label', campo.etiqueta)
+      }
       control.required = Boolean(campo.requerido); contenedor.appendChild(control)
-      const actualizarVisibilidad = () => { contenedor.hidden = Boolean(campo.mostrar_si) && String(respuestas[campo.mostrar_si.campo] ?? '') !== campo.mostrar_si.valor; if (contenedor.hidden) control.required = false; else control.required = Boolean(campo.requerido) }
-      const guardarRespuesta = () => { respuestas[campo.clave] = control.type === 'checkbox' ? control.checked : control.value; camposPersonalizados.forEach((fila) => fila.actualizarVisibilidad()) }
+      let confirmacionCorreo = null
+      if (confirmaCorreo) {
+        const cajaConfirmacion = elemento('label', ['cms-campo-personalizado', 'cms-confirmacion-correo'])
+        cajaConfirmacion.appendChild(elemento('span', [], `Confirmá ${campo.etiqueta.toLocaleLowerCase('es')}`))
+        confirmacionCorreo = document.createElement('input'); confirmacionCorreo.type = 'email'; confirmacionCorreo.maxLength = 500
+        cajaConfirmacion.appendChild(confirmacionCorreo); contenedor.appendChild(cajaConfirmacion)
+      }
+      const actualizarVisibilidad = () => {
+        const anterior = respuestas[campo.mostrar_si?.campo]
+        contenedor.hidden = Boolean(campo.mostrar_si) && !(Array.isArray(anterior) ? anterior.includes(campo.mostrar_si.valor) : String(anterior ?? '') === campo.mostrar_si.valor)
+        control.required = contenedor.hidden ? false : Boolean(campo.requerido)
+        if (confirmacionCorreo) confirmacionCorreo.required = !contenedor.hidden && (Boolean(campo.requerido) || Boolean(control.value))
+      }
+      const validarCorreo = () => {
+        if (!confirmacionCorreo) return
+        const coincide = control.value.trim().toLocaleLowerCase('es') === confirmacionCorreo.value.trim().toLocaleLowerCase('es')
+        confirmacionCorreo.setCustomValidity(confirmacionCorreo.value && !coincide ? 'Los correos electrónicos no coinciden.' : '')
+        confirmacionesCorreo[campo.clave] = confirmacionCorreo.value
+      }
+      const guardarRespuesta = () => {
+        respuestas[campo.clave] = campo.tipo === 'seleccion_multiple' ? [...control.selectedOptions].map((opcion) => opcion.value) : control.type === 'checkbox' ? control.checked : control.value
+        validarCorreo()
+        camposPersonalizados.forEach((fila) => fila.actualizarVisibilidad())
+      }
       control.addEventListener('input', guardarRespuesta); control.addEventListener('change', guardarRespuesta)
-      return { contenedor, actualizarVisibilidad, guardarRespuesta }
+      if (confirmacionCorreo) { confirmacionCorreo.addEventListener('input', validarCorreo); confirmacionCorreo.addEventListener('change', validarCorreo) }
+      return { contenedor, actualizarVisibilidad, guardarRespuesta, validarCorreo }
     })
     camposPersonalizados.forEach((fila) => fila.actualizarVisibilidad())
+    const acuerdos = elemento('section', ['cms-acuerdos-respuesta'])
+    acuerdos.appendChild(elemento('h4', [], 'Confirmaciones de la persona'))
+    acuerdos.appendChild(elemento('p', ['ayuda'], 'Marcá una confirmación únicamente si la persona leyó y aceptó el texto vigente. La versión y la fecha quedarán registradas.'))
+    const privacidadAceptadaCaja = elemento('label', ['cms-configurador-requerido'])
+    const privacidadAceptada = document.createElement('input'); privacidadAceptada.type = 'checkbox'; privacidadAceptada.required = Boolean(formulario.requiere_consentimiento)
+    privacidadAceptadaCaja.append(privacidadAceptada, document.createTextNode(` La persona confirmó: ${configuracion.privacidad_contenido.aceptacion}`))
+    privacidadAceptadaCaja.hidden = !Boolean(formulario.requiere_consentimiento)
+    const compromisoAceptadoCaja = elemento('label', ['cms-configurador-requerido'])
+    const compromisoAceptado = document.createElement('input'); compromisoAceptado.type = 'checkbox'; compromisoAceptado.required = configuracion.requiere_compromiso
+    compromisoAceptadoCaja.append(compromisoAceptado, document.createTextNode(` La persona confirmó: ${configuracion.compromiso_contenido.aceptacion}`))
+    compromisoAceptadoCaja.hidden = !configuracion.requiere_compromiso
+    acuerdos.append(privacidadAceptadaCaja, compromisoAceptadoCaja)
+    acuerdos.hidden = privacidadAceptadaCaja.hidden && compromisoAceptadoCaja.hidden
     const acciones = elemento('div', ['cms-captura-acciones'])
     const cancelar = boton('Cancelar', () => { formularioAbierto = null; formularioParaRespuesta = null; dibujar() })
     const guardar = boton('Derivar respuesta', async () => {
+      validarConfirmacion()
+      camposPersonalizados.forEach((fila) => fila.validarCorreo())
       if (guardando || !forma.reportValidity()) return
       guardando = true
-      try { await pedir(`/api/cms/formularios/${formulario.id}/respuestas`, { method: 'POST', body: JSON.stringify({ nombre: nombre.value, contacto: contacto.value, detalle: detalle.value, objetivo: objetivo.value, pasos: pasos.value, recursos: recursos.value, personas_necesarias: personas.value, respuestas, empresa: '' }) }); formularioAbierto = null; formularioParaRespuesta = null; await cargar() } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
+      try { await pedir(`/api/cms/formularios/${formulario.id}/respuestas`, { method: 'POST', body: JSON.stringify({ nombre: nombre.value, contacto: contacto.value, contacto_confirmacion: confirmarContacto.value, detalle: detalle.value, objetivo: objetivo.value, pasos: pasos.value, recursos: recursos.value, personas_necesarias: personas.value, respuestas, confirmaciones_correo: confirmacionesCorreo, consentimiento_privacidad: privacidadAceptada.checked, compromiso_confidencialidad: compromisoAceptado.checked, empresa: '' }) }); formularioAbierto = null; formularioParaRespuesta = null; await cargar() } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
     }, ['boton-principal'])
     acciones.append(cancelar, guardar)
-    forma.append(nombre, contacto, detalle, formulario.tipo === 'propuesta' ? objetivo : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? pasos : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? recursos : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? personas : document.createDocumentFragment(), ...camposPersonalizados.map((fila) => fila.contenedor), elemento('p', ['ayuda'], 'La respuesta quedará en la bandeja y tendrá una tarea de seguimiento.'), acciones)
+    forma.append(configuracion.nombre === 'oculto' ? document.createDocumentFragment() : nombre, configuracion.contacto === 'oculto' ? document.createDocumentFragment() : contacto, configuracion.confirmar_contacto && configuracion.contacto !== 'oculto' ? confirmarContacto : document.createDocumentFragment(), configuracion.detalle === 'oculto' ? document.createDocumentFragment() : detalle, formulario.tipo === 'propuesta' ? objetivo : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? pasos : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? recursos : document.createDocumentFragment(), formulario.tipo === 'propuesta' ? personas : document.createDocumentFragment(), ...camposPersonalizados.map((fila) => fila.contenedor), acuerdos, elemento('p', ['ayuda'], 'La respuesta quedará en la bandeja y tendrá una tarea de seguimiento.'), acciones)
     forma.addEventListener('submit', (evento) => { evento.preventDefault(); guardar.click() })
     return forma
   }
@@ -2810,7 +3505,13 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       if (filtroFormularios === valor) control.classList.add('activa')
       filtros.appendChild(control)
     })
-    herramientas.append(buscar, filtros)
+    const filtrosPlegables = elemento('details', ['cms-filtros-secundarios'])
+    filtrosPlegables.open = filtrosFormulariosAbiertos || filtroFormularios !== 'todos'
+    filtrosPlegables.addEventListener('toggle', () => { filtrosFormulariosAbiertos = filtrosPlegables.open })
+    const contenidoFiltros = elemento('div', ['cms-filtros-contenido'])
+    contenidoFiltros.appendChild(filtros)
+    filtrosPlegables.append(elemento('summary', [], filtroFormularios === 'todos' ? 'Más filtros' : 'Más filtros (1 activo)'), contenidoFiltros)
+    herramientas.append(buscar, filtrosPlegables)
     const consulta = busquedaFormularios.trim().toLocaleLowerCase('es')
     const formularios = datos.formularios.filter((formulario) => {
       if (filtroFormularios === 'publicos') return formulario.visibilidad === 'publica'
@@ -2828,22 +3529,56 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const lista = elemento('div', ['cms-formularios-lista'])
     if (formularios.length) formularios.forEach((formulario) => {
       const tarjeta = elemento('article', ['cms-formulario'])
-      const acciones = elemento('div', ['cms-reunion-acciones'])
-      if (puedeVerRespuestas()) acciones.appendChild(boton('Registrar respuesta', () => { formularioParaRespuesta = formulario.id; formularioAbierto = 'respuesta-formulario'; dibujar() }))
-      acciones.appendChild(boton('Editar', () => { formularioAEditar = formulario.id; formularioAbierto = 'editar-formulario'; dibujar() }))
-      acciones.appendChild(boton('Duplicar', () => { formularioParaDuplicar = formulario.id; formularioAbierto = 'duplicar-formulario'; dibujar() }))
+      const equipo = datos.equipos.find((fila) => fila.id === formulario.equipo_id)
+      const referencias = datos.responsabilidades.filter((fila) => fila.equipo_id === formulario.equipo_id && fila.activo !== false && ['coordinacion', 'referente'].includes(fila.tipo))
+      const destinoAcceso = elemento('section', ['cms-formulario-destino'])
+      destinoAcceso.setAttribute('aria-label', `Destino y acceso de ${formulario.titulo}`)
+      const encabezadoDestino = elemento('div', ['cms-formulario-destino-encabezado'])
+      encabezadoDestino.append(
+        elemento('strong', [], 'Destino y acceso'),
+        elemento('span', ['cms-formulario-destino-equipo'], equipo?.nombre || 'Sin equipo asignado'),
+      )
+      const politica = equipo
+        ? `Las respuestas llegan a ${equipo.nombre}. Pueden abrirlas Administración, Dirección y Coordinación de ${equipo.nombre}, siempre con acceso vigente a datos personales.`
+        : 'Este formulario todavía no tiene una bandeja de equipo. Asigná un destino antes de compartirlo.'
+      const seguimiento = referencias.length
+        ? `Referencia inicial: ${referencias.map((fila) => fila.usuario_nombre || fila.usuario_correo).join(', ')}.`
+        : equipo ? `Falta asignar una coordinación o referencia en ${equipo.nombre} para asegurar el seguimiento.` : ''
+      destinoAcceso.append(encabezadoDestino, elemento('p', [], politica), seguimiento ? elemento('p', [referencias.length ? 'cms-formulario-referencia' : 'cms-formulario-advertencia'], seguimiento) : document.createDocumentFragment())
+      if (datos.alcance?.perfil === 'administracion') destinoAcceso.appendChild(boton('Revisar accesos', () => alIrA('accesos')))
+      const acciones = elemento('div', ['cms-formulario-acciones'])
+      const opcionesSecundarias = elemento('div', ['cms-menu-acciones-contenido'])
+      const tieneRespuestas = puedeVerRespuestas() && Number(formulario.respuestas_total || 0) > 0
+      const verRespuestas = boton('Ver respuestas', () => {
+        filtroFormularioEntradas = formulario.id
+        filtroEstadoEntradas = 'todas'
+        vistaFormularios = datos.entradas.some((entrada) => entrada.formulario_id === formulario.id && entrada.estado !== 'cerrada') ? 'pendientes' : 'historial'
+        dibujar()
+      }, ['boton-principal'])
+      const editar = boton('Editar', () => { formularioAEditar = formulario.id; formularioAbierto = 'editar-formulario'; dibujar() }, tieneRespuestas ? [] : ['boton-principal'])
+      acciones.appendChild(tieneRespuestas ? verRespuestas : editar)
+      if (puedeVerRespuestas()) opcionesSecundarias.appendChild(boton('Registrar respuesta', () => { formularioParaRespuesta = formulario.id; formularioAbierto = 'respuesta-formulario'; dibujar() }))
+      if (tieneRespuestas) opcionesSecundarias.appendChild(editar)
+      opcionesSecundarias.appendChild(boton('Duplicar', () => { formularioParaDuplicar = formulario.id; formularioAbierto = 'duplicar-formulario'; dibujar() }))
       if (formulario.visibilidad === 'publica' && formulario.estado === 'activa') {
         const url = new URL('formulario.html', window.location.href); url.searchParams.set('id', formulario.id)
-        acciones.append(
+        opcionesSecundarias.append(
           boton('Abrir formulario público', () => { window.open(url.href, '_blank', 'noopener') }),
           boton('Copiar enlace', async () => {
             try { await navigator.clipboard.writeText(url.href); acciones.appendChild(elemento('span', ['cms-enlace-copiado'], 'Enlace copiado')) } catch { error = 'No se pudo copiar el enlace. Abrilo desde el navegador y copialo manualmente.'; dibujar() }
           }),
+          boton('Copiar invitación', async () => {
+            const invitacion = textoInvitacionFormulario(formulario, url.href)
+            try { await navigator.clipboard.writeText(invitacion); acciones.appendChild(elemento('span', ['cms-enlace-copiado'], 'Invitación copiada')) } catch { error = 'No se pudo copiar la invitación. Podés copiar el enlace manualmente.'; dibujar() }
+          }),
         )
       }
+      const menu = elemento('details', ['cms-menu-acciones'])
+      menu.append(elemento('summary', [], 'Más acciones'), opcionesSecundarias)
+      acciones.appendChild(menu)
       let cantidadCampos = 0
       try { cantidadCampos = JSON.parse(formulario.campos_json || '[]').length } catch { cantidadCampos = 0 }
-      tarjeta.append(elemento('strong', [], formulario.titulo), elemento('span', ['cms-proyecto-meta'], [formulario.tipo, formulario.visibilidad === 'publica' ? 'Público' : 'Interno', formulario.estado === 'activa' ? 'Activo' : 'Cerrado', `${cantidadCampos} preguntas propias`, `${formulario.respuestas_total || 0} respuestas`].join(' · ')), formulario.descripcion ? elemento('span', ['cms-proyecto-notas'], formulario.descripcion) : document.createDocumentFragment(), acciones)
+      tarjeta.append(elemento('strong', [], formulario.titulo), elemento('span', ['cms-proyecto-meta'], [formulario.tipo, formulario.visibilidad === 'publica' ? 'Público' : 'Interno', formulario.estado === 'activa' ? 'Activo' : 'Cerrado', `${cantidadCampos} preguntas propias`, `${formulario.respuestas_total || 0} respuestas`].join(' · ')), formulario.descripcion ? elemento('span', ['cms-proyecto-notas'], formulario.descripcion) : document.createDocumentFragment(), destinoAcceso, acciones)
       lista.appendChild(tarjeta)
     })
     else lista.appendChild(elemento('p', ['ayuda'], datos.formularios.length ? 'No hay formularios que coincidan con esta búsqueda o filtro.' : 'Todavía no hay formularios. Creá uno interno para ordenar una solicitud recurrente o hacelo público cuando quieras compartirlo.'))
@@ -3091,7 +3826,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     encabezado.append(texto, boton('Nueva actividad', () => { formularioAbierto = formularioAbierto === 'evento' ? null : 'evento'; dibujar() }))
     const vistas = elemento('div', ['cms-vistas-guardadas', 'cms-agenda-vistas'])
     ;[['mes', 'Mes'], ['semana', 'Semana'], ['proximos30', 'Próximos 30 días'], ['lista', 'Lista']].forEach(([valor, etiqueta]) => {
-      const control = boton(etiqueta, () => { vistaAgenda = valor; dibujar() }, ['cms-filtro'])
+      const control = boton(etiqueta, () => { vistaAgenda = valor; guardarVistaCMS('agenda', valor); dibujar() }, ['cms-filtro'])
       control.setAttribute('aria-pressed', String(vistaAgenda === valor))
       if (vistaAgenda === valor) control.classList.add('activa')
       vistas.appendChild(control)
@@ -3130,7 +3865,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     if (eventosVisibles.length) eventosVisibles.forEach((evento) => {
       const tarjeta = elemento('article', ['cms-evento'])
       const superior = elemento('div', ['cms-reunion-encabezado'])
-      superior.append(elemento('strong', [], evento.titulo), elemento('span', ['cms-estado'], evento.estado === 'realizado' ? 'Realizado' : 'Planificado'))
+      superior.append(elemento('strong', [], evento.titulo), elemento('span', ['cms-estado', claseEstadoSemantico(evento.estado)], evento.estado === 'realizado' ? 'Realizado' : 'Planificado'))
       const contexto = [TEXTO_TIPO_EVENTO[evento.tipo || 'actividad'], fechaHoraProgramadaHumana(evento.fecha_hora), evento.fecha_fin ? `hasta ${fechaHoraProgramadaHumana(evento.fecha_fin)}` : '', evento.lugar, evento.equipo_nombre, evento.proyecto_titulo, evento.responsable_nombre || evento.responsable_correo].filter(Boolean).join(' · ')
       const total = Number(evento.tareas_total || 0)
       const completadas = Number(evento.tareas_completadas || 0)
@@ -3141,7 +3876,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
           : `Preparación completa: ${completadas} tareas`
         : 'Sin tareas de preparación'
       const acciones = elemento('div', ['cms-reunion-acciones'])
-      acciones.appendChild(boton('Agregar tarea', () => { actividadPreseleccionada = evento.id; tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }))
+      if (puedeCrearTareaEn(evento.equipo_id)) acciones.appendChild(boton('Agregar tarea', () => { actividadPreseleccionada = evento.id; tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }))
       acciones.appendChild(boton('Editar actividad', () => { eventoAEditar = evento.id; formularioAbierto = 'editar-evento'; dibujar() }))
       tarjeta.append(superior, elemento('span', ['cms-reunion-meta'], contexto), elemento('span', ['cms-evento-preparacion', pendientes ? 'cms-evento-preparacion-pendiente' : ''], preparacion), evento.descripcion ? elemento('span', ['cms-reunion-objetivo'], evento.descripcion) : document.createDocumentFragment(), acciones)
       lista.appendChild(tarjeta)
@@ -3255,16 +3990,19 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const seccion = elemento('section', ['cms-estructura'])
     const encabezado = elemento('div', ['cms-seccion-encabezado']); const texto = elemento('div', [])
     texto.append(elemento('h3', [], 'Checklists reutilizables'), elemento('p', ['ayuda'], 'Convertí una preparación repetida en tareas con fechas calculadas desde la actividad.'))
-    encabezado.append(texto, boton('Nueva checklist', () => { formularioAbierto = formularioAbierto === 'checklist' ? null : 'checklist'; dibujar() }))
+    encabezado.append(texto, datos.alcance?.puede_gestionar && puedeCrearAlgunaTarea() ? boton('Nueva checklist', () => { formularioAbierto = formularioAbierto === 'checklist' ? null : 'checklist'; dibujar() }) : document.createDocumentFragment())
     const lista = elemento('div', ['cms-estructura-lista'])
     if (datos.plantillas.length) datos.plantillas.forEach((plantilla) => {
       const tarjeta = elemento('article', ['cms-proyecto'])
       const actividad = selectorCms([['', 'Elegí una actividad'], ...datos.eventos.filter((evento) => evento.estado === 'planificado').map((evento) => [evento.id, `${fechaHoraProgramadaHumana(evento.fecha_hora)}: ${evento.titulo}`])], `Actividad para ${plantilla.titulo}`)
       const aplicar = boton('Aplicar checklist', async () => {
         if (!actividad.value || guardando) { actividad.focus(); return }
+        const evento = datos.eventos.find((fila) => fila.id === actividad.value)
+        if (!puedeCrearTareaEn(evento?.equipo_id || null)) { error = 'No tenés permiso para crear las tareas de esa actividad.'; dibujar(); return }
         guardando = true; aplicar.disabled = true
         try { await pedir(`/api/cms/plantillas-tareas/${plantilla.id}/aplicar`, { method: 'POST', body: JSON.stringify({ evento_id: actividad.value }) }); await cargar() } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
       }, ['boton-principal'])
+      aplicar.hidden = !datos.alcance?.puede_gestionar
       tarjeta.append(elemento('strong', [], plantilla.titulo), elemento('span', ['cms-proyecto-meta'], `${plantilla.cantidad_tareas} tareas · ${plantilla.equipo_nombre || 'Equipo de la actividad'}`), plantilla.descripcion ? elemento('span', ['cms-proyecto-notas'], plantilla.descripcion) : document.createDocumentFragment(), actividad, aplicar)
       lista.appendChild(tarjeta)
     })
@@ -3276,7 +4014,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const seccion = elemento('section', ['cms-estructura', 'cms-recurrentes'])
     const encabezado = elemento('div', ['cms-seccion-encabezado']); const texto = elemento('div', [])
     texto.append(elemento('h3', [], 'Tareas recurrentes'), elemento('p', ['ayuda'], 'Las rutinas se convierten automáticamente en tareas al llegar su fecha, con equipo y responsable.'))
-    encabezado.append(texto, boton('Nueva tarea recurrente', () => { modeloRecurrente = null; formularioAbierto = formularioAbierto === 'tarea-recurrente' ? null : 'tarea-recurrente'; dibujar() }))
+    encabezado.append(texto, datos.alcance?.puede_gestionar && puedeCrearAlgunaTarea() ? boton('Nueva tarea recurrente', () => { modeloRecurrente = null; formularioAbierto = formularioAbierto === 'tarea-recurrente' ? null : 'tarea-recurrente'; dibujar() }) : document.createDocumentFragment())
     const sugerencias = elemento('div', ['cms-modelos-recurrentes'])
     sugerencias.appendChild(elemento('p', ['ayuda'], 'Modelos sugeridos por el plan institucional. Siempre revisá equipo, responsable y próxima fecha antes de crear la rutina.'))
     const modelos = [
@@ -3286,14 +4024,14 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       { titulo: 'Renovaciones y trámites institucionales', descripcion: 'Verificar renovaciones, certificaciones y trámites con fecha próxima.', frecuencia: 'mensual', prioridad: 'alta' },
     ]
     const accionesModelos = elemento('div', ['cms-proyecto-acciones'])
-    modelos.forEach((modelo) => accionesModelos.appendChild(boton(modelo.titulo, () => { modeloRecurrente = modelo; formularioAbierto = 'tarea-recurrente'; dibujar() })))
+    if (datos.alcance?.puede_gestionar && puedeCrearAlgunaTarea()) modelos.forEach((modelo) => accionesModelos.appendChild(boton(modelo.titulo, () => { modeloRecurrente = modelo; formularioAbierto = 'tarea-recurrente'; dibujar() })))
     sugerencias.appendChild(accionesModelos)
     const lista = elemento('div', ['cms-estructura-lista'])
     if (datos.recurrencias.length) datos.recurrencias.forEach((recurrente) => {
       const tarjeta = elemento('article', ['cms-proyecto', 'cms-tarea-recurrente'])
       const acciones = elemento('div', ['cms-proyecto-acciones'])
       const fallo = (datos.automatizaciones || []).find((ejecucion) => ejecucion.recurrencia_id === recurrente.id && ejecucion.estado === 'fallida')
-      acciones.appendChild(boton(fallo ? 'Reintentar ahora' : 'Generar ahora', async () => {
+      if (datos.alcance?.puede_gestionar && puedeCrearTareaEn(recurrente.equipo_id || null)) acciones.appendChild(boton(fallo ? 'Reintentar ahora' : 'Generar ahora', async () => {
         if (guardando) return
         guardando = true
         try { await pedir(`/api/cms/tareas-recurrentes/${recurrente.id}/generar`, { method: 'POST' }); await cargar() } catch (fallo) { error = fallo.message; guardando = false; dibujar() }
@@ -3327,9 +4065,9 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         const superior = elemento('div', ['cms-reunion-encabezado'])
         superior.append(
           elemento('strong', [], reunion.titulo),
-          elemento('span', ['cms-estado'], TEXTO_ESTADO_REUNION[reunion.estado] || reunion.estado),
+          elemento('span', ['cms-estado', claseEstadoSemantico(reunion.estado)], TEXTO_ESTADO_REUNION[reunion.estado] || reunion.estado),
         )
-        const contexto = [fechaHoraProgramadaHumana(reunion.fecha_hora), reunion.equipo_nombre, reunion.proyecto_titulo, reunion.lugar].filter(Boolean).join(' · ')
+        const contexto = [fechaHoraProgramadaHumana(reunion.fecha_hora), reunion.proxima_revision ? `Seguimiento ${fechaHumana(reunion.proxima_revision)}` : '', reunion.equipo_nombre, reunion.proyecto_titulo, reunion.lugar].filter(Boolean).join(' · ')
         const acciones = elemento('div', ['cms-reunion-acciones'])
         acciones.append(
           boton('Editar reunión', () => { reunionAEditar = reunion.id; formularioAbierto = 'editar-reunion'; dibujar() }),
@@ -3347,7 +4085,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       datos.decisiones.forEach((decision) => {
         const tarjeta = elemento('article', ['cms-decision'])
         const acciones = elemento('div', ['cms-reunion-acciones'])
-        if (!decision.tarea_id) {
+        if (!decision.tarea_id && datos.alcance?.puede_gestionar && puedeCrearTareaEn(decision.equipo_id || null)) {
           acciones.appendChild(boton('Crear tarea', async () => {
             if (guardando) return
             guardando = true
@@ -3372,6 +4110,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const vigentes = datos.decisiones.filter((decision) => !['cerrada', 'archivada'].includes(decision.estado))
     const sinTarea = vigentes.filter((decision) => !decision.tarea_id)
     const proximas = datos.reuniones.filter((reunion) => ['planificada', 'preparacion'].includes(reunion.estado)).sort((a, b) => String(a.fecha_hora).localeCompare(String(b.fecha_hora)))
+    const seguimientos = proximas.filter((reunion) => reunion.proxima_revision)
     const encabezado = elemento('div', ['cms-seccion-encabezado'])
     const texto = elemento('div', [])
     texto.append(elemento('h3', [], 'Centro de decisiones'), elemento('p', ['ayuda'], 'De cada encuentro debería salir un acuerdo, un responsable y un próximo paso visible.'))
@@ -3381,6 +4120,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       ['Decisiones vigentes', vigentes.length],
       ['Sin tarea vinculada', sinTarea.length],
       ['Próximas reuniones', proximas.length],
+      ['Con seguimiento', seguimientos.length],
     ].forEach(([etiqueta, cantidad]) => {
       const item = elemento('article', [])
       item.append(elemento('strong', [], String(cantidad)), elemento('span', [], etiqueta))
@@ -3403,7 +4143,12 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     seccion.querySelectorAll('button').forEach((control) => {
       const etiqueta = control.textContent.trim()
       const tareaPropia = integrante && ['Completar tarea', 'Editar tarea'].includes(etiqueta)
-      if (!tareaPropia && /^(Nueva|Nuevo|Agregar|Editar|Guardar|Registrar|Solicitar|Crear tarea|Aplicar|Configurar|Asignar|Cerrar seguimiento)/.test(etiqueta)) {
+      const solicitudPermitida = ['Solicitar a un equipo', 'Enviar solicitud', 'Pedido a un equipo'].includes(etiqueta)
+      const creacionTareaPermitida = puedeCrearAlgunaTarea() && (
+        /^(Nueva tarea|Nueva directriz|Crear tarea|Crear primera tarea|Crear tarea aquí|Agregar tarea)/.test(etiqueta)
+        || (etiqueta === 'Agregar' && Boolean(control.closest('form')?.querySelector('input[aria-label="Nueva tarea"]')))
+      )
+      if (!tareaPropia && !solicitudPermitida && !creacionTareaPermitida && /^(Nueva|Nuevo|Agregar|Editar|Guardar|Registrar|Solicitar|Crear tarea|Aplicar|Configurar|Asignar|Cerrar seguimiento)/.test(etiqueta)) {
         control.hidden = true
       }
     })
@@ -3429,6 +4174,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
   const nombresArea = NOMBRES_AREA
   const nombresPagina = { trabajo: 'Mis tareas', agenda: 'Agenda institucional', areas: 'Áreas de Aletea', formularios: 'Formularios y entradas', biblioteca: 'Biblioteca institucional', privacidad: 'Solicitudes de privacidad', auditoria: 'Gestión completa', ...nombresArea }
   const claveNavegacionReciente = `aletea:cms:recientes:v1:${sesion?.usuario || sesion?.correo || 'cuenta'}`
+  const claveNavegacionFavorita = `aletea:cms:favoritos:v1:${sesion?.usuario || sesion?.correo || 'cuenta'}`
   const destinoPorArea = { control: 'inicio', trabajo: 'cms-trabajo', agenda: 'cms-agenda', areas: 'cms-areas', formularios: 'cms-formularios', biblioteca: 'cms-biblioteca', privacidad: 'cms-privacidad', auditoria: 'cms-auditoria' }
   const etiquetaDestino = (destino) => {
     if (destino === 'inicio') return 'Centro de control'
@@ -3436,7 +4182,12 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     return nombresPagina[clave] || 'Sección del gestor'
   }
   let navegacionReciente = []
+  let navegacionFavorita = []
   try { navegacionReciente = JSON.parse(window.localStorage.getItem(claveNavegacionReciente) || '[]') } catch { navegacionReciente = [] }
+  try { navegacionFavorita = JSON.parse(window.localStorage.getItem(claveNavegacionFavorita) || '[]') } catch { navegacionFavorita = [] }
+  const guardarFavoritos = () => {
+    try { window.localStorage.setItem(claveNavegacionFavorita, JSON.stringify(navegacionFavorita)) } catch { /* Los accesos recientes siguen disponibles. */ }
+  }
   const destinoActual = destinoPorArea[area] || `cms-${area}`
   navegacionReciente = [destinoActual, ...navegacionReciente.filter((destino) => destino !== destinoActual)].slice(0, 5)
   try { window.localStorage.setItem(claveNavegacionReciente, JSON.stringify(navegacionReciente)) } catch { /* La navegación sigue disponible sin historial local. */ }
@@ -3484,6 +4235,10 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       busquedaGlobal = buscar.value
       if (consulta.length < 2) {
         const recientes = recientesVisibles()
+        if (navegacionFavorita.length) {
+          resultados.appendChild(elemento('strong', ['cms-busqueda-seccion'], 'Favoritos'))
+          navegacionFavorita.forEach((destino) => resultados.appendChild(boton(`Favorito: ${etiquetaDestino(destino)}`, () => irA(destino), ['cms-busqueda-resultado', 'cms-busqueda-favorito'])))
+        }
         if (mostrarRecientes && recientes.length) {
           const encabezadoRecientes = elemento('div', ['cms-busqueda-recientes-encabezado'])
           const limpiar = boton('Limpiar', () => {
@@ -3498,7 +4253,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         return
       }
       const colecciones = [
-        ['Tarea', datos.tareas, (fila) => fila.titulo, (fila) => irA('cms-trabajo', { tareaId: fila.id, filtroTrabajo: ['completada', 'cancelada'].includes(fila.estado) ? 'cerradas' : (fila.responsable_correo ? 'todas' : 'sin-responsable') }), (fila) => [fila.equipo_nombre, fila.responsable_nombre || fila.responsable_correo].filter(Boolean).join(' · ')],
+        ['Tarea', datos.tareas, (fila) => fila.titulo, (fila) => irA('cms-trabajo', { tareaId: fila.id, filtroTrabajo: fila.estado === 'completada' ? 'completadas' : fila.estado === 'cancelada' ? 'canceladas' : (fila.responsable_correo ? 'todas' : 'sin-responsable') }), (fila) => [fila.equipo_nombre, fila.responsable_nombre || fila.responsable_correo].filter(Boolean).join(' · ')],
         ['Unidad', datos.unidades, (fila) => `${fila.sigla ? `${fila.sigla}: ` : ''}${fila.nombre}`, (fila) => { unidadAbiertaId = fila.id; pestanaUnidad = 'resumen'; formularioAbierto = 'ver-unidad'; dibujar() }, (fila) => datos.equipos.find((equipo) => equipo.id === fila.equipo_id)?.nombre || TEXTO_TIPO_UNIDAD[fila.tipo] || 'Unidad'],
         ['Persona', datos.responsables, (fila) => fila.nombre || fila.correo, () => irA(datos.alcance?.perfil === 'administracion' ? 'accesos' : 'cms-areas'), (fila) => datos.responsabilidades.filter((responsabilidad) => (responsabilidad.usuario_correo || responsabilidad.correo) === fila.correo).map((responsabilidad) => TEXTO_RESPONSABILIDAD[responsabilidad.tipo] || responsabilidad.tipo).filter(Boolean).join(', ') || 'Persona visible en tu alcance'],
         ['Proyecto', datos.proyectos, (fila) => fila.titulo, () => irA('cms-biblioteca'), (fila) => [fila.equipo_nombre, TEXTO_ESTADO_PROYECTO[fila.estado] || fila.estado].filter(Boolean).join(' · ')],
@@ -3506,9 +4261,18 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         ['Formulario', datos.formularios, (fila) => fila.titulo, () => irA('cms-formularios'), (fila) => `${fila.visibilidad === 'publica' ? 'Público' : 'Interno'} · ${fila.estado === 'activa' ? 'Activo' : 'Cerrado'}`],
         ['Documento', datos.documentos, (fila) => fila.titulo, () => irA('cms-biblioteca'), (fila) => [fila.tipo, fila.sensibilidad].filter(Boolean).join(' · ')],
       ]
-      const coincidencias = colecciones.flatMap(([tipo, filas, nombre, accion, detalle]) => filas
+      const coincidenciasEntidades = colecciones.flatMap(([tipo, filas, nombre, accion, detalle]) => filas
         .filter((fila) => `${nombre(fila)} ${fila.descripcion || ''}`.toLocaleLowerCase('es').includes(consulta))
-        .map((fila) => ({ tipo, nombre: nombre(fila), accion: () => accion(fila), detalle: detalle(fila) }))).slice(0, 8)
+        .map((fila) => ({ tipo, nombre: nombre(fila), accion: () => accion(fila), detalle: detalle(fila) })))
+      const accionesDisponibles = [
+        ...(puedeCrearAlgunaTarea() ? [{ nombre: 'Crear tarea', palabras: 'crear nueva tarea asignar trabajo', accion: () => { formularioAbierto = 'tarea'; dibujar() }, detalle: 'Abre una tarea nueva en el contexto actual.' }] : []),
+        { nombre: 'Enviar solicitud', palabras: 'pedir solicitar equipo trabajo', accion: () => { tipoNuevaTarea = 'solicitud'; formularioAbierto = 'tarea'; dibujar() }, detalle: 'Envía un pedido para que el equipo lo revise.' },
+        { nombre: 'Exportar respuestas', palabras: 'exportar respuestas excel csv formularios', accion: () => alIrA('cms-formularios'), detalle: 'Abre Formularios y sus exportaciones.' },
+        { nombre: 'Dar acceso', palabras: 'dar acceso permisos cuenta persona', accion: () => alIrA('accesos'), detalle: 'Abre la gestión de accesos.' },
+        { nombre: 'Publicar página', palabras: 'publicar pagina web contenido', accion: () => alIrA('cms-pagina-web'), detalle: 'Abre el flujo de revisión y publicación.' },
+        { nombre: 'Enviar campaña', palabras: 'enviar campaña comunicaciones correo', accion: () => alIrA('cms-comunicaciones'), detalle: 'Abre campañas y estado de envío.' },
+      ].filter((accion) => `${accion.nombre} ${accion.palabras}`.toLocaleLowerCase('es').includes(consulta)).map((accion) => ({ tipo: 'Acción', ...accion }))
+      const coincidencias = [...accionesDisponibles, ...coincidenciasEntidades].slice(0, 8)
       if (!coincidencias.length) resultados.appendChild(elemento('p', ['ayuda'], 'No encontramos coincidencias. Probá con otra palabra.'))
       else coincidencias.forEach((resultado) => {
         const resultadoBoton = boton('', resultado.accion, ['cms-busqueda-resultado'])
@@ -3534,7 +4298,11 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       }
     }))
     pintarResultados()
-    panel.append(buscar, abrirRecientes, elemento('span', ['cms-atajo'], '⌘ K'), resultados)
+    const accionesBusqueda = elemento('div', ['cms-busqueda-acciones'])
+    const atajo = elemento('kbd', ['cms-atajo'], etiquetaAtajoBusqueda())
+    atajo.setAttribute('aria-label', `Atajo de teclado: ${atajo.textContent}`)
+    accionesBusqueda.append(atajo, abrirRecientes)
+    panel.append(buscar, accionesBusqueda, resultados)
     return panel
   }
 
@@ -3547,7 +4315,19 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       elemento('p', ['ayuda'], destinos.length ? 'Volvé a tus secciones recientes sin recorrer el menú.' : 'Cuando visites tareas, áreas o formularios, aparecerán aquí para retomarlos.'),
     )
     const acciones = elemento('div', ['cms-continuar-acciones'])
-    if (destinos.length) destinos.forEach((destino) => acciones.appendChild(boton(etiquetaDestino(destino), () => irA(destino))))
+    if (destinos.length) destinos.forEach((destino) => {
+      const fila = elemento('div', ['cms-continuar-fila'])
+      fila.appendChild(boton(etiquetaDestino(destino), () => irA(destino)))
+      const esFavorito = navegacionFavorita.includes(destino)
+      const favorito = boton(esFavorito ? 'Quitar favorito' : 'Fijar favorito', () => {
+        navegacionFavorita = esFavorito ? navegacionFavorita.filter((actual) => actual !== destino) : [destino, ...navegacionFavorita.filter((actual) => actual !== destino)].slice(0, 3)
+        guardarFavoritos()
+        dibujar()
+      }, ['boton-secundario'])
+      favorito.setAttribute('aria-label', `${esFavorito ? 'Quitar de favoritos' : 'Agregar a favoritos'} ${etiquetaDestino(destino)}`)
+      fila.appendChild(favorito)
+      acciones.appendChild(fila)
+    })
     else acciones.appendChild(enlaceA('cms-trabajo', 'Abrir Mis tareas', ['boton-principal']))
     panel.appendChild(acciones)
     return panel
@@ -3623,20 +4403,43 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const avisosPendientes = datos.notificaciones.filter((fila) => !fila.leida_en).length
     const urgentesPropias = propiasAbiertas.filter((tarea) => ['atrasada', 'bloqueada'].includes(clasificarTarea(tarea, HOY()))).length
     const filtros = elemento('div', ['cms-vistas-guardadas'])
+    const completadasVisibles = datos.tareas.filter((tarea) => tarea.estado === 'completada')
+    const completadasDelAlcance = alcanceCompletadas === 'propias' && correo
+      ? completadasVisibles.filter((tarea) => tarea.responsable_correo === correo)
+      : alcanceCompletadas === 'asignadas' && correo
+        ? completadasVisibles.filter((tarea) => tarea.creado_por === correo)
+        : completadasVisibles
     const opciones = compacto
-      ? [['mias', 'Para mí'], ['bloqueadas', 'Bloqueadas'], ['seguimiento', 'Seguimiento']]
-      : [['mias', 'Mis pendientes'], ['asignadas', 'Asignadas por mí'], ['atrasadas', 'Vencidas'], ['proximas', 'Próximas'], ['bloqueadas', 'Bloqueadas'], ['seguimiento', 'Seguimientos'], ['sin-responsable', 'Sin responsable'], ['espera', 'Esperando respuesta'], ['todas', 'Todo abierto'], ['cerradas', 'Historial']]
+      ? [['mias', 'Para mí'], ['completadas', 'Completadas'], ['bloqueadas', 'Bloqueadas'], ['seguimiento', 'Seguimiento']]
+      : [['mias', 'Mis pendientes'], ['completadas', `Completadas (${completadasDelAlcance.length})`], ['asignadas', 'Asignadas por mí'], ['todas', 'Todo abierto']]
     opciones.forEach(([valor, etiqueta]) => {
-      const control = boton(etiqueta, () => { filtroTrabajo = valor; dibujar() }, ['cms-filtro'])
+      const control = boton(etiqueta, () => { filtroTrabajo = valor; guardarVistaCMS('trabajo', valor); dibujar() }, ['cms-filtro', `cms-filtro-${valor}`])
       control.setAttribute('aria-pressed', String(filtroTrabajo === valor))
       if (filtroTrabajo === valor) control.classList.add('activa')
       filtros.appendChild(control)
     })
+    if (!compacto) {
+      const vistasSecundarias = [['', 'Más vistas'], ['atrasadas', 'Vencidas'], ['proximas', 'Próximas'], ['bloqueadas', 'Bloqueadas'], ['seguimiento', 'Seguimientos'], ['sin-responsable', 'Sin responsable'], ['espera', 'Esperando respuesta'], ['canceladas', 'Canceladas']]
+      const valoresSecundarios = new Set(vistasSecundarias.slice(1).map(([valor]) => valor))
+      const selectorVistas = document.createElement('select')
+      selectorVistas.className = 'cms-filtro-mas'
+      selectorVistas.setAttribute('aria-label', 'Más vistas de tareas')
+      vistasSecundarias.forEach(([valor, etiqueta]) => selectorVistas.appendChild(new Option(etiqueta, valor)))
+      selectorVistas.value = valoresSecundarios.has(filtroTrabajo) ? filtroTrabajo : ''
+      if (selectorVistas.value) selectorVistas.classList.add('activa')
+      selectorVistas.addEventListener('change', () => {
+        if (!selectorVistas.value) return
+        filtroTrabajo = selectorVistas.value
+        guardarVistaCMS('trabajo', filtroTrabajo)
+        dibujar()
+      })
+      filtros.appendChild(selectorVistas)
+    }
     const buscar = document.createElement('input')
     buscar.type = 'search'; buscar.placeholder = 'Filtrar tareas'; buscar.setAttribute('aria-label', 'Filtrar tareas'); buscar.value = busquedaTrabajo
     buscar.addEventListener('change', () => { busquedaTrabajo = buscar.value; dibujar() })
     const resumenPersonal = elemento('div', ['cms-resumen-personal'])
-    ;[[propiasAbiertas.length, 'tareas abiertas', false], [avisosPendientes, 'notificaciones nuevas', true], [urgentesPropias, 'requieren atención', false]].forEach(([cantidad, etiqueta, esNotificacion]) => {
+    ;[[propiasAbiertas.length, 'tareas abiertas', false], [avisosPendientes, 'avisos nuevos', true], [urgentesPropias, 'requieren atención', false]].forEach(([cantidad, etiqueta, esNotificacion]) => {
       const dato = elemento(esNotificacion ? 'button' : 'span', ['cms-resumen-personal-dato', ...(esNotificacion ? ['cms-resumen-personal-accion'] : [])])
       if (esNotificacion) {
         dato.type = 'button'
@@ -3657,21 +4460,44 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       contextoUnidad.append(elemento('span', [], `Mostrando: ${unidadTrabajo.nombre}`), boton('Quitar filtro', () => { unidadTrabajoId = null; dibujar() }))
       panel.appendChild(contextoUnidad)
     }
-    if (!compacto) panel.appendChild(elemento('p', ['cms-filtro-explicacion'], `${VISTAS_TRABAJO[filtroTrabajo]?.descripcion || 'Los filtros ordenan las tareas sin moverlas ni borrarlas.'} Podés cambiar de filtro en cualquier momento.`))
+    if (!compacto) {
+      const explicacionFiltro = elemento('div', ['cms-filtro-explicacion'])
+      explicacionFiltro.append(elemento('p', [], `${VISTAS_TRABAJO[filtroTrabajo]?.descripcion || 'Los filtros ordenan las tareas sin moverlas ni borrarlas.'} Esta vista queda guardada en tu cuenta.`), boton('Limpiar filtros', () => { filtroTrabajo = 'mias'; busquedaTrabajo = ''; guardarVistaCMS('trabajo', 'mias'); dibujar() }, ['boton-secundario']))
+      panel.appendChild(explicacionFiltro)
+    }
     if (!compacto) panel.appendChild(buscar)
-    let tareas = datos.tareas.filter((tarea) => filtroTrabajo === 'cerradas'
-      ? ['completada', 'cancelada'].includes(tarea.estado)
-      : !['completada', 'cancelada'].includes(tarea.estado))
+    if (!compacto && filtroTrabajo === 'completadas' && datos.alcance?.puede_gestionar) {
+      const filaAlcance = elemento('label', ['cms-alcance-completadas'], elemento('span', [], 'Mostrar'))
+      const selectorAlcance = document.createElement('select')
+      selectorAlcance.setAttribute('aria-label', 'Qué tareas completadas mostrar')
+      ;[['todas', 'Todas las visibles'], ['propias', 'Completadas por mí'], ['asignadas', 'Asignadas por mí']].forEach(([valor, etiqueta]) => selectorAlcance.appendChild(new Option(etiqueta, valor)))
+      selectorAlcance.value = alcanceCompletadas
+      selectorAlcance.addEventListener('change', () => {
+        alcanceCompletadas = selectorAlcance.value
+        guardarVistaCMS('alcanceCompletadas', alcanceCompletadas)
+        dibujar()
+      })
+      filaAlcance.appendChild(selectorAlcance)
+      panel.appendChild(filaAlcance)
+    }
+    let tareas = datos.tareas.filter((tarea) => filtroTrabajo === 'completadas'
+      ? tarea.estado === 'completada'
+      : filtroTrabajo === 'canceladas'
+        ? tarea.estado === 'cancelada'
+        : !['completada', 'cancelada'].includes(tarea.estado))
     if (unidadTrabajoId) tareas = tareas.filter((tarea) => tarea.unidad_id === unidadTrabajoId)
     if (nombresArea[area]) tareas = tareas.filter((tarea) => tarea.equipo_nombre?.toLocaleLowerCase('es') === nombresArea[area].toLocaleLowerCase('es'))
     if (filtroTrabajo === 'mias' && correo) tareas = tareas.filter((tarea) => tarea.responsable_correo === correo)
     else if (filtroTrabajo === 'asignadas' && correo) tareas = tareas.filter((tarea) => tarea.creado_por === correo)
+    else if (filtroTrabajo === 'completadas' && correo && alcanceCompletadas === 'propias') tareas = tareas.filter((tarea) => tarea.responsable_correo === correo)
+    else if (filtroTrabajo === 'completadas' && correo && alcanceCompletadas === 'asignadas') tareas = tareas.filter((tarea) => tarea.creado_por === correo)
     else if (filtroTrabajo === 'atrasadas') tareas = tareas.filter((tarea) => clasificarTarea(tarea, HOY()) === 'atrasada')
     else if (filtroTrabajo === 'proximas') tareas = tareas.filter((tarea) => clasificarTarea(tarea, HOY()) === 'proxima')
     else if (filtroTrabajo === 'bloqueadas') tareas = tareas.filter((tarea) => clasificarTarea(tarea, HOY()) === 'bloqueada')
     else if (filtroTrabajo === 'seguimiento') tareas = tareas.filter((tarea) => requiereSeguimiento(tarea, HOY()))
     else if (filtroTrabajo === 'sin-responsable') tareas = tareas.filter((tarea) => !tarea.responsable_correo)
     else if (filtroTrabajo === 'espera') tareas = tareas.filter((tarea) => tarea.estado === 'esperando_respuesta')
+    if (['completadas', 'canceladas'].includes(filtroTrabajo)) tareas.sort((a, b) => String(b.completado_en || b.actualizado_en || '').localeCompare(String(a.completado_en || a.actualizado_en || '')))
     if (busquedaTrabajo.trim()) tareas = tareas.filter((tarea) => `${tarea.titulo} ${tarea.descripcion || ''}`.toLocaleLowerCase('es').includes(busquedaTrabajo.trim().toLocaleLowerCase('es')))
     if (!tareas.length && filtroTrabajo === 'mias' && !correo) tareas = datos.tareas.filter((tarea) => requiereSeguimiento(tarea, HOY())).slice(0, completo ? 30 : 5)
     if (!tareas.length) {
@@ -3686,11 +4512,17 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         'sin-responsable': 'No hay tareas sin responsable. Cada asunto abierto tiene una persona o equipo que lo sigue.',
         espera: 'No hay tareas esperando respuesta en este momento.',
         todas: 'No hay tareas abiertas con este criterio. Podés registrar una tarea para empezar.',
-        cerradas: 'Todavía no hay tareas completadas o canceladas visibles para esta cuenta.',
+        completadas: alcanceCompletadas === 'propias'
+          ? 'No hay tareas completadas que hayan estado a tu cargo.'
+          : alcanceCompletadas === 'asignadas'
+            ? 'Ninguna tarea que asignaste aparece completada en este momento.'
+            : 'Todavía no hay tareas completadas visibles para esta cuenta.',
+        canceladas: 'No hay tareas canceladas visibles para esta cuenta.',
       }
       const mensaje = mensajes[filtroTrabajo] || mensajes.todas
       vacio.append(elemento('p', ['ayuda'], mensaje))
-      if (datos.alcance?.puede_gestionar) vacio.appendChild(boton('Crear tarea', () => { tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }))
+      if (puedeCrearAlgunaTarea()) vacio.appendChild(boton('Crear tarea', () => { tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }))
+      else vacio.appendChild(boton('Enviar solicitud', () => { tipoNuevaTarea = 'solicitud'; formularioAbierto = 'tarea'; dibujar() }))
       panel.appendChild(vacio)
     }
     else panel.append(...tareas.slice(0, completo ? 40 : compacto ? 3 : 6).map(filaTarea))
@@ -3760,7 +4592,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const sobrecargada = disponible !== null && (disponible === 0 ? asignadas > 0 : asignadas > disponible)
       const tarjeta = elemento('article', ['cms-capacidad-tarjeta', sobrecargada ? 'cms-capacidad-sobrecarga' : ''])
       const titulo = elemento('div', ['cms-capacidad-titulo'])
-      titulo.append(elemento('strong', [], fila.usuario_nombre || fila.usuario_correo), elemento('span', ['cms-estado'], sobrecargada ? 'Revisar carga' : porcentaje === null ? 'Falta disponibilidad' : porcentaje >= 80 ? 'Carga alta' : 'Con margen'))
+      titulo.append(elemento('strong', [], fila.usuario_nombre || fila.usuario_correo), elemento('span', ['cms-estado', claseEstadoSemantico(sobrecargada || porcentaje >= 80 ? 'advertencia' : porcentaje === null ? 'neutral' : 'saludable')], sobrecargada ? 'Revisar carga' : porcentaje === null ? 'Falta disponibilidad' : porcentaje >= 80 ? 'Carga alta' : 'Con margen'))
       const resumen = elemento('div', ['cms-capacidad-resumen'])
       resumen.append(
         elemento('span', [], disponible === null ? 'Sin horas declaradas' : `${disponible.toLocaleString('es-UY')} h disponibles`),
@@ -3795,7 +4627,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const comision = datos.equipos.find((equipo) => equipo.clave === 'comision_directiva' || equipo.categoria === 'comision_directiva')
     gobierno.disabled = !comision
     gobierno.setAttribute('aria-label', comision ? 'Abrir Comisión Directiva' : 'Comisión Directiva pendiente de configurar')
-    gobierno.append(elemento('span', ['cms-panel-etiqueta'], 'Gobierno institucional'), elemento('strong', [], 'Comisión Directiva'), elemento('small', [], comision ? 'Define, aprueba y supervisa' : 'Pendiente de configurar'))
+    gobierno.append(elemento('span', ['cms-panel-etiqueta'], 'Marco institucional'), elemento('strong', [], 'Comisión Directiva'), elemento('small', [], comision ? 'Define, aprueba y supervisa' : 'Pendiente de configurar'))
     const centro = elemento('article', ['cms-mapa-centro'])
     centro.append(elemento('span', ['cms-mapa-conector'], 'Coordina y ejecuta'), elemento('strong', [], 'Dirección'), elemento('span', [], `${datos.decisiones.length} decisiones · ${datos.proyectos.length} proyectos`))
     const areas = elemento('div', ['cms-mapa-areas'])
@@ -3815,16 +4647,18 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const grupo = elemento('section', ['cms-mapa-area', `cms-mapa-area-${id}`])
       const nodo = enlaceA(`cms-${id}`, nombre, ['cms-mapa-nodo', `cms-mapa-${id}`])
       nodo.append(
-        elemento('small', [], `${unidades.length} ${unidades.length === 1 ? 'espacio' : 'espacios'} · ${pendientes} abiertas`),
+        elemento('small', [], `${unidades.length} ${unidades.length === 1 ? 'unidad' : 'unidades'} · ${pendientes} abiertas`),
         elemento('small', ['cms-mapa-responsable'], responsables.length ? `${responsables.length} responsable${responsables.length === 1 ? '' : 's'}` : 'Sin responsable asignado'),
       )
       grupo.appendChild(nodo)
       const listaUnidades = elemento('div', ['cms-mapa-subunidades'])
       if (unidades.length) unidades.forEach((unidad) => {
-        const unidadBoton = boton(unidad.sigla || unidad.nombre, () => abrirUnidad(unidad), ['cms-mapa-subunidad'])
+        const unidadBoton = boton('', () => abrirUnidad(unidad), ['cms-mapa-subunidad'])
         unidadBoton.style.setProperty('--unidad-color', unidad.color || equipo.color || '#6d3087')
         unidadBoton.setAttribute('aria-label', `Abrir ${unidad.nombre}, unidad de ${nombre}`)
         unidadBoton.title = unidad.nombre
+        unidadBoton.appendChild(elemento('strong', [], unidad.sigla || unidad.nombre))
+        if (unidad.sigla && unidad.sigla !== unidad.nombre) unidadBoton.appendChild(elemento('small', ['cms-mapa-subunidad-nombre'], unidad.nombre))
         if (unidad.equipo_id !== equipo.id) unidadBoton.appendChild(elemento('small', [], 'Vista compartida'))
         listaUnidades.appendChild(unidadBoton)
       })
@@ -4465,10 +5299,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     ficha.appendChild(datosArea)
     if (datos.alcance?.puede_gestionar && equipo) {
       const acciones = elemento('div', ['cms-ficha-area-acciones'])
-      acciones.append(
-        boton('Nueva tarea', () => { tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }),
-        boton('Nuevo proyecto', () => { proyectoAEditar = null; formularioAbierto = 'proyecto'; dibujar() }),
-      )
+      if (puedeCrearTareaEn(equipo.id)) acciones.appendChild(boton('Nueva tarea', () => { tipoNuevaTarea = 'tarea'; formularioAbierto = 'tarea'; dibujar() }))
+      acciones.appendChild(boton('Nuevo proyecto', () => { proyectoAEditar = null; formularioAbierto = 'proyecto'; dibujar() }))
       if (datos.alcance?.global) acciones.appendChild(boton('Gestionar integrantes', () => { equipoDeResponsabilidad = equipo.id; formularioAbierto = 'responsabilidad'; dibujar() }))
       ficha.appendChild(acciones)
     }
@@ -4477,11 +5309,14 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
 
   function dibujar() {
     if (conservarFormularioTrasFallo()) return
+    const habiaDialogo = Boolean(raiz.querySelector('.cms-captura[role="dialog"]'))
+    const abreDialogo = Boolean(formularioAbierto) && !habiaDialogo
+    const cierraDialogo = !formularioAbierto && habiaDialogo
     vaciar(raiz)
-    const seccion = elemento('section', ['cms'])
+    const seccion = elemento('section', ['cms', `cms-vista-${densidadCMS}`])
     if (formularioAbierto) seccion.classList.add('cms-con-panel')
     seccion.appendChild(migasPagina())
-    const encabezado = elemento('header', ['cms-encabezado'])
+    const encabezado = elemento('header', ['cms-encabezado', area === 'control' ? 'cms-encabezado-control' : 'cms-encabezado-compacto'])
     const titulo = elemento('div', [])
     const vistaTrabajo = area === 'trabajo' ? VISTAS_TRABAJO[filtroTrabajo] : null
     const tituloArea = vistaTrabajo?.titulo || nombresPagina[area]
@@ -4496,24 +5331,35 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     titulo.append(
       elemento('p', ['cms-sobrelinea'], nombresArea[area] ? 'Gestión institucional · Equipo de trabajo' : 'Gestión institucional'),
-      elemento('h2', [], tituloArea ?? 'Aletea'),
+      elemento('h1', [], tituloArea ?? 'Aletea'),
       elemento('p', ['ayuda'], nombresArea[area] ? `Espacio de trabajo de ${tituloArea.toLowerCase()}.` : (vistaTrabajo?.descripcion || descripcionPagina[area] || 'Lo importante para decidir, hacer y seguir esta semana.')),
     )
     encabezado.appendChild(titulo)
-    const firma = document.createElement('img')
-    firma.className = 'cms-firma-aletea'
-    firma.src = 'assets/logo-aletea.png'
-    firma.alt = 'Aletea'
-    encabezado.appendChild(firma)
-    if (!formularioAbierto && datos.alcance?.puede_gestionar && !['privacidad', 'areas'].includes(area)) {
+    if (area === 'control') {
+      const firma = document.createElement('img')
+      firma.className = 'cms-firma-aletea'
+      firma.src = 'assets/logo-aletea.png'
+      firma.alt = 'Aletea'
+      encabezado.appendChild(firma)
+    }
+    if (!formularioAbierto && !esVistaMovil() && (datos.alcance?.puede_gestionar || puedeCrearAlgunaTarea() || area === 'control') && !['privacidad', 'areas'].includes(area)) {
       const acciones = elemento('div', ['cms-encabezado-acciones'])
-      acciones.append(
-        boton('Solicitar a un equipo', () => { actividadPreseleccionada = null; tipoNuevaTarea = 'solicitud'; formularioAbierto = 'tarea'; dibujar() }),
-        boton('Crear', () => { formularioAbierto = 'captura-rapida'; dibujar() }, ['boton-principal']),
-      )
+      if (area === 'control') acciones.appendChild(boton('Solicitar a un equipo', () => { actividadPreseleccionada = null; tipoNuevaTarea = 'solicitud'; formularioAbierto = 'tarea'; dibujar() }))
+      acciones.appendChild(boton('Crear', () => { formularioAbierto = 'captura-rapida'; dibujar() }, ['boton-principal']))
       encabezado.appendChild(acciones)
     }
     seccion.appendChild(encabezado)
+    if (!formularioAbierto && area !== 'control') {
+      const preferenciaVista = elemento('div', ['cms-preferencia-vista'])
+      preferenciaVista.appendChild(elemento('span', [], 'Vista'))
+      ;[['compacta', 'Compacta'], ['detallada', 'Detallada']].forEach(([valor, etiqueta]) => {
+        const control = boton(etiqueta, () => { densidadCMS = valor; guardarVistaCMS('densidad', valor); dibujar() }, ['cms-preferencia-vista-opcion'])
+        control.setAttribute('aria-pressed', String(densidadCMS === valor))
+        if (densidadCMS === valor) control.classList.add('activa')
+        preferenciaVista.appendChild(control)
+      })
+      seccion.appendChild(preferenciaVista)
+    }
     seccion.appendChild(panelBusquedaGlobal())
     seccion.appendChild(panelConfirmacion())
     if (formularioAbierto === 'captura-rapida') seccion.appendChild(panelCapturaRapida())
@@ -4632,6 +5478,11 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       if (forma) seccion.appendChild(forma)
       else { formularioAbierto = null; tareaParaCompletar = null }
     }
+    if (formularioAbierto === 'reabrir-tarea') {
+      const forma = formularioReabrirTarea()
+      if (forma) seccion.appendChild(forma)
+      else { formularioAbierto = null; tareaParaReabrir = null }
+    }
     if (cargando) {
       const carga = elemento('section', ['cms-carga'], null)
       carga.setAttribute('aria-label', 'Cargando el tablero institucional')
@@ -4650,7 +5501,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       raiz.appendChild(seccion)
       return
     }
-    if (mostrarGuiaInicial) {
+    if (!formularioAbierto && mostrarGuiaInicial && area === 'control') {
       const guia = elemento('section', ['cms-guia-inicial'])
       const textoGuia = elemento('div', [])
       textoGuia.append(
@@ -4663,6 +5514,11 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         mostrarGuiaInicial = false
         try { window.localStorage.setItem(claveGuiaInicial, 'vista') } catch {}
         dibujar()
+      }
+      if (datos.alcance?.puede_gestionar && esVistaMovil()) {
+        const crearDesdeGuia = boton('Crear', () => { formularioAbierto = 'captura-rapida'; dibujar() }, ['cms-accion-rapida-movil', 'cms-accion-rapida-integrada', 'boton-principal'])
+        crearDesdeGuia.setAttribute('aria-label', 'Crear una tarea, actividad, proyecto o solicitud')
+        accionesGuia.appendChild(crearDesdeGuia)
       }
       accionesGuia.append(
         enlaceBoton('Abrir Mis tareas', rutaParaPantalla('cms-trabajo'), () => { cerrarGuia(); alIrA('cms-trabajo') }, ['boton-principal']),
@@ -4682,7 +5538,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       tarjeta.append(elemento('strong', [], String(cantidad)), elemento('span', [], etiqueta), elemento('small', [], 'Abrir'))
       indicadores.appendChild(tarjeta)
     })
-    if (['control', 'trabajo'].includes(area)) seccion.appendChild(indicadores)
+    if (area === 'control') seccion.appendChild(indicadores)
 
     const trabajo = elemento('section', ['cms-trabajo'])
     trabajo.appendChild(elemento('h3', [], 'Prioridades de hoy'))
@@ -4820,14 +5676,17 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       radarInstitucionalAbierto = radar.open
       const estado = radar.querySelector('.cms-radar-estado')
       if (estado) estado.textContent = radar.open ? 'Ocultar' : 'Mostrar'
-      const centroRadar = radar.closest('.cms-centro-control')
-      if (centroRadar) centroRadar.classList.toggle('cms-centro-radar-cerrado', !radar.open)
+      const centroRadar = seccion.querySelector('.cms-centro-control')
+      centroRadar?.classList.toggle('cms-centro-radar-cerrado', !radar.open)
+      if (radar.open) centroRadar?.appendChild(radar)
+      else seccion.querySelector('.cms-busqueda-acciones')?.appendChild(radar)
       try { window.localStorage.setItem(claveRadarInstitucional, radar.open ? 'abierto' : 'cerrado') } catch { /* La interacción sigue funcionando sin persistencia. */ }
     })
     const conRadar = ['control', 'trabajo', 'agenda', 'auditoria'].includes(area) && !esVistaMovil()
     const centro = elemento('div', ['cms-centro-control', `cms-centro-${area}`, ...(conRadar ? [] : ['cms-centro-sin-radar']), ...(conRadar && !radarInstitucionalAbierto ? ['cms-centro-radar-cerrado'] : []), ...(area === 'control' ? [] : ['cms-centro-area'])])
     centro.appendChild(principal)
-    if (conRadar) centro.appendChild(radar)
+    if (conRadar && radarInstitucionalAbierto) centro.appendChild(radar)
+    else if (conRadar) seccion.querySelector('.cms-busqueda-acciones')?.appendChild(radar)
     seccion.appendChild(centro)
 
     const contexto = elemento('section', ['cms-contexto'])
@@ -4838,7 +5697,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       elemento('p', ['ayuda'], sesion?.nombre ? `Sesión de ${sesion.nombre}` : ''),
     )
     seccion.appendChild(panelPlegableMovil('Organización', 'Equipos y proyectos activos de Aletea.', contexto))
-    if (!formularioAbierto && datos.alcance?.puede_gestionar && esVistaMovil() && ['control', 'trabajo', 'agenda'].includes(area)) {
+    if (!formularioAbierto && !(mostrarGuiaInicial && area === 'control') && (datos.alcance?.puede_gestionar || puedeCrearAlgunaTarea() || area === 'control') && esVistaMovil() && ['control', 'trabajo', 'agenda'].includes(area)) {
       const crearRapido = boton('Crear', () => { formularioAbierto = 'captura-rapida'; dibujar() }, ['cms-accion-rapida-movil', 'boton-principal'])
       crearRapido.setAttribute('aria-label', 'Crear una tarea, actividad, proyecto o solicitud')
       seccion.appendChild(crearRapido)
@@ -4879,6 +5738,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
       const tituloPanel = panelActivo.querySelector('h3')
       panelActivo.setAttribute('role', 'dialog')
       panelActivo.setAttribute('aria-modal', 'true')
+      panelActivo.tabIndex = -1
       if (tituloPanel) {
         const idTitulo = `cms-panel-${formularioAbierto}`
         tituloPanel.id = idTitulo
@@ -4887,11 +5747,24 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     }
     ajustarAccionesPorPerfil(seccion)
     raiz.appendChild(seccion)
+    if (abreDialogo) queueMicrotask(() => {
+      const panel = raiz.querySelector('.cms-captura[role="dialog"]')
+      const primerControl = panel?.querySelector('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [href]')
+      ;(primerControl || panel)?.focus()
+    })
+    if (cierraDialogo && firmaFocoPanel) queueMicrotask(() => {
+      const controles = [...raiz.querySelectorAll('button, a, summary')]
+      const origen = controles.find((control) => firmaFocoPanel.aria && control.getAttribute('aria-label') === firmaFocoPanel.aria)
+        || controles.find((control) => control.textContent.trim() === firmaFocoPanel.texto)
+      origen?.focus()
+    })
     raiz.onkeydown = (evento) => {
       if ((evento.metaKey || evento.ctrlKey) && evento.key.toLocaleLowerCase('es') === 'k') {
         evento.preventDefault()
         raiz.querySelector('.cms-busqueda-global input')?.focus()
       }
+      const dialogo = raiz.querySelector('.cms-captura[role="dialog"]')
+      if (dialogo && evento.key === 'Tab' && manejarTecladoDialogo(evento, dialogo)) return
       if (evento.key === 'Escape' && formularioAbierto) {
         const panelConCambios = raiz.querySelector('.cms-captura[data-cambios-sin-guardar="true"]')
         if (panelConCambios) {
@@ -4916,6 +5789,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     redibujar: dibujar,
     destruir() {
       destruida = true
+      raiz.removeEventListener('click', recordarActivadorPanel, true)
       document.removeEventListener('visibilitychange', refrescarAlVolver)
       window.removeEventListener('focus', refrescarAlVolver)
     },

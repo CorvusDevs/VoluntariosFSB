@@ -88,7 +88,7 @@
   },
   "navegacion": [
     {
-      "etiqueta": "Quiénes somos",
+      "etiqueta": "Aletea",
       "enlace": "/quienes-somos/",
       "visible": true,
       "orden": 1
@@ -100,51 +100,35 @@
       "orden": 2
     },
     {
-      "etiqueta": "Biblioteca",
-      "enlace": "/biblioteca/",
-      "visible": true,
-      "orden": 3
-    },
-    {
-      "etiqueta": "Contacto",
-      "enlace": "/contacto/",
-      "visible": true,
-      "orden": 4
-    },
-    {
-      "etiqueta": "Familias",
+      "etiqueta": "Para familias",
       "enlace": "/familias/",
       "visible": true,
-      "orden": 5
-    },
-    {
-      "etiqueta": "Formación",
-      "enlace": "/formacion/",
-      "visible": true,
-      "orden": 6
+      "orden": 3
     },
     {
       "etiqueta": "Recursos",
       "enlace": "/recursos/",
       "visible": true,
-      "orden": 7
+      "orden": 4
     },
     {
-      "etiqueta": "Tienda",
-      "enlace": "/tienda/",
+      "etiqueta": "Participá",
+      "enlace": "/contacto/",
       "visible": true,
-      "orden": 8
+      "orden": 5
     }
   ],
   "portada": {
     "etiqueta": "Asociación civil uruguaya",
-    "tituloAntes": "Una sociedad que",
-    "tituloDestacado": "no resulte discapacitante",
-    "tituloDespues": "para nadie.",
-    "bajada": "Tejemos redes entre familias, generamos espacios inclusivos y compartimos herramientas para construir comunidad.",
+    "tituloAntes": "Transformamos barreras.",
+    "tituloDestacado": "Construimos comunidad.",
+    "tituloDespues": "Junto a vos.",
+    "bajada": "Trabajamos junto a personas autistas, familias y comunidades para generar apoyos, oportunidades y espacios donde todas las personas puedan participar y desarrollar su proyecto de vida.",
     "imagen": {
-      "src": "/assets/images/reunion-cierre.webp",
-      "textoAlternativo": "Encuentro comunitario de Aletea al aire libre"
+      "src": "/assets/images/aletea/comunidad-aletea.webp",
+      "textoAlternativo": "Personas autistas, familias, profesionales y voluntariado reunidos en una actividad de Aletea",
+      "focoX": 50,
+      "focoY": 54
     },
     "accionPrincipal": {
       "etiqueta": "Conocé lo que hacemos",
@@ -154,8 +138,8 @@
       "etiqueta": "Acercate a Aletea",
       "enlace": "/contacto/"
     },
-    "notaTitulo": "Tejer redes",
-    "notaTexto": "Familias, apoyos y espacios inclusivos."
+    "notaTitulo": "Comunidad Aletea",
+    "notaTexto": "Personas, familias y equipos que transforman barreras en comunidad."
   },
   "proposito": {
     "antes": "Apoyamos.",
@@ -196,7 +180,7 @@
   "mapaAreas": {
     "etiqueta": "Una red que se mueve",
     "titulo": "Encontrá tu lugar en Aletea.",
-    "texto": "Cada área tiene su propia tarea, pero ninguna trabaja aislada.",
+    "texto": "Cada área tiene su propio objetivo, pero ninguna trabaja aislada.",
     "centroTexto": "Una comunidad conectada"
   },
   "areas": [
@@ -205,27 +189,36 @@
       "nombre": "Familias",
       "resumen": "Acompañamiento, orientación y comunidad para familias de todo el país.",
       "color": "turquesa",
-      "enlace": "/actividades/#familias",
+      "enlace": "/familias/",
       "visible": true,
       "orden": 1
     },
     {
-      "id": "educacion",
-      "nombre": "Educación",
-      "resumen": "Cursos, talleres y recursos para aprender y transformar prácticas.",
-      "color": "amarillo",
-      "enlace": "/actividades/#capacitaciones",
+      "id": "adultos-autistas",
+      "nombre": "Adultos autistas",
+      "resumen": "Encuentro, orientación, participación y recursos para la vida adulta.",
+      "color": "magenta",
+      "enlace": "/adultos-autistas/",
       "visible": true,
       "orden": 2
     },
     {
-      "id": "deportes",
-      "nombre": "Deportes",
-      "resumen": "Fútbol sin Barreras y actividades recreativas que construyen pertenencia.",
-      "color": "magenta",
-      "enlace": "/actividades/#deporte",
+      "id": "capacitaciones",
+      "nombre": "Capacitaciones",
+      "resumen": "Diplomatura, talleres y recursos para aprender y transformar prácticas.",
+      "color": "amarillo",
+      "enlace": "/formacion/",
       "visible": true,
       "orden": 3
+    },
+    {
+      "id": "cuerpo-expresion",
+      "nombre": "Cuerpo y expresión",
+      "resumen": "Movimiento, recreación, arte y propuestas de expresión para desarrollar habilidades y pertenencia.",
+      "color": "magenta",
+      "enlace": "/actividades/#cuerpo-expresion",
+      "visible": true,
+      "orden": 4
     },
     {
       "id": "activismo",
@@ -234,7 +227,7 @@
       "color": "violeta",
       "enlace": "/quienes-somos/#mision",
       "visible": true,
-      "orden": 4
+      "orden": 5
     },
     {
       "id": "materiales",
@@ -243,16 +236,18 @@
       "color": "azul",
       "enlace": "/biblioteca/",
       "visible": true,
-      "orden": 5
+      "orden": 6
     }
   ],
   "historia": {
     "etiqueta": "Quiénes somos",
     "titulo": "La inclusión se construye en red.",
-    "texto": "Aletea reúne familias, profesionales, personas voluntarias y organizaciones. Creamos espacios donde cada persona pueda participar, aprender y desarrollar vínculos con apoyos respetuosos.",
+    "texto": "Aletea reúne personas autistas, familias, profesionales y personas voluntarias. Creamos espacios donde cada persona pueda participar, aprender y desarrollar vínculos con apoyos respetuosos.",
     "imagen": {
-      "src": "/assets/images/comunidad.webp",
-      "textoAlternativo": "Actividad de la comunidad de Aletea"
+      "src": "/assets/images/aletea/acompanamiento-familias.webp",
+      "textoAlternativo": "Una persona adulta y un niño comparten un momento de afecto en una actividad de Aletea",
+      "focoX": 50,
+      "focoY": 48
     },
     "accion": {
       "etiqueta": "Conocé nuestra historia",
@@ -274,7 +269,7 @@
       }
     ]
   },
-  "orientacion": {"visible":true,"etiqueta":"¿Qué necesitás hoy?","titulo":"Un punto de entrada claro para cada persona.","texto":"Encontrá orientación para familias, actividades, formación y recursos.","acciones":[{"etiqueta":"Soy familiar","enlace":"/actividades/#familias"},{"etiqueta":"Busco una actividad","enlace":"/actividades/"},{"etiqueta":"Busco formación","enlace":"/actividades/#capacitaciones"},{"etiqueta":"Busco recursos","enlace":"/biblioteca/"}]},
+  "orientacion": {"visible":true,"etiqueta":"¿Qué necesitás hoy?","titulo":"Un camino posible para cada persona.","texto":"Encontrá orientación para personas autistas, familias, actividades, formación y recursos.","acciones":[{"etiqueta":"Soy familiar","enlace":"/familias/"},{"etiqueta":"Soy una persona adulta autista","enlace":"/adultos-autistas/"},{"etiqueta":"Busco una actividad","enlace":"/actividades/"},{"etiqueta":"Busco formación","enlace":"/actividades/#capacitaciones"},{"etiqueta":"Busco recursos","enlace":"/biblioteca/"}]},
   "actualidad": {"visible":false,"etiqueta":"Actualidad","titulo":"Novedades de Aletea","texto":"Activá esta sección cuando haya noticias vigentes y confirmadas.","acciones":[]},
   "tienda": {"visible":false,"etiqueta":"Tienda","titulo":"Productos que sostienen nuestra tarea","texto":"Activá esta sección cuando el catálogo y la disponibilidad estén confirmados.","acciones":[]},
   "redes": {"visible":true,"etiqueta":"Seguinos","titulo":"La comunidad también se encuentra en redes.","texto":"Noticias, actividades y recursos compartidos por Aletea."},
@@ -283,6 +278,12 @@
       "etiqueta": "Quiénes somos",
       "titulo": "Una asociación construida en comunidad.",
       "introduccion": "Aletea trabaja por una mejor calidad de vida de las personas autistas y sus familias, desde el paradigma de la neurodiversidad y el modelo social de la discapacidad.",
+      "imagen": {
+        "src": "/assets/images/aletea/equipo-aletea.webp",
+        "textoAlternativo": "Cuatro integrantes de Aletea reunidas con las camisetas de la organización",
+        "focoX": 50,
+        "focoY": 20
+      },
       "bloques": [
         {
           "id": "mision",
@@ -347,6 +348,12 @@
       "etiqueta": "Qué hacemos",
       "titulo": "Apoyos, aprendizaje y espacios para participar.",
       "introduccion": "Las propuestas de Aletea conectan a familias, personas autistas, profesionales y comunidad mediante actividades concretas.",
+      "imagen": {
+        "src": "/assets/images/aletea/cuerpo-expresion.webp",
+        "textoAlternativo": "Un niño participa en una actividad de movimiento atravesando un túnel de juego",
+        "focoX": 50,
+        "focoY": 52
+      },
       "propuestas": [
         {
           "id": "ejemplo-actividad-vigente",
@@ -402,14 +409,24 @@
           ]
         },
         {
+          "id": "adultos-autistas",
+          "titulo": "Adultos autistas",
+          "texto": "Espacios de encuentro, orientación y participación construidos desde la experiencia de las personas adultas autistas.",
+          "elementos": [
+            "Encuentro entre pares",
+            "Orientación y derechos",
+            "Proyectos y participación comunitaria"
+          ]
+        },
+        {
           "id": "capacitaciones",
           "titulo": "Capacitaciones",
           "texto": "Instancias de formación para compartir herramientas y transformar prácticas desde la neurodiversidad."
         },
         {
-          "id": "deporte",
-          "titulo": "Deporte y recreación",
-          "texto": "Actividades inclusivas que crean vínculos y participación comunitaria.",
+          "id": "cuerpo-expresion",
+          "titulo": "Cuerpo y expresión",
+          "texto": "Deporte, movimiento, recreación, arte y expresión para desarrollar habilidades, vínculos y sentido de pertenencia.",
           "elementos": [
             "Fútbol sin Barreras, escuelita inclusiva",
             "Estimulación motriz a través de la plástica",
@@ -424,8 +441,10 @@
       "titulo": "Orientación y comunidad para cada etapa.",
       "introduccion": "Un espacio para encontrar acompañamiento, grupos, actividades y recursos según lo que cada familia necesita.",
       "imagen": {
-        "src": "/assets/images/comunidad.webp",
-        "textoAlternativo": "Actividad de la comunidad de Aletea"
+        "src": "/assets/images/aletea/encuentro-familias.webp",
+        "textoAlternativo": "Una niña abraza a una persona adulta durante una actividad comunitaria de Aletea",
+        "focoX": 52,
+        "focoY": 48
       },
       "bloques": [
         {
@@ -449,6 +468,41 @@
       "acciones": [
         {"etiqueta": "Necesito orientación", "enlace": "/contacto/?motivo=Familias"},
         {"etiqueta": "Ver actividades", "enlace": "/actividades/#familias"}
+      ]
+    },
+    "adultosAutistas": {
+      "visible": true,
+      "etiqueta": "Adultos autistas",
+      "titulo": "Vida adulta, participación y comunidad.",
+      "introduccion": "Un espacio propio para encontrarse, compartir experiencias y acceder a orientación y oportunidades con apoyos respetuosos.",
+      "imagen": {
+        "src": "/assets/images/aletea/acompanamiento-familias.webp",
+        "textoAlternativo": "Dos personas comparten un momento cercano durante una actividad de Aletea",
+        "focoX": 50,
+        "focoY": 40
+      },
+      "bloques": [
+        {
+          "id": "encuentro",
+          "titulo": "Encuentro entre pares",
+          "texto": "Espacios para conversar, construir vínculos y participar desde los propios intereses.",
+          "elementos": ["Grupos y actividades", "Intercambio de experiencias", "Participación comunitaria"]
+        },
+        {
+          "id": "orientacion-adulta",
+          "titulo": "Orientación para la vida adulta",
+          "texto": "Información clara sobre derechos, apoyos y recursos para tomar decisiones con mayor autonomía.",
+          "elementos": ["Derechos y trámites", "Apoyos cotidianos", "Derivación a recursos"]
+        },
+        {
+          "id": "oportunidades",
+          "titulo": "Proyectos y oportunidades",
+          "texto": "Propuestas de formación, expresión, voluntariado y participación social."
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Consultar al equipo", "enlace": "/contacto/?motivo=Adultos%20autistas"},
+        {"etiqueta": "Explorar actividades", "enlace": "/actividades/"}
       ]
     },
     "formacion": {
@@ -573,7 +627,7 @@
           "titulo": "Publicación de ejemplo para reemplazar",
           "resumen": "Este modelo permite revisar cómo se verá una noticia antes de cargar información real.",
           "contenido": "Reemplazá este texto por la noticia, campaña o proyecto confirmado. Revisá la fecha, la imagen y el texto alternativo antes de mostrarlo.",
-          "imagen": {"src": "/assets/images/comunidad.webp", "textoAlternativo": "Imagen provisoria para reemplazar antes de publicar"},
+          "imagen": {"src": "/assets/images/aletea/identidad-aletea.webp", "textoAlternativo": "Prendedores con la identidad visual de Aletea preparados para una actividad"},
           "esEjemplo": true,
           "visible": true,
           "orden": 1
@@ -646,7 +700,7 @@
         {
           "categoria": "Sitios de interés",
           "titulo": "Doctor TEA",
-          "enlace": "http://www.doctortea.org/"
+          "enlace": "https://www.doctortea.org/"
         },
         {
           "categoria": "Sitios de interés",

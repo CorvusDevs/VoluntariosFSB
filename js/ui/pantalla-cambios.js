@@ -15,22 +15,37 @@ function metadatos(cambio) {
   return `${cambio.fecha} · Commit ${cambio.commit} · Autor: ${cambio.autor}`
 }
 
+function enumerarAmbitos(ambitos) {
+  if (ambitos.length < 2) return ambitos[0]
+  return `${ambitos.slice(0, -1).join(', ')} y ${ambitos.at(-1)}`
+}
+
 export function crearSeccionCambios({ compacto = false, soloVersiones = null } = {}) {
   const seccion = elemento('section', ['cambios-cms', compacto ? 'cambios-cms-compacto' : ''])
   seccion.appendChild(elemento(compacto ? 'h2' : 'h1', ['titulo-cambios'], 'Cambios del sistema'))
   seccion.appendChild(elemento('p', ['ayuda-cambios'], 'Actualizaciones, adiciones y arreglos del gestor institucional y de la página pública.'))
   const candidatas = soloVersiones?.length ? NOVEDADES.filter((cambio) => soloVersiones.includes(cambio.version)) : NOVEDADES
-  const visibles = compacto ? candidatas.slice(0, 1) : candidatas
-  visibles.forEach((cambio) => {
+  const visibles = compacto ? candidatas.slice(0, 1) : candidatas.slice(0, 3)
+  const agregarCambio = (cambio, destino = seccion) => {
     const articulo = elemento('article', ['cambio-version'])
     articulo.dataset.version = cambio.version
     articulo.append(elemento('h2', ['cambio-version-titulo'], `Versión ${cambio.version}`), elemento('p', ['cambio-version-meta'], metadatos(cambio)))
     const ambitos = cambio.ambitos?.length ? cambio.ambitos : ['Gestor']
-    articulo.appendChild(elemento('p', ['cambio-version-ambitos'], `Incluye: ${ambitos.join(' y ')}`))
+    articulo.appendChild(elemento('p', ['cambio-version-ambitos'], `Incluye: ${enumerarAmbitos(ambitos)}`))
+    if (cambio.descripcion) articulo.appendChild(elemento('p', ['cambio-version-descripcion'], cambio.descripcion))
     if (compacto) cambio.resumen.forEach((item) => articulo.appendChild(elemento('p', ['cambio-resumen'], item)))
     else articulo.append(lista('Actualizaciones', cambio.actualizaciones), lista('Adiciones', cambio.adiciones), lista('Arreglos', cambio.arreglos))
-    seccion.appendChild(articulo)
-  })
+    destino.appendChild(articulo)
+  }
+  visibles.forEach((cambio) => agregarCambio(cambio))
+  if (!compacto && candidatas.length > visibles.length) {
+    const archivo = elemento('details', ['cambios-archivo'])
+    archivo.appendChild(elemento('summary', [], `Versiones anteriores (${candidatas.length - visibles.length})`))
+    const contenido = elemento('div', ['cambios-archivo-contenido'])
+    candidatas.slice(visibles.length).forEach((cambio) => agregarCambio(cambio, contenido))
+    archivo.appendChild(contenido)
+    seccion.appendChild(archivo)
+  }
   return seccion
 }
 

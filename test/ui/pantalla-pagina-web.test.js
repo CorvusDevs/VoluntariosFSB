@@ -6,7 +6,6 @@ const esperar = () => new Promise((resolver) => setTimeout(resolver, 0))
 const contenidoConEjemplos = JSON.parse(readFileSync(`${process.cwd()}/assets/pagina-publica-v1.json`, 'utf8'))
 const contenidoInicial = structuredClone(contenidoConEjemplos)
 contenidoInicial.demostracion.activa = false
-contenidoInicial.navegacion.slice(4).forEach((item) => { item.visible = false })
 ;['familias', 'formacion', 'recursos', 'tienda', 'actualidad'].forEach((pagina) => { contenidoInicial.paginas[pagina].visible = false })
 contenidoInicial.paginas.actividades.propuestas = []
 contenidoInicial.paginas.formacion.propuestasFormativas = []
@@ -84,11 +83,11 @@ describe('editor de Página web', () => {
     ])
     expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Portada', 'Cifras'])
     ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Páginas y contenido').click()
-    expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Qué hacemos', 'Formación', 'Biblioteca', 'Recursos', 'Tienda', 'Actualidad'])
+    expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Qué hacemos', 'Familias', 'Adultos autistas', 'Formación', 'Biblioteca', 'Recursos', 'Tienda', 'Actualidad'])
     expect(raiz.querySelector('[data-pagina-web-publicar]').disabled).toBe(true)
   })
 
-  it('muestra el menú futuro como una lista ordenable y deja ocultos los destinos todavía no aprobados', async () => {
+  it('muestra los cinco grupos públicos acordados como una lista ordenable', async () => {
     globalThis.fetch = vi.fn(async (url) => url === '/assets/pagina-publica-v1.json'
       ? respuesta(contenidoInicial)
       : respuesta({ borrador: null, publicado: null, revisionBorrador: 0 }))
@@ -98,10 +97,9 @@ describe('editor de Página web', () => {
     ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Ajustes').click()
     expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Datos generales', 'Apariencia del sitio', 'Publicación y calidad', 'Aviso de privacidad', 'Operación y privacidad'])
     const visibles = [...raiz.querySelectorAll('[aria-label^="Visible de navegacion."]')]
-    expect(visibles).toHaveLength(8)
-    expect(visibles.filter((control) => control.checked)).toHaveLength(4)
-    expect(visibles[4].checked).toBe(false)
-    expect(raiz.querySelector('[aria-label="Enlace de navegacion.4.enlace"]').value).toBe('/familias/')
+    expect(visibles).toHaveLength(5)
+    expect(visibles.filter((control) => control.checked)).toHaveLength(5)
+    expect(raiz.querySelector('[aria-label="Enlace de navegacion.2.enlace"]').value).toBe('/familias/')
     expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent === 'Agregar enlace')).toBe(false)
   })
 
@@ -195,20 +193,24 @@ describe('editor de Página web', () => {
     expect(raiz.querySelector('[aria-label="Activar métricas de operacionWeb.analitica.activa"]').checked).toBe(false)
   })
 
-  it('ofrece editores visuales separados para Familias y Formación', async () => {
+  it('ofrece editores visuales separados para Familias, Adultos autistas y Formación', async () => {
     globalThis.fetch = vi.fn(async (url) => url === '/assets/pagina-publica-v1.json'
       ? respuesta(contenidoInicial)
       : respuesta({ borrador: null, publicado: null, revisionBorrador: 0 }))
     crearPantallaPaginaWeb(raiz, { sesion: { perfil_acceso: 'direccion' } })
     await esperar()
 
-    ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Participación').click()
+    ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Páginas y contenido').click()
     ;[...raiz.querySelectorAll('.pagina-web-secciones button')].find((boton) => boton.textContent === 'Familias').click()
     expect(raiz.querySelector('[aria-label="Visible de paginas.familias.visible"]').checked).toBe(false)
     expect(raiz.querySelector('[aria-label="Imagen de paginas.familias.imagen.src"]')).toBeTruthy()
     expect(raiz.querySelectorAll('[aria-label^="Título de paginas.familias.bloques."]')).toHaveLength(3)
 
-    ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Páginas y contenido').click()
+    ;[...raiz.querySelectorAll('.pagina-web-secciones button')].find((boton) => boton.textContent === 'Adultos autistas').click()
+    expect(raiz.querySelector('[aria-label="Visible de paginas.adultosAutistas.visible"]')).toBeTruthy()
+    expect(raiz.querySelector('[aria-label="Imagen de paginas.adultosAutistas.imagen.src"]')).toBeTruthy()
+    expect(raiz.querySelectorAll('[aria-label^="Título de paginas.adultosAutistas.bloques."]')).toHaveLength(3)
+
     ;[...raiz.querySelectorAll('.pagina-web-secciones button')].find((boton) => boton.textContent === 'Formación').click()
     expect(raiz.querySelector('[aria-label="Visible de paginas.formacion.visible"]').checked).toBe(false)
     expect(raiz.querySelector('[aria-label="Imagen de paginas.formacion.imagen.src"]')).toBeTruthy()
@@ -246,7 +248,7 @@ describe('editor de Página web', () => {
     crearPantallaPaginaWeb(raiz, { sesion: { perfil_acceso: 'direccion' } })
     await esperar()
 
-    ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Participación').click()
+    ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Páginas y contenido').click()
     ;[...raiz.querySelectorAll('.pagina-web-secciones button')].find((boton) => boton.textContent === 'Familias').click()
     const titulo = raiz.querySelector('[aria-label="Título de paginas.familias.titulo"]')
     titulo.value = 'Una comunidad que acompaña de verdad.'
@@ -453,7 +455,7 @@ describe('editor de Página web', () => {
 
     const mapa = raiz.querySelector('.pagina-web-mapa')
     expect(mapa).toBeTruthy()
-    expect(mapa.querySelectorAll('.pagina-web-mapa-nodo')).toHaveLength(21)
+    expect(mapa.querySelectorAll('.pagina-web-mapa-nodo')).toHaveLength(22)
     expect(mapa.querySelector('.pagina-web-mapa-nodo.activo').textContent).toBe('Portada')
     const recursos = [...mapa.querySelectorAll('.pagina-web-mapa-nodo')].find((nodo) => nodo.textContent === 'Recursos')
     recursos.click()
@@ -865,7 +867,7 @@ describe('editor de Página web', () => {
     raiz.querySelector('[aria-label="Bajar Familias"]').click()
     raiz.querySelector('[data-pagina-web-guardar]').click()
     await esperar()
-    expect(cuerpoGuardado.areas.slice(0, 2)).toMatchObject([{ id: 'educacion', orden: 1 }, { id: 'familias', orden: 2 }])
+    expect(cuerpoGuardado.areas.slice(0, 2)).toMatchObject([{ id: 'adultos-autistas', orden: 1 }, { id: 'familias', orden: 2 }])
   })
 
   it('encuentra cualquier sección por nombre y abre su inspector', async () => {

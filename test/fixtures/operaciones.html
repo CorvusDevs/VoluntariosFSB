@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Auditoría visual del centro de operaciones</title>
+  <link rel="stylesheet" href="../../css/estilos.css">
+</head>
+<body>
+  <div class="app-cms"><div class="cuerpo" id="fixture"></div></div>
+  <script type="module">
+    import { crearPantallaOperaciones } from '../../js/ui/pantalla-operaciones.js'
+    const respuesta = {
+      version: '2026-08-31.0030-a85aa8a40b',
+      acceso: { puede_administrar: true, puede_ver_datos: true },
+      resumen: { integracionesConAtencion: 3, pendientesCola: 4, fallidosCola: 1, incidentesAbiertos: 1 },
+      indicadores: { formularios_activos: 6, entradas_abiertas: 3, contactos_activos: 142, privacidad_pendiente: 1 },
+      integraciones: [
+        { clave: 'base', nombre: 'Base institucional', estado: 'saludable', detalle: 'Conexión disponible y migraciones aplicadas.' },
+        { clave: 'formularios', nombre: 'Formularios públicos', estado: 'saludable', detalle: 'Las respuestas llegan al gestor con trazabilidad.' },
+        { clave: 'pagina', nombre: 'Página pública', estado: 'saludable', detalle: 'Contenido y formularios usan la misma revisión publicada.' },
+        { clave: 'correo', nombre: 'Correo y newsletters', estado: 'advertencia', detalle: 'La cola funciona, faltan verificaciones del proveedor.' },
+        { clave: 'dominio', nombre: 'Dominio y DMARC', estado: 'pendiente', detalle: 'Falta confirmar la política de autenticación del dominio.' },
+        { clave: 'privacidad', nombre: 'Privacidad', estado: 'advertencia', detalle: 'Hay una solicitud pendiente de atención.' },
+        { clave: 'publicacion', nombre: 'Publicación automática', estado: 'pendiente', detalle: 'La ruta SFTP todavía no tiene evidencia registrada.' },
+      ],
+      controles: [
+        { clave: 'correo_cuenta_remitente', titulo: 'Cuenta remitente', descripcion: 'Casilla institucional para los envíos.', estado: 'confirmado', evidencia: 'novedades@aletea.org validada.', actualizado_en: '2026-08-31 01:10:00', actualizado_por: 'Ale' },
+        { clave: 'correo_dmarc', titulo: 'Autenticación DMARC', descripcion: 'Protege la reputación del dominio.', estado: 'pendiente', evidencia: '' },
+        { clave: 'correo_limites_proveedor', titulo: 'Límites del proveedor', descripcion: 'Volumen diario y velocidad permitida.', estado: 'bloqueado', evidencia: 'Esperando confirmación del hosting.' },
+        { clave: 'correo_prueba_externa', titulo: 'Prueba de entrega externa', descripcion: 'Comprueba entrega y respuesta.', estado: 'pendiente', evidencia: '' },
+      ],
+      incidentes: [{ id: 'i1', titulo: 'Una suscripción no pudo registrarse', detalle: 'El formulario se guardó correctamente y la suscripción quedó para revisión.', fuente: 'comunicaciones:alta', severidad: 'advertencia', estado: 'abierto', ocurrencias: 1, detectado_en: '2026-08-31 01:22:00' }],
+      correosFallidos: [{ id: 'c1', asunto: 'Confirmá tu suscripción', destinatario: 'familia@ejemplo.uy', intentos: 2, ultimo_error: 'Respuesta temporal del servidor de destino.' }],
+      ejecuciones: [
+        { trabajo: 'procesar_cola_correos', estado: 'completada', exitos: 18, reintentados: 1, fallidos: 0, iniciada_en: '2026-08-31 01:15:00' },
+        { trabajo: 'mantenimiento_sistema', estado: 'completada', exitos: 5, reintentados: 0, fallidos: 0, iniciada_en: '2026-08-31 00:45:00' },
+      ],
+    }
+    window.fetch = async () => new Response(JSON.stringify(respuesta), { status: 200, headers: { 'content-type': 'application/json' } })
+    crearPantallaOperaciones(document.getElementById('fixture'), { alIrA: () => {} })
+  </script>
+</body>
+</html>

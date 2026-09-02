@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "actualizadoEn": "2026-09-01",
+  "terminos": {
+    "area": { "nombre": "Área", "definicion": "Equipo institucional estable que reúne responsabilidades y líneas de trabajo." },
+    "unidad": { "nombre": "Unidad", "definicion": "Programa, canal, formación o proceso que organiza trabajo dentro de un área." },
+    "equipo": { "nombre": "Equipo", "definicion": "Grupo de personas con una responsabilidad compartida dentro de Aletea." },
+    "proyecto": { "nombre": "Proyecto", "definicion": "Trabajo con objetivo, responsables, fechas y cierre verificable." },
+    "tarea": { "nombre": "Tarea", "definicion": "Próxima acción concreta con responsable, estado y fecha opcional." },
+    "responsable": { "nombre": "Responsable", "definicion": "Persona o equipo que debe realizar o coordinar el siguiente paso." },
+    "seguimiento": { "nombre": "Seguimiento", "definicion": "Fecha o acción para volver a revisar un asunto que todavía no terminó." },
+    "recurso": { "nombre": "Recurso", "definicion": "Material público seleccionado para orientar o ampliar información." },
+    "biblioteca": { "nombre": "Biblioteca", "definicion": "Archivo completo de documentos internos, recursos públicos y enlaces externos." },
+    "comunicaciones": { "nombre": "Comunicaciones", "definicion": "Módulo de contactos, consentimiento, campañas y estado de envío." },
+    "pagina_web": { "nombre": "Página web", "definicion": "Módulo para editar, previsualizar y publicar el contenido público." },
+    "respuesta_recibida": { "nombre": "Recibida", "definicion": "Respuesta de formulario que todavía necesita revisión." },
+    "respuesta_derivada": { "nombre": "Derivada", "definicion": "Respuesta asignada a un equipo o una tarea de seguimiento." },
+    "respuesta_cerrada": { "nombre": "Cerrada", "definicion": "Respuesta cuyo resultado y fecha de cierre quedaron registrados." }
+  }
+}

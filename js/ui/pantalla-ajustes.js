@@ -161,7 +161,11 @@ export function crearPantallaAjustes(raiz, opciones) {
         // La contraseña la genera siempre la aplicación. No hay campo para
         // elegirla: usuarios.json es público y una elegida a mano no aguanta.
         const contrasena = generarContrasena()
-        const registro = await cifrar(sesion.token, contrasena)
+        const secreto = archivo.version >= 2 && archivo.credencial
+          ? sesion.claveAcceso
+          : sesion.token
+        if (!secreto) throw new Error('Volvé a ingresar para administrar accesos.')
+        const registro = await cifrar(secreto, contrasena)
         const siguiente = agregarUsuario(archivo, { ...datos, rol: selector.value }, registro)
         await guardarArchivo(siguiente, `Dar acceso a ${datos.nombre} como ${selector.value}`)
         archivo = siguiente
@@ -176,9 +180,8 @@ export function crearPantallaAjustes(raiz, opciones) {
   }
 
   function seccionRotar() {
-    // Va plegada y con la advertencia adentro a proposito. Rotar el token deja
-    // afuera a todo el mundo a la vez, y no es algo que deba quedar a un toque
-    // de distancia de las acciones cotidianas.
+    // Sigue plegada porque no es una acción cotidiana, aunque en el formato v2
+    // ya no altera las contraseñas personales.
     const seccion = elemento('section', ['seccion'])
     const plegable = document.createElement('details')
     plegable.className = 'zona-peligro'
@@ -193,10 +196,8 @@ export function crearPantallaAjustes(raiz, opciones) {
     plegable.appendChild(resumen)
 
     plegable.appendChild(elemento('p', ['aviso', 'aviso-rotar'],
-      'Esto no se puede deshacer. Al rotar el token, las contraseñas de todas las '
-      + 'coordinadoras dejan de funcionar en el momento, incluida la tuya. La aplicación '
-      + 'genera una nueva para cada persona y las tenés que repartir una por una antes de '
-      + 'que alguien pueda volver a entrar. Hacelo solo si el token se filtró o venció.'))
+      'Reemplaza la credencial técnica de GitHub sin cambiar las contraseñas personales. '
+      + 'Usalo si el token venció, fue revocado o pudo haberse filtrado.'))
 
     const token = campo('Token nuevo de GitHub', 'password', 'token-nuevo', { autocomplete: 'off' })
     const enviar = elemento('button', ['boton', 'boton-peligro'], 'Rotar el token')
@@ -210,24 +211,16 @@ export function crearPantallaAjustes(raiz, opciones) {
       correr(async () => {
         const nuevo = token.entrada.value.trim()
         if (!nuevo) throw new Error('Pegá el token nuevo de GitHub.')
-        const usuarios = []
-        const nuevas = []
-        for (const registro of archivo.usuarios) {
-          const contrasena = generarContrasena()
-          const cifrado = await cifrar(nuevo, contrasena)
-          usuarios.push({
-            usuario: registro.usuario, nombre: registro.nombre, rol: registro.rol, ...cifrado,
-          })
-          nuevas.push({ usuario: registro.usuario, nombre: registro.nombre, contrasena })
+        if (archivo.version < 2 || !archivo.credencial || !sesion.claveAcceso) {
+          throw new Error('Este acceso todavía usa el formato anterior. Volvé a ingresar después de actualizarlo.')
         }
-        const siguiente = { ...archivo, usuarios }
-        await guardarArchivo(siguiente, 'Rotar el token y regenerar todas las contraseñas')
+        const siguiente = { ...archivo, credencial: await cifrar(nuevo, sesion.claveAcceso) }
+        await guardarArchivo(siguiente, 'Rotar la credencial técnica sin cambiar contraseñas')
         archivo = siguiente
         // El token viejo queda revocado: el almacén tiene que dejar de usarlo
         // o la próxima lista que se guarde falla con un 401.
         sesion.token = nuevo
         if (alCambiarToken) await alCambiarToken(nuevo)
-        generadas = nuevas
       })
     })
 

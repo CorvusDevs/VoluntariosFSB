@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:http'
 import { readFile, stat } from 'node:fs/promises'
 import { extname, join, normalize } from 'node:path'
@@ -5,11 +6,15 @@ import { fileURLToPath } from 'node:url'
 import { onRequest } from '../functions/api/[[ruta]].js'
 import { crearBaseMariaDb } from './base-mysql.mjs'
 import { cabecerasDeArchivo } from './cache-estaticos.mjs'
+import { cargarEntornoAplicacion } from './cargar-entorno.mjs'
 import { aplicarMigracionesMariaDb } from './migraciones.mjs'
 import { esRutaGestor, htmlGestorParaRuta } from './rutas-web.mjs'
 
+cargarEntornoAplicacion()
+
 const raiz = fileURLToPath(new URL('../dist/', import.meta.url))
 const base = crearBaseMariaDb()
+let versionAplicacion = null
 const LIMITE_CUERPO = 2 * 1024 * 1024
 const tipos = new Map([
   ['.css', 'text/css; charset=utf-8'], ['.html', 'text/html; charset=utf-8'],
@@ -49,6 +54,14 @@ async function servirApi(peticion, respuesta) {
       SESION_SECRETO: process.env.SESSION_SECRET,
       ENTORNO: 'produccion',
       STAGING_DEPLOY_WEBHOOK: process.env.STAGING_DEPLOY_WEBHOOK,
+      ORIGEN_PUBLICO: process.env.ORIGEN_PUBLICO || 'https://gestor.aletea.org',
+      EMAIL_TRANSPORT: process.env.EMAIL_TRANSPORT,
+      EMAIL_FROM: process.env.EMAIL_FROM,
+      SMTP_HOST: process.env.SMTP_HOST,
+      SMTP_USER: process.env.SMTP_USER,
+      SMTP_PASSWORD: process.env.SMTP_PASSWORD,
+      EMAIL_JOB_STALE_AFTER_MINUTES: process.env.EMAIL_JOB_STALE_AFTER_MINUTES,
+      VERSION_APLICACION: versionAplicacion,
     },
   })
   respuesta.statusCode = resultado.status
@@ -85,20 +98,38 @@ async function servirArchivo(peticion, respuesta) {
 }
 
 const servidor = createServer(async (peticion, respuesta) => {
+  const idSolicitud = randomUUID()
+  respuesta.setHeader('x-request-id', idSolicitud)
   try {
     if (peticion.url.startsWith('/api/')) await servirApi(peticion, respuesta)
     else await servirArchivo(peticion, respuesta)
   } catch (error) {
-    console.error(error)
+    console.error(JSON.stringify({
+      evento: 'solicitud_fallida',
+      idSolicitud,
+      metodo: peticion.method,
+      ruta: String(peticion.url || '').split('?')[0],
+      codigoHttp: error.codigoHttp || 500,
+      mensaje: String(error?.message || error).slice(0, 1000),
+    }))
     respuesta.statusCode = error.codigoHttp || 500
     respuesta.setHeader('content-type', 'application/json; charset=utf-8')
     if (peticion.url.startsWith('/api/formularios')) respuesta.setHeader('access-control-allow-origin', '*')
     respuesta.setHeader('cache-control', 'no-store, max-age=0')
-    respuesta.end(JSON.stringify({ error: error.codigoHttp === 413 ? 'El archivo supera el límite permitido.' : 'No se pudo completar la operación.' }))
+    respuesta.end(JSON.stringify({
+      error: error.codigoHttp === 413 ? 'El archivo supera el límite permitido.' : 'No se pudo completar la operación.',
+      referencia: idSolicitud,
+    }))
   }
 })
 
 async function iniciarServidor() {
+  try {
+    const version = JSON.parse(await readFile(join(raiz, 'version.json'), 'utf8'))
+    versionAplicacion = version.build || version.version || null
+  } catch {
+    versionAplicacion = null
+  }
   await aplicarMigracionesMariaDb(base)
   servidor.listen(process.env.PORT || 3000)
 }

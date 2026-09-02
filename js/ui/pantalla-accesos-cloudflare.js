@@ -1,9 +1,9 @@
-import { boton, elemento, icono, vaciar } from './componentes.js'
+import { boton, elemento, icono, manejarTecladoDialogo, vaciar } from './componentes.js'
 import { crearSelectorFecha } from './selector-fecha.js'
 import { evitarCortesHora, fechaDesdeUTC } from '../util/fechas.js'
 import { optimizarImagenParaWeb } from '../imagen/optimizar-web.js'
 import {
-  perfilAccesoInstitucional, puedeCrearCartaMembretada, puedeGestionarPaginaWeb,
+  CAPACIDAD_CREAR_TAREAS, perfilAccesoInstitucional, permisoCrearTareasEfectivo, puedeCrearCartaMembretada, puedeGestionarPaginaWeb,
   puedeUsarComunicacionVisual, puedeVerMetricasPaginaWeb,
 } from '../acceso/permisos-funciones.js'
 
@@ -72,7 +72,7 @@ function textoVigenciaCuenta(usuario = {}) {
     : 'Cuenta sin vencimiento'
 }
 
-export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = []) {
+export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = [], politicasTareas = []) {
   const perfil = perfilAccesoInstitucional(usuario)
   const nombresEquipos = [...new Set(asignaciones.map((asignacion) =>
     asignacion.equipo_nombre || equipos.find((equipo) => equipo.id === asignacion.equipo_id)?.nombre,
@@ -89,6 +89,11 @@ export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = [])
       : perfil === 'consulta' ? 'Agenda y documentos compartidos' : alcance
   const edicion = perfil === 'coordinacion' ? `Equipos asignados: ${alcance}`
     : perfil === 'integrante' ? 'Solo sus propias tareas' : perfil === 'consulta' ? 'No puede editar' : 'Toda la institución'
+  const equiposAsignados = [...new Set(asignaciones.map((asignacion) => asignacion.equipo_id).filter(Boolean))]
+  const permisosCrear = (equiposAsignados.length ? equiposAsignados : [null]).map((equipoId) => permisoCrearTareasEfectivo(usuario, equipoId, politicasTareas))
+  const permisosPermitidos = permisosCrear.filter((permiso) => permiso.permitido)
+  const puedeCrearTareas = permisosPermitidos.length > 0
+  const origenCrearTareas = permisosPermitidos[0]?.fuente || permisosCrear[0]?.fuente || 'Predeterminado institucional'
 
   return {
     perfil,
@@ -98,6 +103,7 @@ export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = [])
       `Incluido por perfil: ${PERFILES[perfil]?.[0] || 'Coordinación'}`,
       ['administracion', 'direccion'].includes(perfil) ? 'Alcance: todas las áreas' : `Limitado a: ${alcance}`,
       `Datos personales: ${datos[0]} · ${vigencia}`,
+      `Creación de tareas: ${puedeCrearTareas ? 'habilitada' : 'bloqueada'} · ${origenCrearTareas}`,
     ],
     tarjetas: [
       { tipo: 'ver', texto: trabajo, activo: true },
@@ -107,7 +113,7 @@ export function resumenPermisosDe(usuario = {}, asignaciones = [], equipos = [])
       { tipo: 'administrar', texto: puedeAdministrar ? 'Personas, perfiles y equipos' : 'No administra accesos', activo: puedeAdministrar },
     ],
     modulos: [
-      ['Tareas institucionales', perfil === 'consulta' ? 'Solo consulta' : perfil === 'integrante' ? 'Edita lo propio' : 'Edita', alcance],
+      ['Tareas institucionales', puedeCrearTareas ? 'Puede crear y editar según su alcance' : perfil === 'consulta' ? 'Solo consulta' : perfil === 'integrante' ? 'Edita lo propio, no crea' : 'Edita, no crea', `${alcance} · ${origenCrearTareas}`],
       ['Página web', puedeGestionarPaginaWeb(usuario) ? (puedePublicar ? 'Edita y publica' : 'Edita, no publica') : 'Sin acceso', puedeGestionarPaginaWeb(usuario) ? 'Contenido y borradores' : ''],
       ['Comunicación visual', puedeUsarComunicacionVisual(usuario) ? 'Edita' : 'Sin acceso', puedeCrearCartaMembretada(usuario) ? 'Incluye cartas membretadas' : 'Sin cartas membretadas'],
       ['Métricas de la página', puedeVerMetricasPaginaWeb(usuario) ? 'Puede ver' : 'Sin acceso', 'Datos agregados, sin respuestas personales'],
@@ -198,11 +204,16 @@ export function crearPantallaAccesosCloudflare(raiz, {
   let usuarios = []
   let equipos = []
   let responsabilidades = []
+  let politicasTareas = []
   let error = ''
   let contrasenaNueva = null
   let cargando = true
   let texto = solicitudInicial?.requisito?.resolver?.usuario === 'yo' ? String(sesion?.correo || '') : ''
   let confirmacionQuitar = ''
+  let filtroPerfil = 'todos'
+  let filtroDatos = 'todos'
+  let filtroVigencia = 'todos'
+  let filtroEquipo = 'todos'
 
   function estadoAdopcion(usuario) {
     if (!usuario.ultimo_acceso) return { clave: 'sin-ingreso', texto: 'Todavía no ingresó', atencion: true }
@@ -218,12 +229,13 @@ export function crearPantallaAccesosCloudflare(raiz, {
     error = ''
     dibujar()
     try {
-      const [accesos, datosEquipos, datosResponsabilidades] = await Promise.all([
-        pedir('/api/usuarios'), pedir('/api/cms/equipos'), pedir('/api/cms/responsabilidades'),
+      const [accesos, datosEquipos, datosResponsabilidades, datosPermisosTareas] = await Promise.all([
+        pedir('/api/usuarios'), pedir('/api/cms/equipos'), pedir('/api/cms/responsabilidades'), pedir('/api/cms/permisos-tareas'),
       ])
       usuarios = accesos.usuarios
       equipos = datosEquipos.equipos
       responsabilidades = datosResponsabilidades.responsabilidades
+      politicasTareas = datosPermisosTareas.politicas || []
     } catch (fallo) {
       error = fallo.message
     } finally {
@@ -357,7 +369,7 @@ export function crearPantallaAccesosCloudflare(raiz, {
   }
 
   function abrirVistaPermisos(usuario, asignaciones, activador) {
-    const permisos = resumenPermisosDe(usuario, asignaciones, equipos)
+    const permisos = resumenPermisosDe(usuario, asignaciones, equipos, politicasTareas)
     const pantalla = raiz.querySelector('.ajustes')
     const superposicion = elemento('section', ['vista-permisos-superposicion'])
     superposicion.setAttribute('role', 'dialog')
@@ -396,14 +408,14 @@ export function crearPantallaAccesosCloudflare(raiz, {
     panel.append(cabecera, contexto, lista, aviso)
     superposicion.appendChild(panel)
     superposicion.addEventListener('click', (evento) => { if (evento.target === superposicion) cerrarVista() })
-    superposicion.addEventListener('keydown', (evento) => { if (evento.key === 'Escape') cerrarVista() })
+    superposicion.addEventListener('keydown', (evento) => manejarTecladoDialogo(evento, superposicion, cerrarVista))
     pantalla?.setAttribute('inert', '')
     raiz.appendChild(superposicion)
     superposicion.focus()
   }
 
   function crearResumenVisual(usuario, asignaciones) {
-    const permisos = resumenPermisosDe(usuario, asignaciones, equipos)
+    const permisos = resumenPermisosDe(usuario, asignaciones, equipos, politicasTareas)
     const bloque = elemento('section', ['resumen-permisos-persona'])
     bloque.setAttribute('aria-label', `Resumen de permisos de ${usuario.nombre}`)
     const origen = elemento('div', ['permisos-origenes'])
@@ -423,10 +435,58 @@ export function crearPantallaAccesosCloudflare(raiz, {
     return bloque
   }
 
+  const reglaTareasActual = (alcanceTipo, alcanceId) => politicasTareas.find((regla) =>
+    regla.capacidad === CAPACIDAD_CREAR_TAREAS && regla.alcance_tipo === alcanceTipo
+      && String(regla.alcance_id).toLowerCase() === String(alcanceId).toLowerCase())?.efecto || 'heredar'
+
+  function editorReglaTareas({ alcanceTipo, alcanceId, nombre, ayuda }) {
+    const fila = elemento('div', ['permiso-tareas-fila'])
+    const identidad = elemento('div', ['permiso-tareas-identidad'])
+    identidad.append(elemento('strong', [], nombre), elemento('span', ['ayuda-ajustes'], ayuda))
+    const selector = document.createElement('select')
+    selector.setAttribute('aria-label', `Creación de tareas para ${nombre}`)
+    ;[['heredar', 'Usar regla heredada'], ['permitir', 'Permitir crear tareas'], ['bloquear', 'Bloquear creación']].forEach(([valor, etiqueta]) => selector.appendChild(new Option(etiqueta, valor)))
+    selector.value = reglaTareasActual(alcanceTipo, alcanceId)
+    const guardar = boton('Guardar', async () => {
+      guardar.disabled = true
+      try {
+        await pedir('/api/cms/permisos-tareas', { method: 'PUT', body: JSON.stringify({ alcance_tipo: alcanceTipo, alcance_id: alcanceId, efecto: selector.value }) })
+        await cargar()
+      } catch (fallo) { error = fallo.message; dibujar() }
+    }, ['boton', 'boton-secundario'])
+    fila.append(identidad, selector, guardar)
+    return fila
+  }
+
+  function panelPermisosTareas() {
+    const panel = document.createElement('details')
+    panel.className = 'permisos-tareas-panel'
+    panel.appendChild(elemento('summary', [], 'Quién puede crear tareas'))
+    panel.append(
+      elemento('p', ['ayuda-ajustes'], 'Por defecto solo Administración puede crear tareas. Una excepción individual prevalece sobre el equipo, y el equipo prevalece sobre el perfil. Quien no tenga permiso puede enviar una solicitud.'),
+      elemento('h3', [], 'Reglas por perfil'),
+    )
+    const perfiles = elemento('div', ['permisos-tareas-lista'])
+    Object.entries(PERFILES).forEach(([clave, [nombre]]) => perfiles.appendChild(editorReglaTareas({
+      alcanceTipo: 'perfil', alcanceId: clave, nombre,
+      ayuda: clave === 'administracion' ? 'Predeterminado: permitido' : 'Predeterminado: bloqueado',
+    })))
+    panel.appendChild(perfiles)
+    panel.appendChild(elemento('h3', [], 'Reglas por equipo'))
+    const grupos = elemento('div', ['permisos-tareas-lista'])
+    equipos.forEach((equipo) => grupos.appendChild(editorReglaTareas({
+      alcanceTipo: 'equipo', alcanceId: equipo.id, nombre: equipo.nombre,
+      ayuda: 'Se aplica a las personas asignadas a este equipo, salvo excepción individual.',
+    })))
+    if (!equipos.length) grupos.appendChild(elemento('p', ['ayuda-ajustes'], 'Todavía no hay equipos activos.'))
+    panel.appendChild(grupos)
+    return panel
+  }
+
   function dibujar() {
     vaciar(raiz)
     const caja = elemento('section', ['ajustes'])
-    caja.appendChild(elemento('h2', [], 'Accesos'))
+    caja.appendChild(elemento('h1', [], 'Accesos'))
     caja.appendChild(elemento('p', ['ayuda-ajustes'],
       'Cada persona recibe un usuario y una contraseña generada. La aplicación solo guarda un derivado seguro de esa contraseña.'))
     if (solicitudInicial?.requisito) {
@@ -455,6 +515,22 @@ export function crearPantallaAccesosCloudflare(raiz, {
     buscar.setAttribute('aria-label', 'Buscar acceso')
     buscar.addEventListener('input', () => { texto = buscar.value; dibujar() })
     caja.appendChild(buscar)
+    const filtros = elemento('div', ['accesos-filtros'])
+    const selectorFiltro = (rotulo, opciones, valor, alCambiar) => {
+      const control = document.createElement('select')
+      control.setAttribute('aria-label', rotulo)
+      opciones.forEach(([clave, etiqueta]) => control.appendChild(new Option(etiqueta, clave)))
+      control.value = valor
+      control.addEventListener('change', () => alCambiar(control.value))
+      return campoAcceso(rotulo, control)
+    }
+    filtros.append(
+      selectorFiltro('Filtrar por perfil', [['todos', 'Todos los perfiles'], ...Object.entries(PERFILES).map(([clave, [etiqueta]]) => [clave, etiqueta])], filtroPerfil, (valor) => { filtroPerfil = valor; dibujar() }),
+      selectorFiltro('Filtrar por datos personales', [['todos', 'Todos los niveles'], ...Object.entries(NIVELES_DATOS).map(([clave, [etiqueta]]) => [clave, etiqueta])], filtroDatos, (valor) => { filtroDatos = valor; dibujar() }),
+      selectorFiltro('Filtrar por vencimiento', [['todos', 'Cualquier vigencia'], ['temporal', 'Con vencimiento'], ['indefinida', 'Sin vencimiento']], filtroVigencia, (valor) => { filtroVigencia = valor; dibujar() }),
+      selectorFiltro('Filtrar por equipo', [['todos', 'Todos los equipos'], ...equipos.map((equipo) => [equipo.id, equipo.nombre])], filtroEquipo, (valor) => { filtroEquipo = valor; dibujar() }),
+    )
+    caja.appendChild(filtros)
     const resumen = elemento('div', ['resumen-accesos'])
     const nuncaIngresaron = usuarios.filter((usuario) => !usuario.ultimo_acceso).length
     const necesitanAcompanamiento = usuarios.filter((usuario) => estadoAdopcion(usuario).atencion).length
@@ -465,11 +541,25 @@ export function crearPantallaAccesosCloudflare(raiz, {
       resumen.appendChild(item)
     })
     caja.appendChild(resumen)
+    caja.appendChild(panelPermisosTareas())
+    const usuariosVisibles = usuarios.filter((usuario) => {
+      const coincideTexto = `${usuario.nombre} ${usuario.correo} ${usuarioVisible(usuario)}`.toLocaleLowerCase('es').includes(texto.toLocaleLowerCase('es'))
+      const coincidePerfil = filtroPerfil === 'todos' || perfilAccesoInstitucional(usuario) === filtroPerfil
+      const coincideDatos = filtroDatos === 'todos' || (usuario.nivel_datos_personales || 'ninguno') === filtroDatos
+      const coincideVigencia = filtroVigencia === 'todos' || (usuario.acceso_hasta ? 'temporal' : 'indefinida') === filtroVigencia
+      const coincideEquipo = filtroEquipo === 'todos' || responsabilidades.some((asignacion) => asignacion.usuario_correo === usuario.correo && asignacion.equipo_id === filtroEquipo)
+      return coincideTexto && coincidePerfil && coincideDatos && coincideVigencia && coincideEquipo
+    })
+    const resultados = elemento('p', ['accesos-resultados'], `${usuariosVisibles.length} de ${usuarios.length} cuentas`)
+    resultados.setAttribute('role', 'status')
+    resultados.setAttribute('aria-live', 'polite')
+    caja.appendChild(resultados)
     const lista = elemento('div', ['lista-personas'])
-    usuarios.filter((usuario) => `${usuario.nombre} ${usuario.correo} ${usuarioVisible(usuario)}`.toLocaleLowerCase('es').includes(texto.toLocaleLowerCase('es'))).forEach((usuario) => {
-      const fila = elemento('div', ['persona-fila'])
+    usuariosVisibles.forEach((usuario) => {
+      const fila = document.createElement('details')
+      fila.className = 'persona-fila'
       fila.classList.add('acceso-fila')
-      const identidad = elemento('div', ['acceso-identidad'])
+      const identidad = elemento('summary', ['acceso-identidad'])
       const avatar = elemento('span', ['acceso-avatar'], iniciales(usuario.nombre))
       if (usuario.foto_perfil) {
         const imagen = document.createElement('img')
@@ -489,8 +579,28 @@ export function crearPantallaAccesosCloudflare(raiz, {
       fila.append(
         identidad,
       )
+      const solicitudDeUsuario = solicitudInicial?.requisito?.resolver?.usuario === 'yo'
+        ? usuario.correo === sesion?.correo
+        : solicitudInicial?.requisito?.resolver?.usuario === usuario.correo
+      fila.open = Boolean(solicitudDeUsuario || (texto.trim() && usuariosVisibles.length === 1))
       const asignaciones = responsabilidades.filter((asignacion) => asignacion.usuario_correo === usuario.correo)
       fila.appendChild(crearResumenVisual(usuario, asignaciones))
+      const permisoTareasPersona = document.createElement('details')
+      permisoTareasPersona.className = 'permisos-editar permiso-tareas-persona'
+      permisoTareasPersona.appendChild(elemento('summary', [], 'Creación de tareas'))
+      const equiposPersona = [...new Set(asignaciones.map((asignacion) => asignacion.equipo_id).filter(Boolean))]
+      const resultadosTareas = (equiposPersona.length ? equiposPersona : [null]).map((equipoId) => ({
+        equipoId, resultado: permisoCrearTareasEfectivo(usuario, equipoId, politicasTareas),
+      }))
+      const permitidosTareas = resultadosTareas.filter(({ resultado }) => resultado.permitido)
+      permisoTareasPersona.appendChild(elemento('p', ['ayuda-ajustes'], permitidosTareas.length
+        ? `Permiso efectivo: puede crear${permitidosTareas[0].equipoId ? ` en ${permitidosTareas.map(({ equipoId }) => equipos.find((equipo) => equipo.id === equipoId)?.nombre).filter(Boolean).join(', ')}` : ''}. Fuente: ${permitidosTareas[0].resultado.fuente}.`
+        : `Permiso efectivo: no puede crear tareas. Fuente: ${resultadosTareas[0]?.resultado.fuente || 'Predeterminado institucional'}. Puede enviar solicitudes.`))
+      permisoTareasPersona.appendChild(editorReglaTareas({
+        alcanceTipo: 'usuario', alcanceId: usuario.correo, nombre: usuario.nombre,
+        ayuda: 'La excepción individual tiene prioridad sobre las reglas de perfil y equipo.',
+      }))
+      fila.appendChild(permisoTareasPersona)
       const perfilUsuario = perfilAccesoInstitucional(usuario)
       const equipoFinanzas = equipos.find((equipo) => equipo.clave === 'finanzas' || equipo.nombre?.toLocaleLowerCase('es') === 'finanzas')
       const perteneceAFinanzas = Boolean(equipoFinanzas && asignaciones.some((asignacion) => asignacion.equipo_id === equipoFinanzas.id))
@@ -505,6 +615,7 @@ export function crearPantallaAccesosCloudflare(raiz, {
       datosPersonales.className = 'permisos-editar'
       datosPersonales.appendChild(elemento('summary', [], 'Datos personales'))
       const nivel = document.createElement('select')
+      nivel.setAttribute('aria-label', `Nivel de datos personales de ${usuario.nombre}`)
       Object.entries(NIVELES_DATOS).forEach(([valor, [etiqueta]]) => {
         const opcion = document.createElement('option'); opcion.value = valor; opcion.textContent = etiqueta; nivel.appendChild(opcion)
       })
@@ -643,6 +754,7 @@ export function crearPantallaAccesosCloudflare(raiz, {
         acceso.className = 'permisos-editar'
         acceso.appendChild(elemento('summary', [], 'Perfil de acceso'))
         const perfil = document.createElement('select')
+        perfil.setAttribute('aria-label', `Perfil de acceso de ${usuario.nombre}`)
         Object.entries(PERFILES).forEach(([valor, [etiqueta]]) => {
           const opcion = document.createElement('option'); opcion.value = valor; opcion.textContent = etiqueta; perfil.appendChild(opcion)
         })

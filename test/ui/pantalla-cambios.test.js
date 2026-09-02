@@ -23,6 +23,21 @@ describe('cambios del sistema', () => {
     expect(raiz.textContent).toContain('Adiciones')
     expect(raiz.textContent).toContain('Arreglos')
     expect(raiz.textContent).toContain('Alejandro Estol')
+    expect(raiz.querySelectorAll('.cambios-cms > .cambio-version')).toHaveLength(3)
+    expect(raiz.querySelector('.cambios-archivo')).not.toBeNull()
+    expect(raiz.querySelector('.cambios-archivo').open).toBe(false)
+  })
+
+  it('abre con un resumen integral y muestra el estado publicado', () => {
+    const raiz = document.getElementById('raiz')
+    crearPantallaCambios(raiz)
+    const actual = raiz.querySelector('[data-version="2.0.2"]')
+    expect(actual).not.toBeNull()
+    expect(actual.textContent).toContain('Publicada el 1 de septiembre de 2026')
+    expect(actual.textContent).toContain('preguntas y respuestas')
+    expect(actual.textContent).toContain('consentimientos')
+    expect(actual.textContent).toContain('pantallas angostas')
+    expect(actual.querySelector('.cambio-version-descripcion').textContent).toContain('bloque continuo')
   })
 
   it('usa fechas y commits reales y refleja el estado publicado', () => {

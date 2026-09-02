@@ -1,10 +1,11 @@
-import { boton, botonIcono, elemento, vaciar } from './componentes.js'
+import { boton, botonIcono, elemento, manejarTecladoDialogo, vaciar } from './componentes.js'
 import {
   SECCIONES_PAGINA_WEB, ayudaCampo, asignarEnRuta, clonarContenidoPaginaWeb, contenidoComoBorrador,
   etiquetaCampo, maximoCampo, resumenSeccion, singularDeLista, tipoCampo, validarContenidoPaginaWeb, valorEnRuta,
 } from '../modelo/pagina-web.js'
 import { optimizarImagenParaWeb, textoPeso } from '../imagen/optimizar-web.js'
 import { pasosSincronizacionMetricasWeb } from '../modelo/metricas-web.js'
+import { completarMedicionUX, iniciarMedicionUX } from '../modelo/metricas-ux.js'
 import { MENSAJE_ENLACE_INVALIDO, normalizarCampoEnlace } from '../util/enlaces.js'
 
 const SITIO_PRUEBA = 'https://prueba.aletea.org'
@@ -19,7 +20,7 @@ const CAMPOS_AVANZADOS = new Set([
   'edad', 'donde', 'modalidad', 'costo', 'cupos', 'comoParticipar',
 ])
 
-const MAXIMOS_LISTA = Object.freeze({ navegacion: 8, areas: 8, cifras: 6, redes: 12, propuestas: 30, propuestasFormativas: 30, formularios: 12, recursos: 30, productos: 24, novedades: 30 })
+const MAXIMOS_LISTA = Object.freeze({ navegacion: 5, areas: 8, cifras: 6, redes: 12, propuestas: 30, propuestasFormativas: 30, formularios: 12, recursos: 30, productos: 24, novedades: 30 })
 const CATEGORIAS_RECURSOS = Object.freeze(['Guías', 'Derechos', 'Educación', 'Familias', 'Autismo y neurodiversidad', 'Inclusión', 'Legislación', 'Videos', 'Podcasts', 'Materiales de Aletea'])
 const ESTADOS_INVENTARIO = Object.freeze(['Disponible', 'Pocas unidades', 'Agotado', 'Por encargo'])
 const CONFIGURACION_OPERACION_WEB = Object.freeze({
@@ -61,6 +62,7 @@ const VISTA_POR_SECCION = Object.freeze({
   institucion: { etiqueta: 'paginas.institucion.etiqueta', titulos: ['paginas.institucion.titulo'], texto: 'paginas.institucion.introduccion' },
   actividades: { etiqueta: 'paginas.actividades.etiqueta', titulos: ['paginas.actividades.titulo'], texto: 'paginas.actividades.introduccion' },
   familias: { etiqueta: 'paginas.familias.etiqueta', titulos: ['paginas.familias.titulo'], texto: 'paginas.familias.introduccion' },
+  'adultos-autistas': { etiqueta: 'paginas.adultosAutistas.etiqueta', titulos: ['paginas.adultosAutistas.titulo'], texto: 'paginas.adultosAutistas.introduccion' },
   formacion: { etiqueta: 'paginas.formacion.etiqueta', titulos: ['paginas.formacion.titulo'], texto: 'paginas.formacion.introduccion' },
   biblioteca: { etiqueta: 'paginas.biblioteca.etiqueta', titulos: ['paginas.biblioteca.titulo'], texto: 'paginas.biblioteca.introduccion' },
   recursos: { etiqueta: 'paginas.recursos.etiqueta', titulos: ['paginas.recursos.titulo'], texto: 'paginas.recursos.introduccion' },
@@ -78,8 +80,8 @@ const VISTA_POR_SECCION = Object.freeze({
 const GRUPOS_EDITOR_WEB = Object.freeze([
   { id: 'inicio', titulo: 'Inicio', ayuda: 'Portada y cifras destacadas.', secciones: ['portada', 'impacto'] },
   { id: 'institucion', titulo: 'Institución', ayuda: 'Áreas y presentación de Aletea.', secciones: ['areas', 'institucion'] },
-  { id: 'contenido', titulo: 'Páginas y contenido', ayuda: 'Actividades, formación, recursos, tienda y materiales publicados.', secciones: ['actividades', 'formacion', 'biblioteca', 'recursos', 'tienda', 'actualidad'] },
-  { id: 'participacion', titulo: 'Participación', ayuda: 'Orientación, familias, formas de colaborar y perfiles sociales.', secciones: ['orientacion', 'familias', 'participacion', 'donaciones', 'contacto', 'redes'] },
+  { id: 'contenido', titulo: 'Páginas y contenido', ayuda: 'Familias, adultos autistas, actividades, formación, recursos, tienda y materiales publicados.', secciones: ['familias', 'adultos-autistas', 'actividades', 'formacion', 'biblioteca', 'recursos', 'tienda', 'actualidad'] },
+  { id: 'participacion', titulo: 'Participación', ayuda: 'Orientación, formas de colaborar y perfiles sociales.', secciones: ['orientacion', 'participacion', 'donaciones', 'contacto', 'redes'] },
   { id: 'ajustes', titulo: 'Ajustes', ayuda: 'Apariencia, calidad, aviso público y reglas de operación.', secciones: ['general', 'apariencia', 'calidad', 'privacidad', 'operacion'] },
 ])
 
@@ -147,6 +149,7 @@ function rotuloEstado(estado) {
 }
 
 export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
+  iniciarMedicionUX('publicar_pagina')
   const perfil = sesion?.perfil_acceso || (sesion?.rol === 'admin' ? 'administracion' : 'coordinacion')
   const puedeEditar = ['administracion', 'direccion', 'coordinacion'].includes(perfil)
   const puedePublicar = ['administracion', 'direccion'].includes(perfil)
@@ -513,12 +516,13 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
       if (!pagina.formularios?.length) cuadricula.appendChild(elemento('p', ['pagina-web-vista-completa-vacio'], 'Todavía no hay formularios vinculados. Crealos en Formularios y agregalos acá cuando estén prontos.'))
     } else if (seccionId === 'recursos') {
       ;(pagina.recursos || []).forEach((recurso) => {
-        const tarjeta = elemento('article', ['pagina-web-vista-completa-tarjeta'])
+        const enlaceDegradado = /brincar\.org\.ar/i.test(recurso.enlace || '')
+        const tarjeta = elemento('article', ['pagina-web-vista-completa-tarjeta', ...(enlaceDegradado ? ['pagina-web-enlace-degradado'] : [])])
         tarjeta.append(
           elemento('span', ['pagina-web-vista-completa-categoria'], recurso.categoria || 'Recurso'),
           elemento('h3', [], recurso.titulo || 'Recurso sin título'),
           elemento('p', [], recurso.descripcion || 'Sin descripción.'),
-          elemento('span', ['pagina-web-vista-completa-enlace'], recurso.enlace ? 'Abrir recurso' : 'Falta agregar el enlace'),
+          elemento('span', ['pagina-web-vista-completa-enlace'], enlaceDegradado ? 'Disponibilidad variable, revisar antes de publicar' : recurso.enlace ? 'Abrir recurso' : 'Falta agregar el enlace'),
         )
         cuadricula.appendChild(tarjeta)
       })
@@ -616,7 +620,7 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     cuerpo.appendChild(sitio)
     superposicion.append(barra, cuerpo)
     superposicion.addEventListener('click', (evento) => { if (evento.target === superposicion) cerrarVista() })
-    superposicion.addEventListener('keydown', (evento) => { if (evento.key === 'Escape') cerrarVista() })
+    superposicion.addEventListener('keydown', (evento) => manejarTecladoDialogo(evento, superposicion, cerrarVista))
     if (pantallaEditor) pantallaEditor.setAttribute('inert', '')
     raiz.appendChild(superposicion)
     cambiarModo(false)
@@ -750,6 +754,11 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     })
     etiqueta.prepend(rotulo)
     etiqueta.appendChild(control)
+    if (tipo === 'url' && /brincar\.org\.ar/i.test(String(valor || ''))) {
+      const advertencia = elemento('small', ['pagina-web-enlace-degradado-aviso'], 'Enlace degradado: la última comprobación no pudo confirmar una carga estable. Revisalo antes de publicar.')
+      advertencia.setAttribute('role', 'status')
+      etiqueta.appendChild(advertencia)
+    }
     const ayuda = esCategoriaRecurso ? 'Elegí una categoría común para que las personas puedan filtrar este recurso.' : ayudaCampo(clave)
     if (ayuda) etiqueta.appendChild(elemento('small', ['pagina-web-campo-ayuda'], ayuda))
     return etiqueta
@@ -1052,7 +1061,7 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     const singular = singularDeLista(clave)
     cabecera.append(elemento('span', [], `${lista.length} ${lista.length === 1 ? singular : plurales[singular] || `${singular}s`}`))
     const claveListaAbierta = `${seccionActiva}:${ruta}`
-    if (puedeEditar && lista.length < (MAXIMOS_LISTA[clave] || 30)) cabecera.appendChild(boton(`Agregar ${singularDeLista(clave)}`, () => {
+    if (puedeEditar && clave !== 'navegacion' && lista.length < (MAXIMOS_LISTA[clave] || 30)) cabecera.appendChild(boton(`Agregar ${singularDeLista(clave)}`, () => {
       lista.push(ejemploParaLista(clave, lista))
       listasAbiertas.set(claveListaAbierta, lista.length - 1)
       alCambiar(normalizarOrden(lista)); marcarCambio(); dibujarEditor()
@@ -1100,7 +1109,8 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
         const bajar = botonIcono('adelante', `Bajar ${titulo}`, () => { if (indice < lista.length - 1) { [lista[indice + 1], lista[indice]] = [lista[indice], lista[indice + 1]]; alCambiar(normalizarOrden(lista)); marcarCambio(); dibujarEditor() } })
         bajar.disabled = indice === lista.length - 1
         const quitar = botonIcono('eliminar', `Quitar ${titulo}`, () => { lista.splice(indice, 1); alCambiar(normalizarOrden(lista)); marcarCambio(); dibujarEditor() })
-        acciones.append(duplicar, subir, bajar, quitar)
+        if (clave === 'navegacion') acciones.append(subir, bajar)
+        else acciones.append(duplicar, subir, bajar, quitar)
         barra.appendChild(acciones)
       }
       tarjeta.appendChild(barra)
@@ -1932,6 +1942,7 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
         : datos.despliegue?.estado === 'fallo'
           ? `Versión ${contenido.editorial.revision} guardada, pero no se pudo iniciar la actualización del sitio. Podés reintentar sin perder cambios.`
           : `Versión ${contenido.editorial.revision} guardada. Falta configurar la publicación automática para que aparezca en el sitio de prueba.`
+      completarMedicionUX('publicar_pagina')
     } catch (fallo) { error = fallo.message }
     guardando = false; dibujarEstadoAcciones(); dibujarEditor(); dibujarVistaPrevia()
   }

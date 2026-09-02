@@ -6,6 +6,7 @@ test-results/
 playwright-report/
 *.png.tmp
 respaldos/
+.aletea-publicacion/
 .env
 .env.*
 !.env.example

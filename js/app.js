@@ -19,6 +19,8 @@ import { crearPantallaInicio } from './ui/pantalla-inicio.js'
 import { crearPantallaCMS } from './ui/pantalla-cms.js'
 import { crearPantallaPaginaWeb } from './ui/pantalla-pagina-web.js'
 import { crearPantallaComunicacionVisual } from './ui/pantalla-comunicacion-visual.js'
+import { crearPantallaComunicaciones } from './ui/pantalla-comunicaciones.js'
+import { crearPantallaOperaciones } from './ui/pantalla-operaciones.js'
 import { crearFranjaAlerta } from './ui/franja-alerta.js'
 import { historial, rachasDeFalta, hastaHoy, UMBRAL_ALERTA } from './modelo/asistencia.js'
 import { crearLista, sincronizarConRoster, moverAGrupo, duplicarListaParaFecha } from './modelo/lista.js'
@@ -110,9 +112,12 @@ function actualizarRuta(destino, contexto = {}, reemplazar = false) {
 
 function abrirPantalla(destino, contexto = {}, opciones = {}) {
   if (!pantallaPermitida(destino, {
-    admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso,
+    admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso, nivelDatosPersonales: sesion?.nivel_datos_personales,
   })) return
   const cambioPantalla = destino !== pantalla
+  if (destino === 'ayuda' && pantalla !== 'ayuda' && !contexto.volverPantalla) {
+    contexto = { ...contexto, volverPantalla: pantalla, volverContexto: { ...contextoPantalla } }
+  }
   pantalla = destino
   contextoPantalla = contexto
   guardarUltimaPantalla(pantalla)
@@ -226,7 +231,7 @@ async function guardarArchivoUsuarios(archivo, descripcion = 'Cambiar los acceso
 function navegacion() {
   const caja = elemento('div', ['navegacion-contenedor'])
   const ir = (destino, etiqueta) => {
-    if (!pantallaPermitida(destino, { admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso })) return null
+    if (!pantallaPermitida(destino, { admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso, nivelDatosPersonales: sesion?.nivel_datos_personales })) return null
     const href = usaRutasRealesGestor(location.hostname) ? rutaParaPantalla(destino) : hashParaPantalla(destino)
     const b = enlaceBoton(etiqueta, href, () => abrirPantalla(destino))
     b.dataset.pantalla = destino
@@ -279,12 +284,10 @@ function navegacion() {
       escritorio.appendChild(grupo)
     }
     bloque('trabajo', TITULOS_GRUPOS_NAVEGACION_CMS.trabajo, destinosGrupo('trabajo'))
-    bloque('paginaWeb', TITULOS_GRUPOS_NAVEGACION_CMS.paginaWeb, destinosGrupo('paginaWeb'))
-    bloque('comunicacionVisual', TITULOS_GRUPOS_NAVEGACION_CMS.comunicacionVisual, destinosGrupo('comunicacionVisual'))
     bloque('organizacion', TITULOS_GRUPOS_NAVEGACION_CMS.organizacion, destinosGrupo('organizacion'))
-    if (esAdmin(sesion)) bloque('administracion', TITULOS_GRUPOS_NAVEGACION_CMS.administracion, destinosGrupo('administracion'))
-    bloque('equipos', TITULOS_GRUPOS_NAVEGACION_CMS.equipos, destinosGrupo('equipos'))
-    bloque('sistema', TITULOS_GRUPOS_NAVEGACION_CMS.sistema, destinosGrupo('sistema'), 'navegacion-cms-sistema')
+    bloque('contenidoPublico', TITULOS_GRUPOS_NAVEGACION_CMS.contenidoPublico, destinosGrupo('contenidoPublico'))
+    bloque('comunicacion', TITULOS_GRUPOS_NAVEGACION_CMS.comunicacion, destinosGrupo('comunicacion'))
+    bloque('administracion', TITULOS_GRUPOS_NAVEGACION_CMS.administracion, destinosGrupo('administracion'))
     const cuenta = elemento('div', ['navegacion-cms-cuenta'])
     cuenta.append(elemento('span', ['navegacion-cms-usuario'], sesion?.nombre || 'Cuenta Aletea'))
     const salir = boton('Cerrar sesión', cerrarSesion)
@@ -302,7 +305,7 @@ function navegacion() {
     mas.className = 'navegacion-mas'
     const resumen = elemento('summary', ['boton-navegacion'])
     resumen.append(icono('tablero'), document.createTextNode('Más'))
-    const secundarios = ['cms-pagina-web', 'cms-comunicacion-visual', 'cms-areas', 'cms-formularios', 'cms-biblioteca', 'cms-privacidad', 'cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion', 'accesos', 'registro-institucional', 'ayuda', 'cambios']
+    const secundarios = ['cms-pagina-web', 'cms-comunicacion-visual', 'cms-comunicaciones', 'cms-operaciones', 'cms-areas', 'cms-formularios', 'cms-biblioteca', 'cms-privacidad', 'cms-familias', 'cms-deportes', 'cms-comunicacion', 'cms-capacitaciones', 'cms-finanzas', 'cms-eventos', 'cms-administracion', 'accesos', 'registro-institucional', 'ayuda', 'cambios']
     if (secundarios.includes(pantalla)) resumen.classList.add('activa')
     mas.appendChild(resumen)
     const menu = elemento('div', ['menu-navegacion'])
@@ -320,12 +323,11 @@ function navegacion() {
       grupo.addEventListener('toggle', () => guardarPreferenciaNavegacion(clave, grupo.open, sesion))
       menu.appendChild(grupo)
     }
-    agregarGrupo('paginaWeb', TITULOS_GRUPOS_NAVEGACION_CMS.paginaWeb, GRUPOS_NAVEGACION_CMS.paginaWeb)
-    agregarGrupo('comunicacionVisual', TITULOS_GRUPOS_NAVEGACION_CMS.comunicacionVisual, GRUPOS_NAVEGACION_CMS.comunicacionVisual)
+    agregarGrupo('trabajo', TITULOS_GRUPOS_NAVEGACION_CMS.trabajo, GRUPOS_NAVEGACION_CMS.trabajo)
     agregarGrupo('organizacion', TITULOS_GRUPOS_NAVEGACION_CMS.organizacion, GRUPOS_NAVEGACION_CMS.organizacion)
-    agregarGrupo('equipos', TITULOS_GRUPOS_NAVEGACION_CMS.equipos, GRUPOS_NAVEGACION_CMS.equipos)
+    agregarGrupo('contenidoPublico', TITULOS_GRUPOS_NAVEGACION_CMS.contenidoPublico, GRUPOS_NAVEGACION_CMS.contenidoPublico)
+    agregarGrupo('comunicacion', TITULOS_GRUPOS_NAVEGACION_CMS.comunicacion, GRUPOS_NAVEGACION_CMS.comunicacion)
     agregarGrupo('administracion', TITULOS_GRUPOS_NAVEGACION_CMS.administracion, GRUPOS_NAVEGACION_CMS.administracion)
-    agregarGrupo('sistema', TITULOS_GRUPOS_NAVEGACION_CMS.sistema, GRUPOS_NAVEGACION_CMS.sistema)
     const salirMovil = boton('Cerrar sesión', cerrarSesion)
     salirMovil.dataset.accion = 'cerrar-sesion-movil'
     menu.appendChild(salirMovil)
@@ -524,6 +526,10 @@ function dibujar() {
     vista = crearPantallaPaginaWeb(cuerpo, { sesion, alIrA: abrirPantalla })
   } else if (pantalla === 'cms-comunicacion-visual' && sesion?.origen === 'cloudflare') {
     vista = crearPantallaComunicacionVisual(cuerpo, { sesion })
+  } else if (pantalla === 'cms-comunicaciones' && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaComunicaciones(cuerpo, { sesion, alIrA: abrirPantalla })
+  } else if (pantalla === 'cms-operaciones' && sesion?.origen === 'cloudflare') {
+    vista = crearPantallaOperaciones(cuerpo, { sesion, alIrA: abrirPantalla })
   } else if ((pantalla === 'inicio' || pantalla.startsWith('cms-')) && sesion?.origen === 'cloudflare') {
     vista = crearPantallaCMS(cuerpo, {
       sesion,
@@ -648,6 +654,11 @@ function dibujar() {
       busquedaInicial: contextoPantalla.busqueda,
       alCopiarEnlace: (busqueda) => copiarEnlacePantalla('ayuda', { busqueda }),
       alCopiarTexto: (texto) => navigator.clipboard.writeText(texto),
+      volverA: contextoPantalla.volverPantalla ? {
+        pantalla: contextoPantalla.volverPantalla,
+        contexto: contextoPantalla.volverContexto || {},
+        alVolver: () => abrirPantalla(contextoPantalla.volverPantalla, contextoPantalla.volverContexto || {}),
+      } : null,
     })
   } else if (pantalla === 'cambios' && sesion?.origen === 'cloudflare') {
     vista = crearPantallaCambios(cuerpo)
@@ -723,12 +734,12 @@ async function abrirAplicacion() {
     const sabado = proximoSabado()
     lista = (await deposito.leerLista(sabado)) ?? crearLista(sabado, roster)
     const inicioPorDefecto = sesion?.origen === 'cloudflare' && pantallaPermitida('inicio', {
-      admin: esAdmin(sesion), cloudflare: true, permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso,
+      admin: esAdmin(sesion), cloudflare: true, permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso, nivelDatosPersonales: sesion?.nivel_datos_personales,
     }) ? 'inicio' : 'lista'
     const rutaCompartida = rutaCompartidaDesdeUbicacion(location)
     const restaurada = rutaCompartida?.pantalla || leerUltimaPantalla(globalThis.sessionStorage, inicioPorDefecto)
     pantalla = pantallaPermitida(restaurada, {
-      admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso,
+      admin: esAdmin(sesion), cloudflare: sesion?.origen === 'cloudflare', permisos: sesion?.permisos, perfilAcceso: sesion?.perfil_acceso, nivelDatosPersonales: sesion?.nivel_datos_personales,
     }) ? restaurada : inicioPorDefecto
     contextoPantalla = rutaCompartida?.pantalla === pantalla ? rutaCompartida.contexto : {}
     await actualizarResumenNotificaciones()
@@ -763,9 +774,9 @@ function mostrarIngresoCloudflare() {
   vista = crearPantallaIngresoCloudflare(contenedor, { alEntrar: entrarCloudflare })
 }
 
-async function entrar({ token, nombre, usuario, rol, recordar: recordarme }) {
-  if (recordarme) await recordar(token, nombre, { usuario, rol })
-  sesion = { token, nombre, usuario, rol, origen: 'github' }
+async function entrar({ token, claveAcceso = null, nombre, usuario, rol, recordar: recordarme }) {
+  if (recordarme) await recordar(token, nombre, { usuario, rol, claveAcceso })
+  sesion = { token, claveAcceso, nombre, usuario, rol, origen: 'github' }
   configurar({ modo: 'github', token, autor: nombre })
   await abrirAplicacion()
 }

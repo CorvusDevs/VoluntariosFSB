@@ -11,6 +11,20 @@ export const SENSIBILIDAD_DOCUMENTO_CMS = Object.freeze(['compartido', 'interno'
 export const ESTADOS_EVENTO_CMS = Object.freeze(['planificado', 'realizado', 'cancelado'])
 export const TIPOS_EVENTO_CMS = Object.freeze(['actividad', 'reunion', 'curso', 'publicacion', 'vencimiento', 'pago', 'renovacion', 'tramite', 'certificacion', 'asamblea'])
 
+export function unidadesCompatiblesCms(unidades = [], equipoId = '') {
+  const activas = unidades.filter((unidad) => unidad.estado !== 'archivada')
+  if (!equipoId) return activas
+  return activas.filter((unidad) => unidad.equipo_id === equipoId
+    || (unidad.vistas || []).some((vista) => vista.equipo_id === equipoId))
+}
+
+export function proyectosCompatiblesCms(proyectos = [], { equipoId = '', unidadId = '' } = {}) {
+  const activos = proyectos.filter((proyecto) => proyecto.estado !== 'cerrado')
+  if (unidadId) return activos.filter((proyecto) => proyecto.unidad_id === unidadId)
+  if (equipoId) return activos.filter((proyecto) => proyecto.equipo_id === equipoId)
+  return activos
+}
+
 export function fechaISOValida(fecha) {
   if (!fecha) return true
   const texto = String(fecha)

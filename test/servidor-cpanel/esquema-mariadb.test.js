@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('esquema MariaDB para cPanel', () => {
-  it('se regenera desde las 54 migraciones y contiene el modelo completo', () => {
+  it('se regenera desde las 60 migraciones y contiene el modelo completo', () => {
     execFileSync(process.execPath, ['servidor-cpanel/generar-esquema.mjs'])
     const esquema = readFileSync('servidor-cpanel/esquema-mariadb.sql', 'utf8')
-    expect(esquema.match(/^CREATE TABLE/gm)).toHaveLength(44)
+    expect(esquema.match(/^CREATE TABLE/gm)).toHaveLength(55)
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS usuarios')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS intentos_ingreso_cms')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS historial_entradas_cms')
@@ -26,6 +26,7 @@ describe('esquema MariaDB para cPanel', () => {
     expect(esquema).toContain('datos_personales_sin_vencimiento INT NOT NULL DEFAULT 0')
     expect(esquema).toContain('acceso_hasta DATE')
     expect(esquema).toContain('requiere_consentimiento')
+    expect(esquema).toContain('configuracion_publica_json LONGTEXT NOT NULL')
     expect(esquema).toContain('datos MEDIUMBLOB NOT NULL')
     expect(esquema).toContain('alcance LONGTEXT NOT NULL')
     expect(esquema).toContain('nota_revision LONGTEXT NOT NULL')
@@ -34,6 +35,15 @@ describe('esquema MariaDB para cPanel', () => {
     expect(esquema).toContain('cerrada_en DATETIME')
     expect(esquema).toContain('seguimiento_personal INT NOT NULL DEFAULT 0')
     expect(esquema).toContain('destino_respuesta VARCHAR')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS contactos_comunicacion')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS consentimientos_comunicacion')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS campanas_comunicacion')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS cola_correos')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS ejecuciones_sistema')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS incidentes_operativos_cms')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS controles_operativos_cms')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS permisos_capacidades_cms')
+    expect(esquema).toContain('contenido_html LONGTEXT')
     expect(esquema).toContain('CREATE TRIGGER tareas_cms_registrar_asignacion_update')
     expect(esquema).not.toMatch(/sqlite_sequence|AUTOINCREMENT|\bREAL\b|\bTEXT\b|IF NOT EXISTS IF NOT EXISTS/)
   })

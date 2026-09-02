@@ -14,14 +14,14 @@ function crearAlmacen() {
 }
 
 describe('preferencias de navegación del CMS', () => {
-  it('separa la web de las herramientas de organización', () => {
-    expect(GRUPOS_NAVEGACION_CMS.paginaWeb).toEqual(['cms-pagina-web'])
-    expect(GRUPOS_NAVEGACION_CMS.comunicacionVisual).toEqual(['cms-comunicacion-visual'])
-    expect(GRUPOS_NAVEGACION_CMS.organizacion).toEqual(['cms-areas', 'cms-formularios', 'cms-biblioteca'])
-    expect(GRUPOS_NAVEGACION_CMS.administracion).toEqual(['cms-privacidad', 'accesos', 'registro-institucional'])
-    expect(TITULOS_GRUPOS_NAVEGACION_CMS.comunicacionVisual).toBe('Comunicación visual')
+  it('agrupa todos los destinos en cinco tareas reconocibles', () => {
+    expect(Object.keys(GRUPOS_NAVEGACION_CMS)).toEqual(['trabajo', 'organizacion', 'contenidoPublico', 'comunicacion', 'administracion'])
+    expect(GRUPOS_NAVEGACION_CMS.contenidoPublico).toEqual(['cms-pagina-web', 'cms-comunicacion-visual'])
+    expect(GRUPOS_NAVEGACION_CMS.organizacion).toEqual(expect.arrayContaining(['cms-areas', 'cms-formularios', 'cms-biblioteca', 'cms-familias']))
+    expect(GRUPOS_NAVEGACION_CMS.administracion).toEqual(expect.arrayContaining(['cms-operaciones', 'cms-privacidad', 'accesos', 'registro-institucional', 'ayuda', 'cambios']))
+    expect(TITULOS_GRUPOS_NAVEGACION_CMS.contenidoPublico).toBe('Contenido público')
     expect(TITULOS_GRUPOS_NAVEGACION_CMS.organizacion).toBe('Organización')
-    expect(ETIQUETAS_NAVEGACION_CMS['cms-pagina-web']).toBe('Contenido')
+    expect(ETIQUETAS_NAVEGACION_CMS['cms-pagina-web']).toBe('Página web')
     expect(ETIQUETAS_NAVEGACION_CMS['cms-privacidad']).toBe('Solicitudes de privacidad')
   })
 
@@ -30,30 +30,31 @@ describe('preferencias de navegación del CMS', () => {
     expect(clavePreferenciasNavegacion({ correo: 'otra@aletea.org' })).not.toBe(clavePreferenciasNavegacion({ correo: 'Claudia@Aletea.org' }))
   })
 
-  it('guarda y recupera los grupos colapsados entre sesiones', () => {
+  it('guarda un solo grupo favorito entre sesiones', () => {
     const almacen = crearAlmacen()
     const sesion = { correo: 'claudia@aletea.org' }
-    guardarPreferenciaNavegacion('paginaWeb', true, sesion, almacen)
+    guardarPreferenciaNavegacion('contenidoPublico', true, sesion, almacen)
     guardarPreferenciaNavegacion('organizacion', true, sesion, almacen)
-    guardarPreferenciaNavegacion('equipos', false, sesion, almacen)
-    expect(leerPreferenciasNavegacion(sesion, almacen)).toEqual({ paginaWeb: true, organizacion: true, equipos: false })
+    expect(leerPreferenciasNavegacion(sesion, almacen)).toEqual({ favorito: 'organizacion' })
+    guardarPreferenciaNavegacion('organizacion', false, sesion, almacen)
+    expect(leerPreferenciasNavegacion(sesion, almacen)).toEqual({})
   })
 
   it('abre siempre el grupo de la pantalla activa', () => {
     expect(grupoActivoNavegacion('cms-biblioteca')).toBe('organizacion')
     expect(grupoActivoNavegacion('cms-areas')).toBe('organizacion')
     expect(grupoActivoNavegacion('cms-formularios')).toBe('organizacion')
-    expect(grupoActivoNavegacion('cms-comunicacion-visual')).toBe('comunicacionVisual')
+    expect(grupoActivoNavegacion('cms-comunicacion-visual')).toBe('contenidoPublico')
     expect(grupoActivoNavegacion('cms-privacidad')).toBe('administracion')
-    expect(grupoDebeEstarAbierto('organizacion', 'cms-biblioteca', { organizacion: false })).toBe(true)
-    expect(grupoDebeEstarAbierto('paginaWeb', 'cms-biblioteca', { paginaWeb: false })).toBe(false)
-    expect(grupoDebeEstarAbierto('equipos', 'cms-biblioteca', { equipos: false })).toBe(false)
+    expect(grupoDebeEstarAbierto('organizacion', 'cms-biblioteca', { favorito: 'trabajo' })).toBe(true)
+    expect(grupoDebeEstarAbierto('contenidoPublico', 'cms-biblioteca', { favorito: 'contenidoPublico' })).toBe(true)
+    expect(grupoDebeEstarAbierto('trabajo', 'cms-biblioteca', { favorito: 'contenidoPublico' })).toBe(false)
   })
 
   it('continúa con valores seguros si el almacenamiento falla', () => {
     const almacen = { getItem: () => { throw new Error('sin acceso') } }
     expect(leerPreferenciasNavegacion({}, almacen)).toEqual({})
-    expect(grupoDebeEstarAbierto('trabajo', 'cms-pagina-web', {})).toBe(true)
-    expect(grupoDebeEstarAbierto('paginaWeb', 'cms-pagina-web', {})).toBe(true)
+    expect(grupoDebeEstarAbierto('trabajo', 'cms-pagina-web', {})).toBe(false)
+    expect(grupoDebeEstarAbierto('contenidoPublico', 'cms-pagina-web', {})).toBe(true)
   })
 })
