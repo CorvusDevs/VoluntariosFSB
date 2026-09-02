@@ -1,17 +1,5 @@
 {
-  "version": 2,
-  "credencial": {
-    "kdf": {
-      "algoritmo": "PBKDF2-SHA256",
-      "iteraciones": 600000,
-      "sal": "16N7H+foFF6z4tweg3jjxQ=="
-    },
-    "cifrado": {
-      "algoritmo": "AES-GCM",
-      "iv": "fMB8FZUTKXjXbGXL",
-      "datos": "4+4z8eo+f0w4jKOaUiUxY4QMkv8Hn7Iy5c8ggmZ2WGgG5ATM1CDCmgAODDDYDlCqNaxRPjAIlCY="
-    }
-  },
+  "version": 1,
   "usuarios": [
     {
       "usuario": "claudiacravea",
@@ -20,12 +8,12 @@
       "kdf": {
         "algoritmo": "PBKDF2-SHA256",
         "iteraciones": 600000,
-        "sal": "W2x6eUdSOzuk8xTvtLqWZw=="
+        "sal": "3H4+X4Qn6axJVOvxCgj1pw=="
       },
       "cifrado": {
         "algoritmo": "AES-GCM",
-        "iv": "7MMEnvR9AJqY+gzR",
-        "datos": "11aw0bbpofn5wap/jVlpe3fIz/DY5cd9ycPulhthW0DCm+Mzrcz9J83fj2MsNEwS"
+        "iv": "hOg3tzAVmK48anXt",
+        "datos": "4g7ablGTe6krXILHUqY2b9oFuoYfTkkrfTOUZCADN6bx3RhbBQuj/e8b+FZqJqd++XOLt9eXQ6Q="
       }
     },
     {
@@ -35,12 +23,12 @@
       "kdf": {
         "algoritmo": "PBKDF2-SHA256",
         "iteraciones": 600000,
-        "sal": "ahCKBmp4jcRi47L79wsKhA=="
+        "sal": "FF+p9pDEU9rqQAmlGneJPw=="
       },
       "cifrado": {
         "algoritmo": "AES-GCM",
-        "iv": "HnQBGFrtn2NN9boG",
-        "datos": "DS2hhDBLAMhCLNRVkoRgDwo6WXa2pMI8/ibp2R1+NvypRVLL/Xv6c45U2dFwMi+d"
+        "iv": "/S5uovZ56q+rA8AQ",
+        "datos": "JnBqYN21xYXZh0uxBhBarcYxXW+hW0HQI3bxwTY68fEtV9R/3ZmWWdPeKi33jV5cn0cuRSCdIn0="
       }
     },
     {
@@ -50,12 +38,12 @@
       "kdf": {
         "algoritmo": "PBKDF2-SHA256",
         "iteraciones": 600000,
-        "sal": "oHOSqVgRmZJZyq68wqwoQQ=="
+        "sal": "3NkW/f+iYMaTt4EVwWyNhg=="
       },
       "cifrado": {
         "algoritmo": "AES-GCM",
-        "iv": "sUk8exPbW0s7vwN7",
-        "datos": "CwlZvs1jYcqctTQbn73Td1AFyiFi25Y04W/OGNGtINexdaCIQ13I+GONC8GzJYz9"
+        "iv": "yOacXlkRWTUyBMIl",
+        "datos": "qi9XIRAgk9F9qz/FNl20jI1+iyK8bHCfvtOD+rFVxzKER7wGnZqcUYBCEcCRhhjt6iu7zlLpllA="
       }
     },
     {
@@ -65,12 +53,12 @@
       "kdf": {
         "algoritmo": "PBKDF2-SHA256",
         "iteraciones": 600000,
-        "sal": "01zBkv4hOXoKp9XjzezIxw=="
+        "sal": "PHofa7usZjEzeVXUMfVqQw=="
       },
       "cifrado": {
         "algoritmo": "AES-GCM",
-        "iv": "jmfjv6oHgovxcXdk",
-        "datos": "046+4fPWNq/4BDJg1G6ve39yyhpQ4yYNMOs4lR/NFGweazW7RJW0aVWEZFKcx3P+"
+        "iv": "dKTsPd+srWOY/ZXL",
+        "datos": "LyqZfDGZVlmYxWegeiL2OEqyxT9BQwudhFVVtxqvgyO4W/ZOpNRm/U2NuCW/LuCOA4uFLxPczuA="
       }
     },
     {
@@ -80,12 +68,12 @@
       "kdf": {
         "algoritmo": "PBKDF2-SHA256",
         "iteraciones": 600000,
-        "sal": "bBiE+GNoyg0T6DVJLR6C9Q=="
+        "sal": "Hi3v8cxdQFwlk1FtlHhHOQ=="
       },
       "cifrado": {
         "algoritmo": "AES-GCM",
-        "iv": "K6aZGqdzjOvTwCMj",
-        "datos": "eGVOt+hbat4hdk8xYMNmktKqZQPdX8wo7ZPs7lWysaO1zNAzSPqxDhUQG/p4yTo8"
+        "iv": "aq1iAfATY/XWukzY",
+        "datos": "b7694cRtQ7a+szU5ePDF53XJBFxeFWQSlkwQKG67xC38jiDBwKeARZbILjsw66ymZPDWoKyuS/s="
       }
     }
   ]
