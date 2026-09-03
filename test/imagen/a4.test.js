@@ -136,7 +136,18 @@ describe('hoja A4 por cancha', () => {
     const participante = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p1.jpg')
     const voluntario = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
     expect(voluntario.y).toBeGreaterThanOrEqual(participante.y + participante.alto)
+    expect(voluntario.ancho).toBeGreaterThanOrEqual(participante.ancho * 0.5)
     expect(plano.ordenes.some((o) => o.tipo === 'texto' && o.fila === 'p1' && o.texto === 'Acompaña')).toBe(true)
+  })
+
+  it('no agrega bandeja ni texto a quien no tiene acompañante', () => {
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, ROSTER, grupo, medirFalso)
+    expect(plano.ordenes.some((o) => o.fila === 'p4'
+      && o.tipo === 'texto' && /^Acompaña/.test(o.texto))).toBe(false)
+    expect(plano.ordenes.some((o) => o.fila === 'p4'
+      && o.tipo === 'texto' && /sin acompañante/i.test(o.texto))).toBe(false)
   })
 
   it('aprovecha al menos el 95 por ciento del ancho A4 con catorce participantes', () => {

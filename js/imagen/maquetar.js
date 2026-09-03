@@ -602,11 +602,14 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const altoFranja = aire * 2 + pxBase
   const inset = Math.round(ancho * RETRATOS.insetMedallon)
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
-  const separacionBandeja = 8
-  const padBandeja = 8
-  const altoEtiquetaBandeja = Math.max(20, Math.round(ancho * 0.11))
+  const separacionBandeja = 6
+  const padBandeja = 4
+  const altoEtiquetaBandeja = Math.max(22, Math.round(ancho * 0.12))
   const anchoMedBandeja = Math.floor((ancho - padBandeja * 2 - separacionBandeja) / 2)
-  const altoMedBandeja = Math.round(anchoMedBandeja * RETRATOS.proporcionMedallon)
+  const anchoMedBandejaUnico = Math.round(ancho * 0.58)
+  // En papel la foto individual crece hacia los costados, no hacia abajo. Así
+  // mejora el reconocimiento y el nombre gana ancho sin consumir más hoja.
+  const altoMedBandeja = Math.round(anchoMedBandeja * 1.12)
   const altoDeBandeja = (cantidad) => padBandeja + altoEtiquetaBandeja
     + Math.ceil(cantidad / 2) * altoMedBandeja
     + Math.max(0, Math.ceil(cantidad / 2) - 1) * separacionBandeja
@@ -669,20 +672,21 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       ordenes.push({
         tipo: 'texto', texto: voluntarios.length === 1 ? 'Acompaña' : 'Acompañan',
         x: x + padBandeja, y: yBandeja + padBandeja + altoEtiquetaBandeja / 2,
-        fuente: FUENTES.titulo(Math.max(12, Math.round(ancho * 0.065))),
+        fuente: FUENTES.titulo(Math.max(14, Math.round(ancho * 0.075))),
         color: COLORES.violeta, lineaBase: 'middle', fila: clave,
       })
       voluntarios.forEach((voluntario, n) => {
         const columna = n % 2
         const renglonBandeja = Math.floor(n / 2)
         const cantidadEnRenglon = Math.min(2, voluntarios.length - renglonBandeja * 2)
-        const anchoRenglon = cantidadEnRenglon * anchoMedBandeja
+        const anchoMedActual = voluntarios.length === 1 ? anchoMedBandejaUnico : anchoMedBandeja
+        const anchoRenglon = cantidadEnRenglon * anchoMedActual
           + (cantidadEnRenglon - 1) * separacionBandeja
         const inicio = x + (ancho - anchoRenglon) / 2
-        const mx = inicio + columna * (anchoMedBandeja + separacionBandeja)
+        const mx = inicio + columna * (anchoMedActual + separacionBandeja)
         const my = yBandeja + padBandeja + altoEtiquetaBandeja
           + renglonBandeja * (altoMedBandeja + separacionBandeja)
-        medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMedBandeja, altoMedBandeja,
+        medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMedActual, altoMedBandeja,
           m.colorVoluntario ?? color, clave, medirTexto,
           m.abreviar?.voluntario ?? abreviarApellido)
       })
