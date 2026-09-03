@@ -17,6 +17,8 @@ export const NOVEDADES = Object.freeze([
       'Uno, dos o más voluntarios mantienen el mismo patrón, sin cubrir la cara ni el nombre del participante.',
       'La cabecera A4 es más compacta para dedicar más superficie de impresión a las personas.',
       'Todas las fotos del voluntariado mantienen el mismo formato retrato, tanto en asignaciones individuales como múltiples.',
+      'Las bandas de cancha y apoyo comparten el mismo largo y los mismos márgenes que la grilla de participantes.',
+      'La imagen horizontal reparte el ancho según la cantidad de participantes y conserva una escala común entre canchas.',
     ],
     adiciones: [
       'Las asignaciones muestran las fotos disponibles según el formato visual elegido.',
@@ -28,6 +30,8 @@ export const NOVEDADES = Object.freeze([
       'Los medallones dejan de invadir la foto, usan violeta y explicitan si acompaña una o más personas.',
       'Las personas sin acompañante conservan el fondo de la bandeja para alinear la grilla, sin textos innecesarios.',
       'Los nombres largos del voluntariado se acortan de forma legible en vez de quedar recortados.',
+      'Los retratos del voluntariado ganan altura al eliminar el rótulo auxiliar de acompañamiento.',
+      'La composición horizontal deja de superponer voluntariado sobre las fotos y libera el centro decorativo para contenido útil.',
       'La vista vertical ya no queda disponible solamente como descarga sin vista previa.',
     ],
   },

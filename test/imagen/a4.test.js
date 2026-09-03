@@ -122,7 +122,7 @@ describe('hoja A4 por cancha', () => {
     expect(plano.x).toBeGreaterThanOrEqual(0)
   })
 
-  it('también separa de la foto al voluntario único y explicita su rol', () => {
+  it('también separa de la foto al voluntario único y aprovecha el alto para su retrato', () => {
     const roster = structuredClone(ROSTER)
     roster.participantes.find((p) => p.id === 'p1').foto = 'p1.jpg'
     roster.voluntarios.find((v) => v.id === 'v1').foto = 'v1.jpg'
@@ -136,8 +136,9 @@ describe('hoja A4 por cancha', () => {
     const participante = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p1.jpg')
     const voluntario = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
     expect(voluntario.y).toBeGreaterThanOrEqual(participante.y + participante.alto)
-    expect(voluntario.alto).toBeGreaterThan(voluntario.ancho)
-    expect(plano.ordenes.some((o) => o.tipo === 'texto' && o.fila === 'p1' && o.texto === 'Acompaña')).toBe(true)
+    expect(voluntario.alto).toBeGreaterThan(voluntario.ancho * 1.25)
+    expect(plano.ordenes.some((o) => o.tipo === 'texto' && o.fila === 'p1'
+      && /^Acompaña/.test(o.texto))).toBe(false)
   })
 
   it('conserva el fondo alineado pero no agrega texto a quien no tiene acompañante', () => {
@@ -193,6 +194,15 @@ describe('hoja A4 por cancha', () => {
     expect(plano.contenido.ancho).toBe(ANCHO_A4)
     expect(plano.contenido.ancho * plano.escala).toBeGreaterThanOrEqual(ANCHO_A4 * 0.95)
     expect(plano.x).toBeLessThanOrEqual(ANCHO_A4 * 0.025)
+  })
+
+  it('alinea simétricamente las bandas de cancha y apoyo con la grilla', () => {
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, ROSTER, grupo, medirFalso)
+    const bandas = plano.ordenes.filter((o) => o.tipo === 'rect'
+      && o.x === 56 && o.ancho === ANCHO_A4 - 112)
+    expect(bandas.length).toBeGreaterThanOrEqual(2)
   })
 
   it('hereda la opción de ocultar fotos', () => {

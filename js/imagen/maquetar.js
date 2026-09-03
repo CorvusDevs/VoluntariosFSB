@@ -614,11 +614,11 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
   const separacionBandeja = 6
   const padBandeja = 5
-  const altoEtiquetaBandeja = Math.max(22, Math.round(ancho * 0.12))
+  const altoEtiquetaBandeja = 0
   const anchoMedBandeja = Math.floor((ancho - padBandeja * 2 - separacionBandeja) / 2)
   // Un acompañante y dos usan exactamente el mismo retrato. Antes el unico se
   // ensanchaba y terminaba pareciendo una tarjeta horizontal diferente.
-  const altoMedBandeja = Math.round(anchoMedBandeja * 1.12)
+  const altoMedBandeja = Math.round(anchoMedBandeja * 1.36)
   const altoDeBandeja = (cantidad) => {
     const renglones = Math.max(1, Math.ceil(cantidad / 2))
     return padBandeja + altoEtiquetaBandeja
@@ -680,14 +680,6 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         tipo: 'rect', x, y: yBandeja, ancho, alto: altoBandeja,
         color: COLORES.violetaTenue, radio: 12, fila: clave,
       })
-      if (voluntarios.length > 0) {
-        ordenes.push({
-          tipo: 'texto', texto: voluntarios.length === 1 ? 'Acompaña' : 'Acompañan',
-          x: x + padBandeja, y: yBandeja + padBandeja + altoEtiquetaBandeja / 2 + 2,
-          fuente: FUENTES.titulo(Math.max(14, Math.round(ancho * 0.075))),
-          color: COLORES.violeta, lineaBase: 'middle', fila: clave,
-        })
-      }
       voluntarios.forEach((voluntario, n) => {
         const columna = n % 2
         const renglonBandeja = Math.floor(n / 2)

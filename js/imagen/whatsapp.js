@@ -6,11 +6,17 @@ import { formatearFechaLarga } from '../util/fechas.js'
 export const ANCHO_WHATSAPP = 1920
 export const ALTO_WHATSAPP = 1240
 export const MARGEN_WHATSAPP = 30
-export const SEPARACION_WHATSAPP = 16
-export const ALTO_CABECERA_WHATSAPP = 132
-export const ALTO_PIE_WHATSAPP = 52
-const AIRE_CABECERA = 14
-const AIRE_PIE = 14
+export const SEPARACION_WHATSAPP = 24
+export const ALTO_CABECERA_WHATSAPP = 112
+export const ALTO_PIE_WHATSAPP = 44
+const AIRE_CABECERA = 12
+const AIRE_PIE = 12
+
+export function columnasParaHorizontal(cantidad) {
+  if (cantidad <= 10) return 3
+  if (cantidad <= 16) return 5
+  return 6
+}
 
 export function calcularComposicionWhatsApp(planos) {
   if (!Array.isArray(planos) || planos.length === 0) {
@@ -18,25 +24,38 @@ export function calcularComposicionWhatsApp(planos) {
   }
   const columnas = planos.length
   const anchoDisponible = ANCHO_WHATSAPP - MARGEN_WHATSAPP * 2 - SEPARACION_WHATSAPP * (columnas - 1)
-  const anchoColumna = anchoDisponible / columnas
+  const pesos = planos.map((plano) => Math.max(1, Number(plano.peso) || 1))
+  const pesoTotal = pesos.reduce((total, peso) => total + peso, 0)
+  const anchosAsignados = pesos.map((peso) => anchoDisponible * peso / pesoTotal)
   const yPaneles = MARGEN_WHATSAPP + ALTO_CABECERA_WHATSAPP + AIRE_CABECERA
   const altoDisponible = ALTO_WHATSAPP - yPaneles - ALTO_PIE_WHATSAPP - AIRE_PIE - MARGEN_WHATSAPP
-
+  const escalasMaximas = planos.map((plano, indice) => {
+    const altoContenido = plano.altoCuerpo ?? plano.alto
+    return Math.min(anchosAsignados[indice] / plano.ancho, altoDisponible / altoContenido)
+  })
+  // Una sola escala evita que una cancha parezca secundaria por tener más
+  // personas. El ancho proporcional y la cantidad de columnas hacen que las
+  // dos composiciones aprovechen su sector sin cambiar el tamaño de las caras.
+  const escalaCompartida = Math.min(...escalasMaximas)
+  let cursorX = MARGEN_WHATSAPP
   const paneles = planos.map((plano, indice) => {
     const altoContenido = plano.altoCuerpo ?? plano.alto
-    const escala = Math.min(anchoColumna / plano.ancho, altoDisponible / altoContenido)
+    const anchoAsignado = anchosAsignados[indice]
+    const escala = escalaCompartida
     const ancho = plano.ancho * escala
     const alto = altoContenido * escala
-    const inicioColumna = MARGEN_WHATSAPP + indice * (anchoColumna + SEPARACION_WHATSAPP)
-    return {
-      x: inicioColumna + (anchoColumna - ancho) / 2,
+    const panel = {
+      x: cursorX + (anchoAsignado - ancho) / 2,
       y: yPaneles + (altoDisponible - alto) / 2,
       ancho,
       alto,
+      anchoAsignado,
       escala,
       recorteY: plano.recorteY ?? 0,
       altoContenido,
     }
+    cursorX += anchoAsignado + SEPARACION_WHATSAPP
+    return panel
   })
 
   return {
@@ -58,18 +77,6 @@ function fondoDeMarca(ctx) {
   ctx.fillStyle = '#F7F0F9'
   ctx.fillRect(0, 0, ANCHO_WHATSAPP, ALTO_WHATSAPP)
 
-  ctx.save()
-  ctx.globalAlpha = 0.1
-  ctx.lineWidth = 46
-  ctx.strokeStyle = COLORES.turquesa
-  ctx.beginPath()
-  ctx.ellipse(690, 710, 430, 230, -0.08, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.strokeStyle = COLORES.magenta
-  ctx.beginPath()
-  ctx.ellipse(1230, 710, 430, 230, 0.08, 0, Math.PI * 2)
-  ctx.stroke()
-  ctx.restore()
 }
 
 function cabeceraCompartida(ctx, lista, imagenes) {
@@ -78,21 +85,21 @@ function cabeceraCompartida(ctx, lista, imagenes) {
     ANCHO_WHATSAPP - MARGEN_WHATSAPP * 2, ALTO_CABECERA_WHATSAPP, 30, COLORES.violeta,
   )
   ctx.fillStyle = COLORES.blanco
-  ctx.font = FUENTES.titulo(55)
+  ctx.font = FUENTES.titulo(52)
   ctx.textBaseline = 'top'
-  ctx.fillText('Fútbol sin Barreras', 76, 60)
+  ctx.fillText('Fútbol sin Barreras', 76, 50)
   ctx.fillStyle = COLORES.violetaClaro
   ctx.font = FUENTES.normal(25)
-  ctx.fillText(`${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`, 78, 112)
+  ctx.fillText(`${formatearFechaLarga(lista.fecha)} · ${lista.hora} h · ${lista.lugar}`, 78, 101)
 
   const logo = imagenes.logo
   if (logo) {
-    ctx.drawImage(logo, ANCHO_WHATSAPP - 322, 57, 220, 82)
+    ctx.drawImage(logo, ANCHO_WHATSAPP - 302, 47, 200, 75)
   } else {
     ctx.fillStyle = COLORES.turquesa
     ctx.font = FUENTES.titulo(31)
     ctx.textAlign = 'right'
-    ctx.fillText('Aletea', ANCHO_WHATSAPP - 76, 85)
+    ctx.fillText('Aletea', ANCHO_WHATSAPP - 76, 73)
     ctx.textAlign = 'left'
   }
 }
@@ -120,13 +127,21 @@ export function crearLienzoWhatsApp({ lista, roster, imagenes, medirTexto, crear
     {
       ...lista,
       grupos: [grupo],
-      opcionesImagen: { ...lista.opcionesImagen, columnasPorFila: 4 },
+      opcionesImagen: { ...lista.opcionesImagen },
     },
     roster,
-    { saludo: '', despedida: '', medirTexto },
+    {
+      saludo: '', despedida: '', medirTexto,
+      ajustesImpresion: {
+        columnasPorFila: columnasParaHorizontal(grupo.filas.length),
+        colorVoluntario: COLORES.violeta,
+        bandejaVoluntariosIntegrada: lista.opcionesImagen?.formato === 'retratos',
+      },
+    },
   ))
-  const cuerpos = planos.map((plano) => ({
+  const cuerpos = planos.map((plano, indice) => ({
     ...plano,
+    peso: Math.max(1, grupos[indice].filas.length),
     recorteY: geometria.altoBandaSuperior,
     altoCuerpo: plano.alto - geometria.altoBandaSuperior - geometria.altoBandaInferior,
   }))

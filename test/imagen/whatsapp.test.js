@@ -4,6 +4,7 @@ import {
   ANCHO_WHATSAPP,
   MARGEN_WHATSAPP,
   calcularComposicionWhatsApp,
+  columnasParaHorizontal,
 } from '../../js/imagen/whatsapp.js'
 
 describe('composición para WhatsApp', () => {
@@ -24,6 +25,23 @@ describe('composición para WhatsApp', () => {
       expect(panel.y).toBeGreaterThan(MARGEN_WHATSAPP + 132)
       expect(panel.recorteY).toBe(210)
     })
+  })
+
+  it('reparte el ancho según las personas y conserva una escala compartida', () => {
+    const composicion = calcularComposicionWhatsApp([
+      { ancho: 700, alto: 900, peso: 9 },
+      { ancho: 1100, alto: 900, peso: 14 },
+    ])
+    expect(composicion.paneles[1].anchoAsignado).toBeGreaterThan(composicion.paneles[0].anchoAsignado)
+    expect(composicion.paneles[0].escala).toBe(composicion.paneles[1].escala)
+    expect(composicion.paneles[0].x + composicion.paneles[0].ancho)
+      .toBeLessThan(composicion.paneles[1].x)
+  })
+
+  it('adapta las columnas a la cantidad de participantes', () => {
+    expect(columnasParaHorizontal(9)).toBe(3)
+    expect(columnasParaHorizontal(14)).toBe(5)
+    expect(columnasParaHorizontal(18)).toBe(6)
   })
 
   it('marca como poco legible una lista excepcionalmente alta', () => {
