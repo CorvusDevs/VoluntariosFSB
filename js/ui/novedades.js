@@ -5,19 +5,20 @@ export const NOVEDADES = Object.freeze([
   {
     version: '2.0.9', estado: 'Preparada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Fútbol sin Barreras', 'Planillas', 'Vista previa'],
-    resumen: ['Una A4 por cancha', 'Fotos de ambos roles', 'Asignaciones múltiples completas'],
-    descripcion: 'Las planillas incorporan una salida A4 operativa por cancha y permiten revisar todas las orientaciones antes de descargar.',
+    resumen: ['Una A4 por cancha', 'Mismo estilo configurado', 'Asignaciones múltiples completas'],
+    descripcion: 'Las planillas incorporan una salida A4 operativa por cancha, con el mismo estilo configurado para la imagen vertical.',
     actualizaciones: [
       'Vista previa permite alternar entre la composición horizontal, la vertical completa y cada cancha en A4.',
       'Cada hoja A4 reúne participantes, voluntariado y apoyos correspondientes a una sola cancha.',
+      'El A4 hereda formato, fotos, modo compacto, posición y tamaño del voluntariado de la configuración elegida.',
     ],
     adiciones: [
-      'Las asignaciones muestran las fotos disponibles de participantes y voluntariado en el mismo bloque.',
+      'Las asignaciones muestran las fotos disponibles según el formato visual elegido.',
       'Ayuda explica cómo descargar cada cancha y cómo se representan las relaciones múltiples.',
     ],
     arreglos: [
-      'Un voluntario compartido por varias personas se muestra como una sola asignación grupal.',
-      'Un participante con varios voluntarios conserva a todas las personas acompañantes en la misma tarjeta.',
+      'Las hojas A4 dejan de imponer tarjetas y retratos circulares propios.',
+      'Un participante con varios voluntarios conserva a todas las personas acompañantes en el formato configurado.',
       'La vista vertical ya no queda disponible solamente como descarga sin vista previa.',
     ],
   },
