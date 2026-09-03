@@ -122,6 +122,23 @@ describe('hoja A4 por cancha', () => {
     expect(plano.x).toBeGreaterThanOrEqual(0)
   })
 
+  it('también separa de la foto al voluntario único y explicita su rol', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes.find((p) => p.id === 'p1').foto = 'p1.jpg'
+    roster.voluntarios.find((v) => v.id === 'v1').foto = 'v1.jpg'
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: {
+        ...lista.opcionesImagen,
+        formato: 'retratos',
+        esquinaVoluntario: 'superpuesto-abajo-derecha',
+      },
+    }, roster, grupo, medirFalso)
+    const participante = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p1.jpg')
+    const voluntario = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
+    expect(voluntario.y).toBeGreaterThanOrEqual(participante.y + participante.alto)
+    expect(plano.ordenes.some((o) => o.tipo === 'texto' && o.fila === 'p1' && o.texto === 'Acompaña')).toBe(true)
+  })
+
   it('aprovecha al menos el 95 por ciento del ancho A4 con catorce participantes', () => {
     const filas = Array.from({ length: 14 }, (_, i) => ({
       participantes: [`p${(i % 4) + 1}`],

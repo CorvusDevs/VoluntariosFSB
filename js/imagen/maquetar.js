@@ -16,7 +16,20 @@ export function maquetar(lista, roster, opciones = {}) {
   const compacto = Boolean(lista.opcionesImagen?.compacto)
   const conFotos = Boolean(lista.opcionesImagen?.fotos) && medidas(compacto).mostrarFotos
   const mostrarIconoVoluntariado = Boolean(lista.opcionesImagen?.mostrarIconoVoluntariado)
-  const base = medidas(compacto)
+  const baseOriginal = medidas(compacto)
+  const base = ajustesImpresion.cabeceraCompacta
+    ? {
+        ...baseOriginal,
+        altoBandaSuperior: 164,
+        logoY: 42,
+        logoAncho: 160,
+        logoAlto: 60,
+        yTituloDesdeAbajo: 126,
+        ySubtituloDesdeAbajo: 56,
+        pxTitular: 54,
+        pxBanda: 22,
+      }
+    : baseOriginal
   const porId = indexar(roster)
   // Los apellidos se abrevian contra el resto de su propia lista: chicos con
   // chicos y voluntarios con voluntarios. Asi dos Francisco P. distintos salen
@@ -70,6 +83,7 @@ export function maquetar(lista, roster, opciones = {}) {
     esquinaVoluntario, tamanoVoluntario, asomoVoluntario, mostrarIconoVoluntariado, retratos, abreviar,
     colorVoluntario: ajustesImpresion.colorVoluntario,
     bandejaVoluntariosMultiples: ajustesImpresion.bandejaVoluntariosMultiples,
+    bandejaVoluntariosIntegrada: ajustesImpresion.bandejaVoluntariosIntegrada,
   }
 
   const ordenes = []
@@ -588,6 +602,15 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const altoFranja = aire * 2 + pxBase
   const inset = Math.round(ancho * RETRATOS.insetMedallon)
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
+  const separacionBandeja = 8
+  const padBandeja = 8
+  const altoEtiquetaBandeja = Math.max(20, Math.round(ancho * 0.11))
+  const anchoMedBandeja = Math.floor((ancho - padBandeja * 2 - separacionBandeja) / 2)
+  const altoMedBandeja = Math.round(anchoMedBandeja * RETRATOS.proporcionMedallon)
+  const altoDeBandeja = (cantidad) => padBandeja + altoEtiquetaBandeja
+    + Math.ceil(cantidad / 2) * altoMedBandeja
+    + Math.max(0, Math.ceil(cantidad / 2) - 1) * separacionBandeja
+    + padBandeja
 
   // El sobresalido se reserva por renglon y solo donde de verdad hay medallones.
   // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
@@ -595,11 +618,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const renglonDe = (i) => posicionEnRenglon(i, grupo.filas.length, columnas).renglon
   const extraDeFila = (fila) => {
     if (!superpuesto || fila.voluntarios.length === 0) return 0
-    if (m.bandejaVoluntariosMultiples && fila.voluntarios.length > 1) {
-      const columnasBandeja = Math.min(2, fila.voluntarios.length)
-      const anchoBandeja = Math.floor((ancho - 8 * (columnasBandeja - 1)) / columnasBandeja)
-      const altoBandeja = Math.round(anchoBandeja * RETRATOS.proporcionMedallon)
-      return Math.ceil(fila.voluntarios.length / columnasBandeja) * (altoBandeja + 8) + 4
+    if (m.bandejaVoluntariosIntegrada || (m.bandejaVoluntariosMultiples && fila.voluntarios.length > 1)) {
+      return altoDeBandeja(fila.voluntarios.length) + 6
     }
     return asoma
   }
@@ -619,7 +639,10 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
     const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
-    const usaBandeja = Boolean(m.bandejaVoluntariosMultiples && voluntarios.length > 1)
+    const usaBandeja = Boolean(voluntarios.length > 0 && (
+      m.bandejaVoluntariosIntegrada
+      || (m.bandejaVoluntariosMultiples && voluntarios.length > 1)
+    ))
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
     const arriba = cursor + (superpuesto && !abajo && !usaBandeja ? extraFila : 0)
@@ -637,16 +660,29 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     })
 
     if (usaBandeja) {
-      const columnasBandeja = Math.min(2, voluntarios.length)
-      const separacionBandeja = 8
-      const anchoBandeja = Math.floor((ancho - separacionBandeja * (columnasBandeja - 1)) / columnasBandeja)
-      const altoBandeja = Math.round(anchoBandeja * RETRATOS.proporcionMedallon)
+      const yBandeja = arriba + alto + 6
+      const altoBandeja = altoDeBandeja(voluntarios.length)
+      ordenes.push({
+        tipo: 'rect', x, y: yBandeja, ancho, alto: altoBandeja,
+        color: COLORES.violetaTenue, radio: 12, fila: clave,
+      })
+      ordenes.push({
+        tipo: 'texto', texto: voluntarios.length === 1 ? 'Acompaña' : 'Acompañan',
+        x: x + padBandeja, y: yBandeja + padBandeja + altoEtiquetaBandeja / 2,
+        fuente: FUENTES.titulo(Math.max(12, Math.round(ancho * 0.065))),
+        color: COLORES.violeta, lineaBase: 'middle', fila: clave,
+      })
       voluntarios.forEach((voluntario, n) => {
-        const columna = n % columnasBandeja
-        const renglonBandeja = Math.floor(n / columnasBandeja)
-        const mx = x + columna * (anchoBandeja + separacionBandeja)
-        const my = arriba + alto + 8 + renglonBandeja * (altoBandeja + separacionBandeja)
-        medallonDeVoluntario(ordenes, voluntario, mx, my, anchoBandeja, altoBandeja,
+        const columna = n % 2
+        const renglonBandeja = Math.floor(n / 2)
+        const cantidadEnRenglon = Math.min(2, voluntarios.length - renglonBandeja * 2)
+        const anchoRenglon = cantidadEnRenglon * anchoMedBandeja
+          + (cantidadEnRenglon - 1) * separacionBandeja
+        const inicio = x + (ancho - anchoRenglon) / 2
+        const mx = inicio + columna * (anchoMedBandeja + separacionBandeja)
+        const my = yBandeja + padBandeja + altoEtiquetaBandeja
+          + renglonBandeja * (altoMedBandeja + separacionBandeja)
+        medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMedBandeja, altoMedBandeja,
           m.colorVoluntario ?? color, clave, medirTexto,
           m.abreviar?.voluntario ?? abreviarApellido)
       })

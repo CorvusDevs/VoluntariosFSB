@@ -13,7 +13,9 @@ export const NOVEDADES = Object.freeze([
       'El A4 hereda formato, fotos, modo compacto, posición y tamaño del voluntariado de la configuración elegida.',
       'La composición de impresión adapta automáticamente las columnas para aprovechar mejor la altura de la hoja.',
       'La hoja aprovecha prácticamente todo el ancho A4 y distribuye entre tres y seis columnas según la cantidad de participantes.',
-      'Cuando una persona tiene varios voluntarios, sus retratos pasan a una bandeja debajo de la foto para mantener visible al participante.',
+      'Cada participante y sus acompañantes forman una unidad visual, con una bandeja violeta debajo de la foto.',
+      'Uno, dos o más voluntarios mantienen el mismo patrón, sin cubrir la cara ni el nombre del participante.',
+      'La cabecera A4 es más compacta para dedicar más superficie de impresión a las personas.',
     ],
     adiciones: [
       'Las asignaciones muestran las fotos disponibles según el formato visual elegido.',
@@ -22,7 +24,7 @@ export const NOVEDADES = Object.freeze([
     arreglos: [
       'Las hojas A4 dejan de imponer tarjetas y retratos circulares propios.',
       'Un participante con varios voluntarios conserva a todas las personas acompañantes en el formato configurado.',
-      'Los medallones inferiores invaden menos la foto y usan violeta para distinguir el rol voluntario.',
+      'Los medallones dejan de invadir la foto, usan violeta y explicitan si acompaña una o más personas.',
       'La vista vertical ya no queda disponible solamente como descarga sin vista previa.',
     ],
   },

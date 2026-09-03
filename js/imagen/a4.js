@@ -57,7 +57,8 @@ export function maquetarA4(lista, roster, grupo, medirTexto = medirAproximado) {
     // El color del grupo identifica al participante. El violeta diferencia el
     // rol de voluntariado sin sumar otra paleta a la pieza.
     colorVoluntario: COLORES.violeta,
-    bandejaVoluntariosMultiples: true,
+    bandejaVoluntariosIntegrada: true,
+    cabeceraCompacta: true,
   }
   const contenido = maquetar(listaDeCancha, roster, {
     saludo: lista.saludo ?? '',
