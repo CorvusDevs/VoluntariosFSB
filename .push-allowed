@@ -5,6 +5,7 @@
 AGENTS.md
 .gitignore
 .push-allowed
+.cpanel.yml
 actualizar.html
 app.js
 assets/**

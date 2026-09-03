@@ -1,0 +1,5 @@
+{
+  "schema": 1,
+  "purpose": "Verify cPanel-managed Git deployment without modifying a website",
+  "target": "/home/aleteaor/.aletea-deploy/git-smoke/receipt.json"
+}

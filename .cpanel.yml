@@ -1,0 +1,5 @@
+---
+deployment:
+  tasks:
+    - /bin/mkdir -p /home/aleteaor/.aletea-deploy/git-smoke
+    - /bin/cp herramientas/cpanel-git-smoke.json /home/aleteaor/.aletea-deploy/git-smoke/receipt.json
