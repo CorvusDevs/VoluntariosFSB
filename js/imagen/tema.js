@@ -175,9 +175,14 @@ export const SUPERPUESTO = Object.freeze({
 // lado, un cambio en el medallon dejaria las columnas y el lienzo desfasados.
 export function medidasRetratos({
   margen, columnas = RETRATOS.porFila, esquina = ESQUINA_POR_DEFECTO,
-  tamano = TAMANO_POR_DEFECTO, asomo = ASOMO_POR_DEFECTO,
+  tamano = TAMANO_POR_DEFECTO, asomo = ASOMO_POR_DEFECTO, anchoLienzo,
 }) {
-  const celda = anchoDeCeldaRetratos(margen)
+  // La imagen habitual conserva el tamaño histórico de la celda y crece hacia
+  // los costados. Una salida con ancho fijado, como A4, reparte en cambio todo
+  // el ancho imprimible entre las columnas solicitadas.
+  const celda = anchoLienzo
+    ? anchoDeCeldaRetratos(margen, columnas, anchoLienzo)
+    : anchoDeCeldaRetratos(margen)
   const alto = Math.round(celda * RETRATOS.proporcionCelda)
   const superpuesto = esSuperpuesto(esquina)
   const factor = superpuesto
@@ -196,7 +201,7 @@ export function medidasRetratos({
   const separacion = superpuesto
     ? Math.max(RETRATOS.separacion, asomaLado + Math.round(celda * SUPERPUESTO.aireColumna))
     : RETRATOS.separacion
-  const anchoImagen = margen * 2 + columnas * celda + (columnas - 1) * separacion
+  const anchoImagen = anchoLienzo ?? (margen * 2 + columnas * celda + (columnas - 1) * separacion)
   return {
     celda, alto, superpuesto, anchoMed, altoMed, asoma, asomaLado, separacion, anchoImagen,
     // Sin el aire entre renglones: ese lo pone el cuerpo, que es el unico que

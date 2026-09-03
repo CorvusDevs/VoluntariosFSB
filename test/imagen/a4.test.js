@@ -57,7 +57,7 @@ describe('hoja A4 por cancha', () => {
     }, ROSTER, grupo)
     expect(enFilas.formato).toBe('filas')
     expect(enGrilla.formato).toBe('grilla')
-    expect(enFilas.contenido.ancho).not.toBe(enGrilla.contenido.ancho)
+    expect(enFilas.contenido.ordenes).not.toEqual(enGrilla.contenido.ordenes)
   })
 
   it('usa el mismo plano que la imagen vertical para esa cancha', () => {
@@ -81,8 +81,9 @@ describe('hoja A4 por cancha', () => {
 
   it('distribuye la cancha en columnas adecuadas para una hoja vertical', () => {
     expect(columnasParaA4(6)).toBe(3)
-    expect(columnasParaA4(14)).toBe(4)
-    expect(columnasParaA4(19)).toBe(5)
+    expect(columnasParaA4(8)).toBe(4)
+    expect(columnasParaA4(14)).toBe(5)
+    expect(columnasParaA4(19)).toBe(6)
   })
 
   it('diferencia al voluntariado y limita su solapamiento en papel', () => {
@@ -94,10 +95,49 @@ describe('hoja A4 por cancha', () => {
         asomoVoluntario: 'alto',
       },
     }, ROSTER, grupo)
-    expect(plano.ajustesImpresion.asomoVoluntario).toBe('apenas')
+    expect(plano.ajustesImpresion.asomoVoluntario).toBe('alto')
     expect(plano.ajustesImpresion.colorVoluntario).toBe('#662D7D')
     expect(plano.ordenes.some((orden) =>
       orden.tipo === 'rect' && orden.fila === 'p1' && orden.color === '#662D7D')).toBe(true)
+  })
+
+  it('ubica varios voluntarios en una bandeja sin cubrir la foto participante', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes.find((p) => p.id === 'p2').foto = 'p2.jpg'
+    roster.voluntarios.find((v) => v.id === 'v2').foto = 'v2.jpg'
+    roster.voluntarios.find((v) => v.id === 'v3').foto = 'v3.jpg'
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: {
+        ...lista.opcionesImagen,
+        formato: 'retratos',
+        esquinaVoluntario: 'superpuesto-abajo-derecha',
+      },
+    }, roster, grupo, medirFalso)
+    const participante = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p2.jpg')
+    const voluntarios = plano.ordenes.filter((o) =>
+      o.tipo === 'imagen' && ['v2.jpg', 'v3.jpg'].includes(o.clave))
+    expect(voluntarios).toHaveLength(2)
+    expect(voluntarios.every((o) => o.y >= participante.y + participante.alto)).toBe(true)
+    expect(plano.contenido.ancho).toBe(ANCHO_A4)
+    expect(plano.x).toBeGreaterThanOrEqual(0)
+  })
+
+  it('aprovecha al menos el 95 por ciento del ancho A4 con catorce participantes', () => {
+    const filas = Array.from({ length: 14 }, (_, i) => ({
+      participantes: [`p${(i % 4) + 1}`],
+      voluntarios: i % 3 === 0 ? ['v2', 'v3'] : ['v1'],
+    }))
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: {
+        ...lista.opcionesImagen,
+        formato: 'retratos',
+        esquinaVoluntario: 'superpuesto-abajo-derecha',
+      },
+    }, ROSTER, { ...grupo, filas }, medirFalso)
+    expect(plano.ajustesImpresion.columnasPorFila).toBe(5)
+    expect(plano.contenido.ancho).toBe(ANCHO_A4)
+    expect(plano.contenido.ancho * plano.escala).toBeGreaterThanOrEqual(ANCHO_A4 * 0.95)
+    expect(plano.x).toBeLessThanOrEqual(ANCHO_A4 * 0.025)
   })
 
   it('hereda la opción de ocultar fotos', () => {

@@ -60,14 +60,16 @@ export function maquetar(lista, roster, opciones = {}) {
     margen: base.margen, columnas: columnasGrilla,
     esquina: formato === 'retratos-nombre' ? ESQUINA_POR_DEFECTO : esquinaVoluntario,
     tamano: tamanoVoluntario, asomo: asomoVoluntario,
+    anchoLienzo: ajustesImpresion.anchoLienzo,
   })
-  let ancho = ANCHO
-  if (formato === 'grilla') ancho = anchoParaColumnas(columnasGrilla, base.margen)
+  let ancho = ajustesImpresion.anchoLienzo ?? ANCHO
+  if (!ajustesImpresion.anchoLienzo && formato === 'grilla') ancho = anchoParaColumnas(columnasGrilla, base.margen)
   else if (formato === 'retratos' || formato === 'retratos-nombre') ancho = retratos.anchoImagen
   const m = {
     ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
     esquinaVoluntario, tamanoVoluntario, asomoVoluntario, mostrarIconoVoluntariado, retratos, abreviar,
     colorVoluntario: ajustesImpresion.colorVoluntario,
+    bandejaVoluntariosMultiples: ajustesImpresion.bandejaVoluntariosMultiples,
   }
 
   const ordenes = []
@@ -448,7 +450,7 @@ function xDeCeldaEnRenglon(indice, cantidadTotal, columnas, anchoCelda, separaci
 
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const columnas = m.columnasGrilla ?? GRILLA.porFila
-  const ancho = anchoDeCeldaGrilla(m.margen)
+  const ancho = anchoDeCeldaGrilla(m.margen, columnas, m.ancho)
   const altoFoto = Math.round(ancho * GRILLA.proporcionFoto)
   const fuenteNombre = FUENTES.titulo(GRILLA.pxNombre)
   const fuenteVoluntario = FUENTES.normal(GRILLA.pxVoluntario)
@@ -591,30 +593,41 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
   // 18 chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
   const renglonDe = (i) => posicionEnRenglon(i, grupo.filas.length, columnas).renglon
-  const conMedallon = grupo.filas.reduce((acc, fila, i) => {
+  const extraDeFila = (fila) => {
+    if (!superpuesto || fila.voluntarios.length === 0) return 0
+    if (m.bandejaVoluntariosMultiples && fila.voluntarios.length > 1) {
+      const columnasBandeja = Math.min(2, fila.voluntarios.length)
+      const anchoBandeja = Math.floor((ancho - 8 * (columnasBandeja - 1)) / columnasBandeja)
+      const altoBandeja = Math.round(anchoBandeja * RETRATOS.proporcionMedallon)
+      return Math.ceil(fila.voluntarios.length / columnasBandeja) * (altoBandeja + 8) + 4
+    }
+    return asoma
+  }
+  const extraEnRenglon = grupo.filas.reduce((acc, fila, i) => {
     const r = renglonDe(i)
-    acc[r] = acc[r] || fila.voluntarios.length > 0
+    acc[r] = Math.max(acc[r] ?? 0, extraDeFila(fila))
     return acc
   }, [])
-  const asomaEn = (i) => (superpuesto && conMedallon[renglonDe(i)] ? asoma : 0)
+  const extraEn = (i) => extraEnRenglon[renglonDe(i)] ?? 0
 
   let cursor = y
   grupo.filas.forEach((fila, i) => {
     const { renglon } = posicionEnRenglon(i, grupo.filas.length, columnas)
     const x = xDeCeldaEnRenglon(i, grupo.filas.length, columnas, ancho, separacion, m.margen, m.ancho)
-    const asomaFila = asomaEn(i)
-    // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
-    // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
-    const arriba = cursor + (superpuesto && !abajo ? asomaFila : 0)
+    const extraFila = extraEn(i)
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
     const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
+    const usaBandeja = Boolean(m.bandejaVoluntariosMultiples && voluntarios.length > 1)
+    // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
+    // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
+    const arriba = cursor + (superpuesto && !abajo && !usaBandeja ? extraFila : 0)
 
     // El hueco solo existe si esta fila tiene a alguien acompañando y el medallon
     // va abajo. Reservarlo siempre dejaba a los chicos sin voluntario con el
     // nombre corrido contra el borde, sin nada que lo justificara.
-    const hueco = abajo && voluntarios.length > 0
+    const hueco = !usaBandeja && abajo && voluntarios.length > 0
       ? (superpuesto ? anchoMed - asomaLado + inset : anchoMed + inset * 2)
       : 0
     dibujarRetrato(ordenes, {
@@ -623,7 +636,21 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       corto: m.abreviar?.participante ?? abreviarApellido,
     })
 
-    voluntarios.forEach((voluntario, n) => {
+    if (usaBandeja) {
+      const columnasBandeja = Math.min(2, voluntarios.length)
+      const separacionBandeja = 8
+      const anchoBandeja = Math.floor((ancho - separacionBandeja * (columnasBandeja - 1)) / columnasBandeja)
+      const altoBandeja = Math.round(anchoBandeja * RETRATOS.proporcionMedallon)
+      voluntarios.forEach((voluntario, n) => {
+        const columna = n % columnasBandeja
+        const renglonBandeja = Math.floor(n / columnasBandeja)
+        const mx = x + columna * (anchoBandeja + separacionBandeja)
+        const my = arriba + alto + 8 + renglonBandeja * (altoBandeja + separacionBandeja)
+        medallonDeVoluntario(ordenes, voluntario, mx, my, anchoBandeja, altoBandeja,
+          m.colorVoluntario ?? color, clave, medirTexto,
+          m.abreviar?.voluntario ?? abreviarApellido)
+      })
+    } else voluntarios.forEach((voluntario, n) => {
       // Superpuesto: pegado al borde de la celda y corrido hacia afuera, arrancando
       // por encima del techo. Apoyado: adentro, separado del borde por el inset.
       const mx = superpuesto
@@ -633,7 +660,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
       // por debajo de la celda y meterse en la fila siguiente, asi que va contra
       // el borde inferior.
       const base = superpuesto
-        ? (abajo ? arriba + alto + asomaFila - altoMed : arriba - asomaFila)
+        ? (abajo ? arriba + alto + extraFila - altoMed : arriba - extraFila)
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
       // Con el medallon abajo la pila sube, para no salirse por el pie.
       const my = abajo ? base - paso * n : base + paso * n
@@ -654,7 +681,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     const ultimo = i === grupo.filas.length - 1
     const ultimoDelRenglon = ultimo || posicionEnRenglon(i + 1, grupo.filas.length, columnas).renglon !== renglon
     if (ultimoDelRenglon) {
-      cursor += alto + asomaFila + (ultimo ? 0 : m.espacioBajoTitulo)
+      cursor += alto + extraFila + (ultimo ? 0 : m.espacioBajoTitulo)
     }
   })
   return cursor

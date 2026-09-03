@@ -6,9 +6,10 @@ export const ANCHO_A4 = 1240
 export const ALTO_A4 = 1754
 
 export function columnasParaA4(cantidad) {
-  if (cantidad <= 8) return 3
-  if (cantidad <= 16) return 4
-  return 5
+  if (cantidad <= 6) return 3
+  if (cantidad <= 8) return 4
+  if (cantidad <= 15) return 5
+  return 6
 }
 
 const unicos = (valores) => [...new Set(valores)]
@@ -49,12 +50,14 @@ export function maquetarA4(lista, roster, grupo, medirTexto = medirAproximado) {
   const listaDeCancha = { ...lista, grupos: [grupo] }
   const ajustesImpresion = {
     columnasPorFila: columnasParaA4(grupo.filas.length),
-    // En papel el medallón no debe invadir la cara. Se conserva la esquina y el
-    // tamaño elegidos, pero el solapamiento se limita a la posición más suave.
-    asomoVoluntario: 'apenas',
+    anchoLienzo: ANCHO_A4,
+    // "Alto" significa que una mayor parte del medallón queda fuera de la foto:
+    // solo el 30 % se superpone. Antes se usaba "apenas" y se cubría el 60 %.
+    asomoVoluntario: 'alto',
     // El color del grupo identifica al participante. El violeta diferencia el
     // rol de voluntariado sin sumar otra paleta a la pieza.
     colorVoluntario: COLORES.violeta,
+    bandejaVoluntariosMultiples: true,
   }
   const contenido = maquetar(listaDeCancha, roster, {
     saludo: lista.saludo ?? '',

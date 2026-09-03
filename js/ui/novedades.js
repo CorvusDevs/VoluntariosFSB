@@ -12,6 +12,8 @@ export const NOVEDADES = Object.freeze([
       'Cada hoja A4 reúne participantes, voluntariado y apoyos correspondientes a una sola cancha.',
       'El A4 hereda formato, fotos, modo compacto, posición y tamaño del voluntariado de la configuración elegida.',
       'La composición de impresión adapta automáticamente las columnas para aprovechar mejor la altura de la hoja.',
+      'La hoja aprovecha prácticamente todo el ancho A4 y distribuye entre tres y seis columnas según la cantidad de participantes.',
+      'Cuando una persona tiene varios voluntarios, sus retratos pasan a una bandeja debajo de la foto para mantener visible al participante.',
     ],
     adiciones: [
       'Las asignaciones muestran las fotos disponibles según el formato visual elegido.',
