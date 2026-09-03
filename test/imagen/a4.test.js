@@ -136,11 +136,11 @@ describe('hoja A4 por cancha', () => {
     const participante = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'p1.jpg')
     const voluntario = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
     expect(voluntario.y).toBeGreaterThanOrEqual(participante.y + participante.alto)
-    expect(voluntario.ancho).toBeGreaterThanOrEqual(participante.ancho * 0.5)
+    expect(voluntario.alto).toBeGreaterThan(voluntario.ancho)
     expect(plano.ordenes.some((o) => o.tipo === 'texto' && o.fila === 'p1' && o.texto === 'Acompaña')).toBe(true)
   })
 
-  it('no agrega bandeja ni texto a quien no tiene acompañante', () => {
+  it('conserva el fondo alineado pero no agrega texto a quien no tiene acompañante', () => {
     const plano = maquetarA4({
       ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
     }, ROSTER, grupo, medirFalso)
@@ -148,6 +148,33 @@ describe('hoja A4 por cancha', () => {
       && o.tipo === 'texto' && /^Acompaña/.test(o.texto))).toBe(false)
     expect(plano.ordenes.some((o) => o.fila === 'p4'
       && o.tipo === 'texto' && /sin acompañante/i.test(o.texto))).toBe(false)
+    expect(plano.ordenes.some((o) => o.fila === 'p4'
+      && o.tipo === 'rect' && o.color === '#F3E9F7')).toBe(true)
+  })
+
+  it('usa la misma proporción de retrato con uno o dos acompañantes', () => {
+    const roster = structuredClone(ROSTER)
+    roster.voluntarios.find((v) => v.id === 'v1').foto = 'v1.jpg'
+    roster.voluntarios.find((v) => v.id === 'v2').foto = 'v2.jpg'
+    roster.voluntarios.find((v) => v.id === 'v3').foto = 'v3.jpg'
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, roster, grupo, medirFalso)
+    const uno = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg' && o.fila === 'p1')
+    const dos = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v2.jpg' && o.fila === 'p2')
+    expect(uno.ancho).toBe(dos.ancho)
+    expect(uno.alto).toBe(dos.alto)
+  })
+
+  it('acorta con elipsis un nombre que no cabe en el retrato', () => {
+    const roster = structuredClone(ROSTER)
+    roster.voluntarios.find((v) => v.id === 'v1').nombre = 'NombreExtraordinariamenteExtensoQueNoPuedeEntrarCompleto'
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, roster, grupo, medirFalso)
+    const etiqueta = plano.ordenes.find((o) => o.tipo === 'texto'
+      && o.fila === 'p1' && o.texto.endsWith('…'))
+    expect(etiqueta).toBeTruthy()
   })
 
   it('aprovecha al menos el 95 por ciento del ancho A4 con catorce participantes', () => {

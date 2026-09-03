@@ -574,12 +574,22 @@ function medallonDeVoluntario(ordenes, voluntario, x, y, ancho, alto, color, cla
 
   ordenes.push({ tipo: 'rect', x: ix, y: iy + iAlto - franja, ancho: iAncho, alto: franja,
     color, radio: [0, 0, radioInterno, radioInterno], fila: clave })
-  const nombre = corto(voluntario.nombre) + (voluntario.nuevo ? ' (nuevo)' : '')
+  const nombreCompleto = corto(voluntario.nombre) + (voluntario.nuevo ? ' (nuevo)' : '')
   // Aire propio: con el borde del marco como unico margen, el nombre quedaba
   // tocando los dos costados del medallon.
   const pad = Math.round(iAncho * RETRATOS.padNombreMedallon)
-  const px = ajustarTexto(nombre, iAncho - pad * 2,
+  const anchoNombre = iAncho - pad * 2
+  const px = ajustarTexto(nombreCompleto, anchoNombre,
     Math.round(franja * RETRATOS.factorNombreMedallon), 7, FUENTES.normal, medirTexto)
+  // El ajuste tipografico tiene un piso para seguir siendo legible. Si un nombre
+  // excepcionalmente largo tampoco entra en ese piso, se acorta con elipsis en
+  // vez de quedar cortado por el borde del retrato.
+  let nombre = nombreCompleto
+  const caracteres = [...nombreCompleto]
+  while (caracteres.length > 1 && medirTexto(nombre, FUENTES.normal(px)) > anchoNombre) {
+    caracteres.pop()
+    nombre = `${caracteres.join('').trimEnd()}…`
+  }
   ordenes.push({ tipo: 'texto', texto: nombre, x: ix + iAncho / 2, y: iy + iAlto - franja / 2,
     fuente: FUENTES.normal(px), color: COLORES.blanco,
     alineacion: 'center', lineaBase: 'middle', fila: clave })
@@ -603,24 +613,27 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   const inset = Math.round(ancho * RETRATOS.insetMedallon)
   const paso = Math.round(altoMed * RETRATOS.pasoMedallon)
   const separacionBandeja = 6
-  const padBandeja = 4
+  const padBandeja = 5
   const altoEtiquetaBandeja = Math.max(22, Math.round(ancho * 0.12))
   const anchoMedBandeja = Math.floor((ancho - padBandeja * 2 - separacionBandeja) / 2)
-  const anchoMedBandejaUnico = Math.round(ancho * 0.58)
-  // En papel la foto individual crece hacia los costados, no hacia abajo. Así
-  // mejora el reconocimiento y el nombre gana ancho sin consumir más hoja.
+  // Un acompañante y dos usan exactamente el mismo retrato. Antes el unico se
+  // ensanchaba y terminaba pareciendo una tarjeta horizontal diferente.
   const altoMedBandeja = Math.round(anchoMedBandeja * 1.12)
-  const altoDeBandeja = (cantidad) => padBandeja + altoEtiquetaBandeja
-    + Math.ceil(cantidad / 2) * altoMedBandeja
-    + Math.max(0, Math.ceil(cantidad / 2) - 1) * separacionBandeja
+  const altoDeBandeja = (cantidad) => {
+    const renglones = Math.max(1, Math.ceil(cantidad / 2))
+    return padBandeja + altoEtiquetaBandeja
+    + renglones * altoMedBandeja
+    + Math.max(0, renglones - 1) * separacionBandeja
     + padBandeja
+  }
 
   // El sobresalido se reserva por renglon y solo donde de verdad hay medallones.
   // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
   // 18 chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
   const renglonDe = (i) => posicionEnRenglon(i, grupo.filas.length, columnas).renglon
   const extraDeFila = (fila) => {
-    if (!superpuesto || fila.voluntarios.length === 0) return 0
+    if (!superpuesto) return 0
+    if (fila.voluntarios.length === 0 && !m.bandejaVoluntariosIntegrada) return 0
     if (m.bandejaVoluntariosIntegrada || (m.bandejaVoluntariosMultiples && fila.voluntarios.length > 1)) {
       return altoDeBandeja(fila.voluntarios.length) + 6
     }
@@ -642,10 +655,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
     const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
-    const usaBandeja = Boolean(voluntarios.length > 0 && (
-      m.bandejaVoluntariosIntegrada
-      || (m.bandejaVoluntariosMultiples && voluntarios.length > 1)
-    ))
+    const usaBandeja = Boolean(m.bandejaVoluntariosIntegrada
+      || (voluntarios.length > 1 && m.bandejaVoluntariosMultiples))
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
     const arriba = cursor + (superpuesto && !abajo && !usaBandeja ? extraFila : 0)
@@ -669,17 +680,19 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         tipo: 'rect', x, y: yBandeja, ancho, alto: altoBandeja,
         color: COLORES.violetaTenue, radio: 12, fila: clave,
       })
-      ordenes.push({
-        tipo: 'texto', texto: voluntarios.length === 1 ? 'Acompaña' : 'Acompañan',
-        x: x + padBandeja, y: yBandeja + padBandeja + altoEtiquetaBandeja / 2,
-        fuente: FUENTES.titulo(Math.max(14, Math.round(ancho * 0.075))),
-        color: COLORES.violeta, lineaBase: 'middle', fila: clave,
-      })
+      if (voluntarios.length > 0) {
+        ordenes.push({
+          tipo: 'texto', texto: voluntarios.length === 1 ? 'Acompaña' : 'Acompañan',
+          x: x + padBandeja, y: yBandeja + padBandeja + altoEtiquetaBandeja / 2 + 2,
+          fuente: FUENTES.titulo(Math.max(14, Math.round(ancho * 0.075))),
+          color: COLORES.violeta, lineaBase: 'middle', fila: clave,
+        })
+      }
       voluntarios.forEach((voluntario, n) => {
         const columna = n % 2
         const renglonBandeja = Math.floor(n / 2)
         const cantidadEnRenglon = Math.min(2, voluntarios.length - renglonBandeja * 2)
-        const anchoMedActual = voluntarios.length === 1 ? anchoMedBandejaUnico : anchoMedBandeja
+        const anchoMedActual = anchoMedBandeja
         const anchoRenglon = cantidadEnRenglon * anchoMedActual
           + (cantidadEnRenglon - 1) * separacionBandeja
         const inicio = x + (ancho - anchoRenglon) / 2
