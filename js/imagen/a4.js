@@ -5,6 +5,12 @@ import { pintar } from './pintar.js'
 export const ANCHO_A4 = 1240
 export const ALTO_A4 = 1754
 
+export function columnasParaA4(cantidad) {
+  if (cantidad <= 8) return 3
+  if (cantidad <= 16) return 4
+  return 5
+}
+
 const unicos = (valores) => [...new Set(valores)]
 const firma = (fila) => [...(fila.voluntarios ?? [])].sort().join('|')
 
@@ -41,10 +47,20 @@ const medirAproximado = (texto, fuente) => {
 // Después se escala de forma uniforme para entrar en una página A4 sin recortar.
 export function maquetarA4(lista, roster, grupo, medirTexto = medirAproximado) {
   const listaDeCancha = { ...lista, grupos: [grupo] }
+  const ajustesImpresion = {
+    columnasPorFila: columnasParaA4(grupo.filas.length),
+    // En papel el medallón no debe invadir la cara. Se conserva la esquina y el
+    // tamaño elegidos, pero el solapamiento se limita a la posición más suave.
+    asomoVoluntario: 'apenas',
+    // El color del grupo identifica al participante. El violeta diferencia el
+    // rol de voluntariado sin sumar otra paleta a la pieza.
+    colorVoluntario: COLORES.violeta,
+  }
   const contenido = maquetar(listaDeCancha, roster, {
     saludo: lista.saludo ?? '',
     despedida: lista.despedida ?? '',
     medirTexto,
+    ajustesImpresion,
   })
   const escala = Math.min(ANCHO_A4 / contenido.ancho, ALTO_A4 / contenido.alto)
   return {
@@ -58,6 +74,7 @@ export function maquetarA4(lista, roster, grupo, medirTexto = medirAproximado) {
     asignaciones: agruparAsignaciones(grupo.filas),
     grupoNumero: grupo.numero,
     formato: lista.opcionesImagen?.formato,
+    ajustesImpresion,
   }
 }
 

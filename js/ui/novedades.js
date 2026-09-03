@@ -11,6 +11,7 @@ export const NOVEDADES = Object.freeze([
       'Vista previa permite alternar entre la composición horizontal, la vertical completa y cada cancha en A4.',
       'Cada hoja A4 reúne participantes, voluntariado y apoyos correspondientes a una sola cancha.',
       'El A4 hereda formato, fotos, modo compacto, posición y tamaño del voluntariado de la configuración elegida.',
+      'La composición de impresión adapta automáticamente las columnas para aprovechar mejor la altura de la hoja.',
     ],
     adiciones: [
       'Las asignaciones muestran las fotos disponibles según el formato visual elegido.',
@@ -19,6 +20,7 @@ export const NOVEDADES = Object.freeze([
     arreglos: [
       'Las hojas A4 dejan de imponer tarjetas y retratos circulares propios.',
       'Un participante con varios voluntarios conserva a todas las personas acompañantes en el formato configurado.',
+      'Los medallones inferiores invaden menos la foto y usan violeta para distinguir el rol voluntario.',
       'La vista vertical ya no queda disponible solamente como descarga sin vista previa.',
     ],
   },

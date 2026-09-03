@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agruparAsignaciones, ALTO_A4, ANCHO_A4, maquetarA4, nombreDeArchivoA4 } from '../../js/imagen/a4.js'
+import { agruparAsignaciones, ALTO_A4, ANCHO_A4, columnasParaA4, maquetarA4, nombreDeArchivoA4 } from '../../js/imagen/a4.js'
 import { maquetar } from '../../js/imagen/maquetar.js'
 import { ROSTER, medirFalso } from '../ayudas/datos.js'
 
@@ -74,8 +74,30 @@ describe('hoja A4 por cancha', () => {
     const a4 = maquetarA4(configurada, ROSTER, grupo, medirFalso)
     const vertical = maquetar({ ...configurada, grupos: [grupo] }, ROSTER, {
       saludo: '', despedida: '', medirTexto: medirFalso,
+      ajustesImpresion: a4.ajustesImpresion,
     })
     expect(a4.contenido).toEqual(vertical)
+  })
+
+  it('distribuye la cancha en columnas adecuadas para una hoja vertical', () => {
+    expect(columnasParaA4(6)).toBe(3)
+    expect(columnasParaA4(14)).toBe(4)
+    expect(columnasParaA4(19)).toBe(5)
+  })
+
+  it('diferencia al voluntariado y limita su solapamiento en papel', () => {
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: {
+        ...lista.opcionesImagen,
+        formato: 'retratos',
+        esquinaVoluntario: 'superpuesto-abajo-derecha',
+        asomoVoluntario: 'alto',
+      },
+    }, ROSTER, grupo)
+    expect(plano.ajustesImpresion.asomoVoluntario).toBe('apenas')
+    expect(plano.ajustesImpresion.colorVoluntario).toBe('#662D7D')
+    expect(plano.ordenes.some((orden) =>
+      orden.tipo === 'rect' && orden.fila === 'p1' && orden.color === '#662D7D')).toBe(true)
   })
 
   it('hereda la opción de ocultar fotos', () => {

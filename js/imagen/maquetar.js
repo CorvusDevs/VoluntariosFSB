@@ -8,7 +8,7 @@ import { iniciales, abreviarApellido, crearAbreviador } from '../util/nombres.js
 const RELACION_RECORTE = 2.5
 
 export function maquetar(lista, roster, opciones = {}) {
-  const { saludo = '', despedida = '', medirTexto } = opciones
+  const { saludo = '', despedida = '', medirTexto, ajustesImpresion = {} } = opciones
   if (typeof medirTexto !== 'function') {
     throw new Error('maquetar necesita una funcion medirTexto(texto, fuente)')
   }
@@ -42,13 +42,15 @@ export function maquetar(lista, roster, opciones = {}) {
   // participantes: se agregan columnas y la celda mantiene su tamaño, asi la cara
   // no se achica dentro del archivo. Los otros dos formatos conservan el ancho fijo.
   const masPobladoDelGrupo = Math.max(1, ...lista.grupos.map((g) => g.filas.length))
-  const columnasPedidas = Number(lista.opcionesImagen?.columnasPorFila)
+  const columnasPedidas = Number(ajustesImpresion.columnasPorFila ?? lista.opcionesImagen?.columnasPorFila)
   const columnasGrilla = Number.isInteger(columnasPedidas) && columnasPedidas >= 3 && columnasPedidas <= 8
     ? columnasPedidas
     : columnasNecesarias(masPobladoDelGrupo)
   const esquinaVoluntario = lista.opcionesImagen?.esquinaVoluntario ?? ESQUINA_POR_DEFECTO
   const tamanoVoluntario = lista.opcionesImagen?.tamanoVoluntario ?? TAMANO_POR_DEFECTO
-  const asomoVoluntario = lista.opcionesImagen?.asomoVoluntario ?? ASOMO_POR_DEFECTO
+  const asomoVoluntario = ajustesImpresion.asomoVoluntario
+    ?? lista.opcionesImagen?.asomoVoluntario
+    ?? ASOMO_POR_DEFECTO
   // Retratos con el medallon superpuesto separa mas las columnas para que dos
   // medallones no se pisen, asi que su ancho no es el mismo que el de la grilla.
   // El formato con el voluntario debajo no tiene medallon que sobresalga, asi que
@@ -65,6 +67,7 @@ export function maquetar(lista, roster, opciones = {}) {
   const m = {
     ...base, ancho, columnasGrilla, columnasRetratos: columnasGrilla,
     esquinaVoluntario, tamanoVoluntario, asomoVoluntario, mostrarIconoVoluntariado, retratos, abreviar,
+    colorVoluntario: ajustesImpresion.colorVoluntario,
   }
 
   const ordenes = []
@@ -634,7 +637,8 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
         : (abajo ? arriba + alto - inset - altoMed : arriba + inset)
       // Con el medallon abajo la pila sube, para no salirse por el pie.
       const my = abajo ? base - paso * n : base + paso * n
-      medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed, color, clave, medirTexto,
+      medallonDeVoluntario(ordenes, voluntario, mx, my, anchoMed, altoMed,
+        m.colorVoluntario ?? color, clave, medirTexto,
         m.abreviar?.voluntario ?? abreviarApellido)
     })
 
