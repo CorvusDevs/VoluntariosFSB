@@ -81,10 +81,32 @@ describe('editor de Página web', () => {
     expect([...raiz.querySelectorAll('.pagina-web-grupos button')].map((boton) => boton.textContent)).toEqual([
       'Inicio', 'Institución', 'Páginas y contenido', 'Participación', 'Ajustes',
     ])
-    expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Portada', 'Cifras'])
+    expect(raiz.querySelectorAll('.pagina-web-paginas button')).toHaveLength(17)
+    expect([...raiz.querySelectorAll('.pagina-web-paginas button')].map((boton) => boton.textContent)).toEqual(expect.arrayContaining([
+      'Inicio/', 'Agenda/agenda/', 'Elecciones/elecciones/', 'Transparencia/transparencia/', 'Preguntas frecuentes/preguntas-frecuentes/',
+    ]))
+    expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual([
+      'Portada', 'Cifras', 'Áreas', 'Quiénes somos', 'Qué hacemos', 'Formación', 'Participación', 'Orientación', 'Redes sociales',
+    ])
     ;[...raiz.querySelectorAll('.pagina-web-grupos button')].find((boton) => boton.textContent === 'Páginas y contenido').click()
     expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual(['Qué hacemos', 'Familias', 'Adultos autistas', 'Formación', 'Biblioteca', 'Recursos', 'Tienda', 'Actualidad'])
     expect(raiz.querySelector('[data-pagina-web-publicar]').disabled).toBe(true)
+  })
+
+  it('abre cada destino público con sus controles y el enlace exacto al resultado', async () => {
+    globalThis.fetch = vi.fn(async (url) => url === '/assets/pagina-publica-v1.json'
+      ? respuesta(contenidoInicial)
+      : respuesta({ borrador: null, publicado: null, revisionBorrador: 0 }))
+    crearPantallaPaginaWeb(raiz, { sesion: { perfil_acceso: 'direccion' } })
+    await esperar()
+
+    raiz.querySelector('[data-pagina-web-pagina="elecciones"]').click()
+    expect(raiz.querySelector('[data-pagina-web-pagina="elecciones"]').getAttribute('aria-current')).toBe('page')
+    expect([...raiz.querySelectorAll('.pagina-web-secciones button')].map((boton) => boton.textContent)).toEqual([
+      'Quiénes somos', 'Datos generales', 'Publicación y calidad',
+    ])
+    expect(raiz.querySelector('.pagina-web-vista-publicada').href).toBe('https://prueba.aletea.org/elecciones/')
+    expect(raiz.textContent).toContain('Elecciones/elecciones/')
   })
 
   it('muestra los cinco grupos públicos acordados como una lista ordenable', async () => {
@@ -430,8 +452,9 @@ describe('editor de Página web', () => {
     await esperar()
 
     const trabajo = raiz.querySelector('.pagina-web-trabajo')
-    expect(trabajo.firstElementChild.classList.contains('pagina-web-vista')).toBe(true)
-    expect(raiz.textContent).toContain('Editá sobre la maqueta')
+    expect(trabajo.firstElementChild.classList.contains('pagina-web-navegacion-editor')).toBe(true)
+    expect(trabajo.children[1].classList.contains('pagina-web-vista')).toBe(true)
+    expect(raiz.textContent).toContain('Hacé clic sobre un texto y escribí.')
     expect(raiz.querySelectorAll('.pagina-web-preview-editable').length).toBeGreaterThanOrEqual(4)
     expect([...raiz.querySelectorAll('.pagina-web-avanzado')].every((detalle) => !detalle.open)).toBe(true)
 
@@ -455,9 +478,11 @@ describe('editor de Página web', () => {
 
     const mapa = raiz.querySelector('.pagina-web-mapa')
     expect(mapa).toBeTruthy()
-    expect(mapa.querySelectorAll('.pagina-web-mapa-nodo')).toHaveLength(22)
-    expect(mapa.querySelector('.pagina-web-mapa-nodo.activo').textContent).toBe('Portada')
-    const recursos = [...mapa.querySelectorAll('.pagina-web-mapa-nodo')].find((nodo) => nodo.textContent === 'Recursos')
+    ;[...raiz.querySelectorAll('.pagina-web-mapa-herramientas button')].find((control) => control.textContent === 'Mostrar mapa').click()
+    const mapaAbierto = raiz.querySelector('.pagina-web-mapa')
+    expect(mapaAbierto.querySelectorAll('.pagina-web-mapa-nodo')).toHaveLength(22)
+    expect(mapaAbierto.querySelector('.pagina-web-mapa-nodo.activo').textContent).toBe('Portada')
+    const recursos = [...mapaAbierto.querySelectorAll('.pagina-web-mapa-nodo')].find((nodo) => nodo.textContent === 'Recursos')
     recursos.click()
     expect(raiz.querySelector('[data-pagina-web-editor] h2').textContent).toBe('Recursos')
     expect(raiz.querySelector('.pagina-web-mapa-nodo.activo').textContent).toBe('Recursos')
@@ -484,9 +509,9 @@ describe('editor de Página web', () => {
     const pantalla = crearPantallaPaginaWeb(raiz, { sesion: { perfil_acceso: 'direccion' } })
     await esperar()
 
-    const alternar = [...raiz.querySelectorAll('.pagina-web-mapa-herramientas button')].find((control) => control.textContent === 'Ocultar mapa')
+    const alternar = [...raiz.querySelectorAll('.pagina-web-mapa-herramientas button')].find((control) => control.textContent === 'Mostrar mapa')
     alternar.click()
-    expect(raiz.querySelector('.pagina-web-mapa').hidden).toBe(true)
+    expect(raiz.querySelector('.pagina-web-mapa').hidden).toBe(false)
     const filtro = raiz.querySelector('[aria-label="Filtrar secciones por estado"]')
     filtro.value = 'incompleta'; filtro.dispatchEvent(new Event('change', { bubbles: true }))
     expect([...raiz.querySelectorAll('.pagina-web-secciones button')].every((control) => control.dataset.estado === 'incompleta')).toBe(true)
@@ -550,6 +575,9 @@ describe('editor de Página web', () => {
     crearPantallaPaginaWeb(raiz, { sesion: { perfil_acceso: 'direccion' } })
     await esperar()
 
+    const mostrarMapa = [...raiz.querySelectorAll('.pagina-web-mapa-herramientas button')]
+      .find((boton) => boton.textContent === 'Mostrar mapa')
+    mostrarMapa.click()
     const recursos = [...raiz.querySelectorAll('.pagina-web-mapa-nodo')].find((nodo) => nodo.textContent === 'Recursos')
     recursos.click()
     const horizontal = raiz.querySelector('[aria-label="Horizontal de paginas.recursos.imagen"]')

@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { JSDOM } from 'jsdom'
-import { crearPantallaAyuda, filtrarPreguntas, PREGUNTAS_AYUDA } from '../../js/ui/pantalla-ayuda.js'
+import { buscarPreguntasDetalladas, crearPantallaAyuda, filtrarPreguntas, PREGUNTAS_AYUDA, sugerirBusqueda } from '../../js/ui/pantalla-ayuda.js'
 
 beforeEach(() => {
   const dom = new JSDOM('<div id="raiz"></div>')
   globalThis.document = dom.window.document
+  globalThis.HTMLElement = dom.window.HTMLElement
+  dom.window.HTMLElement.prototype.scrollIntoView = vi.fn()
 })
 
 describe('ayuda del gestor institucional', () => {
@@ -16,8 +18,8 @@ describe('ayuda del gestor institucional', () => {
   it('encuentra respuestas sin depender de tildes', () => {
     expect(filtrarPreguntas('contenidos de ejemplo').map((item) => item.pregunta)).toContain('¿Por qué aparecen contenidos de ejemplo en el sitio de prueba?')
     expect(filtrarPreguntas('notificacion').map((item) => item.pregunta)).toContain('¿Dónde veo las notificaciones de tareas?')
-    expect(filtrarPreguntas('Canva')).toHaveLength(2)
-    expect(filtrarPreguntas('Pegar enlace').map((item) => item.pregunta)).toContain('¿Cómo agrego un enlace de Google Drive o Canva a la Biblioteca?')
+    expect(filtrarPreguntas('Canva')).toHaveLength(4)
+    expect(filtrarPreguntas('Pegar enlace').map((item) => item.pregunta)).toContain('¿Dónde guardo la carpeta principal de Drive de un proyecto?')
     expect(filtrarPreguntas('recurrente').map((item) => item.pregunta)).toContain('¿Cómo agendo una actividad recurrente?')
     expect(filtrarPreguntas('reunión recurrente').map((item) => item.pregunta)).toContain('¿Cómo agendo una reunión recurrente?')
     expect(filtrarPreguntas('tarea recurrente').map((item) => item.pregunta)).toContain('¿Cuándo uso una tarea recurrente en lugar de una actividad recurrente?')
@@ -51,6 +53,46 @@ describe('ayuda del gestor institucional', () => {
     expect(filtrarPreguntas('borrar participante').map((item) => item.pregunta)).toContain('¿Cómo archivo o recupero a una persona sin perder su historial?')
     expect(filtrarPreguntas('calendario').map((item) => item.pregunta)).toContain('¿Cómo creo una actividad o una reunión en la agenda?')
     expect(filtrarPreguntas('login usuario').map((item) => item.pregunta)).toContain('¿Cuál es la diferencia entre una persona y una cuenta de acceso?')
+  })
+
+  it('tolera plural, palabras equivalentes y errores breves sin perder relevancia', () => {
+    for (const consulta of ['formularios', 'formulairo', 'formualrios', 'forms']) {
+      expect(filtrarPreguntas(consulta)[0].pregunta).toMatch(/formulario/i)
+    }
+    expect(filtrarPreguntas('como crear formulario')[0].pregunta).toBe('¿Cómo creo un formulario sin configurar todo desde cero?')
+    expect(buscarPreguntasDetalladas('formulairo')[0].coincidencias[0].tipo).toBe('aproximada')
+    expect(sugerirBusqueda('calandrio')).toBe('calendario')
+  })
+
+  it('pone los resultados delante, explica la coincidencia y usa Enter para abrir el mejor', () => {
+    const raiz = document.getElementById('raiz')
+    crearPantallaAyuda(raiz)
+    const buscar = raiz.querySelector('[aria-label="Buscar en la ayuda"]')
+    buscar.value = 'formularios'
+    buscar.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }))
+    expect(raiz.querySelector('.ayuda-frecuentes').hidden).toBe(true)
+    expect(raiz.querySelector('.ayuda-estado-busqueda').textContent).toMatch(/respuestas encontradas/)
+    expect(raiz.querySelector('.ayuda-coincidencia').textContent).toMatch(/Coincide con:/)
+    expect(raiz.querySelector('.ayuda-coincidencia-marca')).not.toBeNull()
+
+    buscar.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    expect(raiz.querySelector('.ayuda-pregunta').open).toBe(true)
+    expect(raiz.querySelector('.ayuda-resultados-panel').scrollIntoView).toHaveBeenCalled()
+    expect(document.activeElement).toBe(raiz.querySelector('.ayuda-resultados-titulo'))
+  })
+
+  it('registra una consulta sin resultados una sola vez y sin bloquear la ayuda', async () => {
+    const alRegistrarBusquedaSinResultados = vi.fn(async () => {})
+    const raiz = document.getElementById('raiz')
+    crearPantallaAyuda(raiz, { alRegistrarBusquedaSinResultados })
+    const buscar = raiz.querySelector('[aria-label="Buscar en la ayuda"]')
+    buscar.value = 'zxqv inexistente'
+    buscar.dispatchEvent(new document.defaultView.Event('input', { bubbles: true }))
+    buscar.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    buscar.dispatchEvent(new document.defaultView.KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    await Promise.resolve()
+    expect(alRegistrarBusquedaSinResultados).toHaveBeenCalledTimes(1)
+    expect(alRegistrarBusquedaSinResultados).toHaveBeenCalledWith('zxqv inexistente')
   })
 
   it('abre con recorridos breves y navega a la pantalla indicada', () => {
@@ -156,7 +198,7 @@ describe('ayuda del gestor institucional', () => {
     const raiz = document.getElementById('raiz')
     crearPantallaAyuda(raiz, { busquedaInicial: 'Canva', alCopiarEnlace })
     expect(raiz.querySelector('[aria-label="Buscar en la ayuda"]').value).toBe('Canva')
-    expect(raiz.querySelectorAll('.ayuda-pregunta')).toHaveLength(2)
+    expect(raiz.querySelectorAll('.ayuda-pregunta')).toHaveLength(4)
     expect(raiz.querySelector('.ayuda-pregunta').open).toBe(false)
     ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Copiar esta búsqueda').click()
     await Promise.resolve()
@@ -184,5 +226,15 @@ describe('ayuda del gestor institucional', () => {
     expect(preguntas).not.toContain('¿Cómo vuelvo rápidamente a una sección que estaba usando?')
     expect(preguntas).not.toContain('¿Cómo vuelvo a una sección visitada recientemente?')
     expect(preguntas).not.toContain('¿Cómo pruebo los formularios del sitio nuevo?')
+  })
+
+  it('mantiene poblados los temas cotidianos que antes tenían pocas respuestas', () => {
+    const cantidades = PREGUNTAS_AYUDA.reduce((acumulado, item) => {
+      acumulado[item.categoria] = (acumulado[item.categoria] || 0) + 1
+      return acumulado
+    }, {})
+    for (const categoria of ['Centro de control', 'Reuniones', 'Fútbol sin Barreras', 'Asistencia', 'Privacidad y registro']) {
+      expect(cantidades[categoria]).toBeGreaterThanOrEqual(5)
+    }
   })
 })

@@ -7,8 +7,9 @@ TRABAJO=${1:-}
 case "$TRABAJO" in
   correos) ARCHIVO="$RAIZ/servidor-cpanel/procesar-cola-correos.mjs" ;;
   mantenimiento) ARCHIVO="$RAIZ/servidor-cpanel/mantenimiento-sistema.mjs" ;;
+  publicacion) ARCHIVO="$RAIZ/servidor-cpanel/procesar-publicacion.mjs" ;;
   *)
-    echo "Trabajo desconocido. Usá correos o mantenimiento." >&2
+    echo "Trabajo desconocido. Usá correos, mantenimiento o publicacion." >&2
     exit 64
     ;;
 esac

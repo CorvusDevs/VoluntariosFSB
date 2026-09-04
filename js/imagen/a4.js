@@ -8,7 +8,7 @@ export const ALTO_A4 = 1754
 export function columnasParaA4(cantidad) {
   if (cantidad <= 6) return 3
   if (cantidad <= 8) return 4
-  if (cantidad <= 15) return 5
+  if (cantidad <= 14) return 5
   return 6
 }
 
@@ -51,21 +51,29 @@ export function maquetarA4(lista, roster, grupo, medirTexto = medirAproximado) {
   const ajustesImpresion = {
     columnasPorFila: columnasParaA4(grupo.filas.length),
     anchoLienzo: ANCHO_A4,
+    altoLienzo: ALTO_A4,
     // "Alto" significa que una mayor parte del medallón queda fuera de la foto:
     // solo el 30 % se superpone. Antes se usaba "apenas" y se cubría el 60 %.
     asomoVoluntario: 'alto',
     // El color del grupo identifica al participante. El violeta diferencia el
     // rol de voluntariado sin sumar otra paleta a la pieza.
     colorVoluntario: COLORES.violeta,
-    bandejaVoluntariosIntegrada: true,
+    bandejaVoluntariosCompartida: true,
+    centrarRenglonComoBloque: true,
+    centrarCuerpoVerticalmente: false,
+    anclarPieAbajo: true,
+    distribuirRenglonesVerticalmente: true,
     cabeceraCompacta: true,
   }
-  const contenido = maquetar(listaDeCancha, roster, {
+  const crearContenido = () => maquetar(listaDeCancha, roster, {
     saludo: lista.saludo ?? '',
     despedida: lista.despedida ?? '',
     medirTexto,
     ajustesImpresion,
   })
+  let contenido = crearContenido()
+  // La cantidad de columnas es parte de la composición. Si el contenido supera
+  // el alto de la hoja, se escala el conjunto de forma uniforme.
   const escala = Math.min(ANCHO_A4 / contenido.ancho, ALTO_A4 / contenido.alto)
   return {
     ancho: ANCHO_A4,

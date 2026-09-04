@@ -297,7 +297,7 @@ function navegacion() {
 
     const movil = elemento('nav', ['navegacion-movil', 'navegacion-cms-movil'])
     movil.setAttribute('aria-label', 'Secciones principales')
-    ;[['inicio', 'Inicio'], ['cms-trabajo', 'Mis tareas'], ['cms-areas', 'Áreas']].forEach(([destino, etiqueta]) => {
+    ;[['inicio', 'Hoy'], ['cms-trabajo', 'Tareas'], ['cms-agenda', 'Agenda']].forEach(([destino, etiqueta]) => {
       const control = ir(destino, etiqueta)
       if (control) movil.appendChild(control)
     })
@@ -654,6 +654,18 @@ function dibujar() {
       busquedaInicial: contextoPantalla.busqueda,
       alCopiarEnlace: (busqueda) => copiarEnlacePantalla('ayuda', { busqueda }),
       alCopiarTexto: (texto) => navigator.clipboard.writeText(texto),
+      alRegistrarBusquedaSinResultados: async (consulta) => {
+        const respuesta = await fetch('/api/cms/ayuda/busquedas-sin-resultados', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ consulta, resultados: 0 }),
+        })
+        if (!respuesta.ok) throw new Error('No se pudo registrar la búsqueda sin resultados.')
+      },
+      alLeerBusquedasSinResultados: esAdmin(sesion) ? async () => {
+        const respuesta = await fetch('/api/cms/ayuda/busquedas-sin-resultados')
+        if (!respuesta.ok) return []
+        return (await respuesta.json()).busquedas || []
+      } : null,
       volverA: contextoPantalla.volverPantalla ? {
         pantalla: contextoPantalla.volverPantalla,
         contexto: contextoPantalla.volverContexto || {},

@@ -504,6 +504,21 @@ const MIGRACIONES = [
       [JSON.stringify(borradorRecuperado.contenido), Number(borrador.revision || 0) + 1, borrador.revision])
     },
   },
+  {
+    nombre: '0063_metricas_ayuda_sin_resultados',
+    async aplicar(conexion) {
+      await conexion.query(`
+        CREATE TABLE IF NOT EXISTS metricas_ayuda_sin_resultados (
+          fecha DATE NOT NULL,
+          consulta VARCHAR(191) NOT NULL,
+          cantidad INT NOT NULL DEFAULT 1,
+          actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          PRIMARY KEY (fecha, consulta),
+          INDEX metricas_ayuda_consulta_fecha (consulta, fecha)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      `)
+    },
+  },
 ]
 
 export async function aplicarMigracionesMariaDb(base) {

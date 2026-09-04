@@ -2,21 +2,28 @@ import { describe, expect, it } from 'vitest'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { asegurarDependenciasPassenger, hostCpanel, huellaFuentesPagina, huellaPaginaConContenido, opcionesDesde, prepararPaquetes, puertoPruebasPublicacion, rutaRelativaCuenta, _pruebas } from '../../herramientas/publicar-cpanel-api.mjs'
+import { asegurarDependenciasPassenger, comandosValidacionWeb, hostCpanel, huellaFuentesGestor, huellaFuentesPagina, huellaPaginaConContenido, opcionesDesde, prepararPaquetes, puertoPruebasPublicacion, rutaRelativaCuenta, _pruebas } from '../../herramientas/publicar-cpanel-api.mjs'
 import { CpanelApi } from '../../herramientas/cpanel-api.mjs'
 import { entradasZip } from '../../herramientas/publicacion-cpanel-recibo.mjs'
 
 describe('publicación automatizada de cPanel', () => {
   it('interpreta el modo seguro y la ruta de la página', () => {
     expect(opcionesDesde(['--simular', '--sin-construir', '--web-root', '/sitio'])).toEqual({
-      simular: true, sinConstruir: true, webRoot: '/sitio', recibo: '', forzarTodo: false,
+      simular: true, sinConstruir: true, webRoot: '/sitio', recibo: '', forzarTodo: false, filtroAceptacion: '',
     })
   })
 
   it('interpreta un recibo exacto y el reemplazo completo explícito', () => {
     expect(opcionesDesde(['--recibo', '/artefactos/recibo.json', '--forzar-todo'])).toEqual({
-      simular: false, sinConstruir: false, webRoot: '', recibo: '/artefactos/recibo.json', forzarTodo: true,
+      simular: false, sinConstruir: false, webRoot: '', recibo: '/artefactos/recibo.json', forzarTodo: true, filtroAceptacion: '',
     })
+  })
+
+  it('admite una prueba enfocada concreta y rechaza combinaciones ambiguas', () => {
+    expect(opcionesDesde(['--filtro-aceptacion', 'recorrido electoral']).filtroAceptacion).toBe('recorrido electoral')
+    expect(() => opcionesDesde(['--filtro-aceptacion', 'x'])).toThrow('3 y 120')
+    expect(() => opcionesDesde(['--forzar-todo', '--filtro-aceptacion', 'recorrido electoral'])).toThrow('no se puede combinar')
+    expect(() => opcionesDesde(['--recibo', '/recibo.json', '--filtro-aceptacion', 'recorrido electoral'])).toThrow('no acepta otro filtro')
   })
 
   it('solo permite operar dentro de la cuenta esperada', () => {
@@ -53,6 +60,35 @@ describe('publicación automatizada de cPanel', () => {
     expect(await huellaFuentesPagina(raiz)).toBe(inicial)
     await writeFile(join(raiz, 'src', 'pagina.ts'), 'export const titulo = "B"\n')
     expect(await huellaFuentesPagina(raiz)).not.toBe(inicial)
+  })
+
+  it('la huella del gestor ignora salidas, pruebas, documentación y sellos generados', async () => {
+    const raiz = await mkdtemp(join(tmpdir(), 'aletea-gestor-huella-test-'))
+    await mkdir(join(raiz, 'js'), { recursive: true })
+    await mkdir(join(raiz, 'dist'), { recursive: true })
+    await mkdir(join(raiz, 'test'), { recursive: true })
+    await mkdir(join(raiz, 'docs'), { recursive: true })
+    await writeFile(join(raiz, 'index.html'), '<script src="app.js?v=primero"></script>')
+    await writeFile(join(raiz, 'js', 'version.js'), "export const VERSION = 'primero'\n")
+    await writeFile(join(raiz, 'js', 'app.js'), 'export const titulo = "A"\n')
+    const inicial = await huellaFuentesGestor(raiz)
+    await writeFile(join(raiz, 'index.html'), '<script src="app.js?v=segundo"></script>')
+    await writeFile(join(raiz, 'js', 'version.js'), "export const VERSION = 'segundo'\n")
+    await writeFile(join(raiz, 'dist', 'app.js'), 'generado')
+    await writeFile(join(raiz, 'test', 'app.test.js'), 'prueba')
+    await writeFile(join(raiz, 'docs', 'flujo.md'), 'documentación')
+    expect(await huellaFuentesGestor(raiz)).toBe(inicial)
+    await writeFile(join(raiz, 'js', 'app.js'), 'export const titulo = "B"\n')
+    expect(await huellaFuentesGestor(raiz)).not.toBe(inicial)
+  })
+
+  it('reduce solo la aceptación en modo enfocado y conserva unitarias y build completo', () => {
+    expect(comandosValidacionWeb('recorrido electoral')).toEqual([
+      ['npm', ['test']],
+      ['npm', ['run', 'test:acceptance', '--', '--grep', 'recorrido electoral']],
+      ['npm', ['run', 'build:staging']],
+    ])
+    expect(comandosValidacionWeb('')).toEqual([['npm', ['run', 'release:staging']]])
   })
 
   it('invalida el paquete web cuando cambia el contenido publicado del CMS', () => {

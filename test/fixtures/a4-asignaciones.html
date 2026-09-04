@@ -1,1 +1,61 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prueba A4</title><style>body{margin:0;padding:24px;background:#f4eff6;font-family:system-ui}.hojas{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;max-width:760px;margin:auto}canvas{display:block;width:100%;height:auto;background:white;box-shadow:0 12px 34px #44205022}</style></head><body><main class="hojas" id="hojas"></main><script type="module">import{crearLienzoA4}from'../../js/imagen/a4.js';const personas=(prefijo,nombres,grupo)=>nombres.map((nombre,i)=>({id:prefijo+(i+1),nombre,grupo,activo:true,foto:null}));const participantes=personas('p',['Ángel','Thiago','Nikita','Francisco Planells','Gaia','Lautaro','Julián','Ezequiel','Agustín','Gonzalo Pereira','Luan','Manu','Nicolás','Samu'],2);const voluntarios=personas('v',['Ruben','Cris','Francisco','Majo','Vicky','Jess','Alejandro','Noha','Lizz','Pato','Lucía','Fer','Marce','Dalma','Moni','Rena'],0);const filas=[{participantes:['p1','p2'],voluntarios:['v1']},{participantes:['p3'],voluntarios:['v2','v3']},...participantes.slice(3).map((p,i)=>({participantes:[p.id],voluntarios:[`v${i+4}`]}))];const lista={fecha:'2026-08-29',hora:'11:00',lugar:'Tres Cruces'};const grupo={numero:2,cancha:'Cancha 2',titulo:'Grupo 2',subtitulo:'5 a 9 años',filas,apoyo:['v15','v16']};const resultado=crearLienzoA4({lista,roster:{participantes,voluntarios},grupo,imagenes:{}});document.querySelector('#hojas').append(resultado.lienzo);</script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Prueba A4 adaptable</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #f4eff6; font-family: system-ui; }
+    .hojas { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 24px; max-width: 1220px; margin: auto; }
+    figure { margin: 0; }
+    figcaption { margin-bottom: 10px; color: #542064; font-weight: 700; }
+    canvas { display: block; width: 100%; height: auto; background: white; box-shadow: 0 12px 34px #44205022; }
+  </style>
+</head>
+<body>
+  <main class="hojas" id="hojas"></main>
+  <script type="module">
+    import { crearLienzoA4 } from '../../js/imagen/a4.js'
+
+    const nombresParticipantes = ['Ángel', 'Fabi', 'Gonzalo S.', 'Juan', 'Santiago', 'Sofi', 'Lucas', 'Agustín', 'Ezequiel', 'Gaia', 'Julián', 'Luan', 'Maxi', 'Nicolás', 'Samu']
+    const nombresReferentes = ['Pato', 'Majo', 'Ruben', 'Cris', 'Dalma', 'Noha', 'Juli', 'Rena']
+    const participantes = nombresParticipantes.map((nombre, i) => ({ id: `p${i + 1}`, nombre, grupo: i < 7 ? 1 : 2, activo: true, foto: null }))
+    const voluntarios = nombresReferentes.map((nombre, i) => ({ id: `v${i + 1}`, nombre, activo: true, foto: null }))
+    const roster = { participantes, voluntarios }
+    const lista = {
+      fecha: '2026-09-05', hora: '11:00', lugar: 'Tres Cruces',
+      opcionesImagen: { formato: 'retratos', fotos: true, compacto: false },
+    }
+    const grupos = [
+      {
+        numero: 1, cancha: 'Cancha 1', titulo: 'Grupo 1', subtitulo: '10 a 17 años', apoyo: [],
+        filas: [
+          { participantes: ['p1'], voluntarios: ['v1'] },
+          { participantes: ['p2'], voluntarios: ['v1'] },
+          { participantes: ['p3'], voluntarios: ['v2'] },
+          { participantes: ['p4'], voluntarios: ['v2'] },
+          { participantes: ['p5'], voluntarios: [] },
+          { participantes: ['p6'], voluntarios: ['v3'] },
+          { participantes: ['p7'], voluntarios: ['v3'] },
+        ],
+      },
+      {
+        numero: 2, cancha: 'Cancha 2', titulo: 'Grupo 2', subtitulo: '5 a 9 años', apoyo: [],
+        filas: participantes.map((persona, i) => ({
+          participantes: [persona.id],
+          voluntarios: i < 3 ? ['v4'] : i < 6 ? ['v5'] : i < 9 ? ['v6'] : i < 12 ? ['v7'] : i < 14 ? ['v8'] : [],
+        })),
+      },
+    ]
+
+    grupos.forEach((grupo) => {
+      const { lienzo } = crearLienzoA4({ lista, roster, grupo, imagenes: {} })
+      const figura = document.createElement('figure')
+      const titulo = document.createElement('figcaption')
+      titulo.textContent = `${grupo.cancha}: ${grupo.filas.length} participantes`
+      figura.append(titulo, lienzo)
+      document.querySelector('#hojas').append(figura)
+    })
+  </script>
+</body>
+</html>

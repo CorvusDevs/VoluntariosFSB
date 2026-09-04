@@ -34,6 +34,8 @@ describe('composición para WhatsApp', () => {
     ])
     expect(composicion.paneles[1].anchoAsignado).toBeGreaterThan(composicion.paneles[0].anchoAsignado)
     expect(composicion.paneles[0].escala).toBe(composicion.paneles[1].escala)
+    expect(composicion.paneles[0].slotX + composicion.paneles[0].anchoAsignado + 24)
+      .toBe(composicion.paneles[1].slotX)
     expect(composicion.paneles[0].x + composicion.paneles[0].ancho)
       .toBeLessThan(composicion.paneles[1].x)
   })

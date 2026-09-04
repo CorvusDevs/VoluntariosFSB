@@ -974,6 +974,18 @@ ON permisos_capacidades_cms(
   alcance_tipo,
   alcance_id
 );
+CREATE TABLE IF NOT EXISTS metricas_ayuda_sin_resultados(
+  fecha DATE NOT NULL,
+  consulta VARCHAR(191) NOT NULL CHECK(length(consulta) BETWEEN 3 AND 80),
+  cantidad INT NOT NULL DEFAULT 1 CHECK(cantidad >= 1),
+  actualizado_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY(fecha, consulta)
+);
+CREATE INDEX metricas_ayuda_consulta_fecha
+ON metricas_ayuda_sin_resultados(
+  consulta,
+  fecha
+);
 
 DROP TRIGGER IF EXISTS tareas_cms_registrar_asignacion_insert;
 CREATE TRIGGER tareas_cms_registrar_asignacion_insert BEFORE INSERT ON tareas_cms FOR EACH ROW SET NEW.asignado_en = IF(NEW.responsable_correo IS NULL, NULL, COALESCE(NEW.asignado_en, CURRENT_TIMESTAMP));

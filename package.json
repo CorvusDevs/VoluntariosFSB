@@ -16,6 +16,7 @@
     "publicar:cpanel:simular": "node herramientas/publicar-cpanel-api.mjs --simular",
     "publicar:cpanel:api": "node herramientas/publicar-cpanel-api.mjs",
     "publicar:cpanel:sftp": "node herramientas/publicar-cpanel-sftp.mjs",
+    "publicar:cpanel:paquete": "node herramientas/publicar-cpanel-paquete.mjs",
     "configurar:cpanel:comunicaciones": "node herramientas/configurar-cpanel-comunicaciones.mjs",
     "esquema:cpanel": "node servidor-cpanel/generar-esquema.mjs",
     "iniciar:cpanel": "node app.js",

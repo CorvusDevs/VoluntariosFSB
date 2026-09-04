@@ -83,10 +83,11 @@ describe('hoja A4 por cancha', () => {
     expect(columnasParaA4(6)).toBe(3)
     expect(columnasParaA4(8)).toBe(4)
     expect(columnasParaA4(14)).toBe(5)
+    expect(columnasParaA4(15)).toBe(6)
     expect(columnasParaA4(19)).toBe(6)
   })
 
-  it('diferencia al voluntariado y limita su solapamiento en papel', () => {
+  it('diferencia al voluntariado dentro de bandejas compartidas', () => {
     const plano = maquetarA4({
       ...lista, opcionesImagen: {
         ...lista.opcionesImagen,
@@ -97,8 +98,10 @@ describe('hoja A4 por cancha', () => {
     }, ROSTER, grupo)
     expect(plano.ajustesImpresion.asomoVoluntario).toBe('alto')
     expect(plano.ajustesImpresion.colorVoluntario).toBe('#662D7D')
+    expect(plano.ajustesImpresion.bandejaVoluntariosCompartida).toBe(true)
     expect(plano.ordenes.some((orden) =>
-      orden.tipo === 'rect' && orden.fila === 'p1' && orden.color === '#662D7D')).toBe(true)
+      orden.tipo === 'rect' && String(orden.fila).startsWith('referentes-')
+      && orden.color === '#662D7D')).toBe(true)
   })
 
   it('ubica varios voluntarios en una bandeja sin cubrir la foto participante', () => {
@@ -141,7 +144,7 @@ describe('hoja A4 por cancha', () => {
       && /^Acompaña/.test(o.texto))).toBe(false)
   })
 
-  it('conserva el fondo alineado pero no agrega texto a quien no tiene acompañante', () => {
+  it('conserva una bandeja vacía para quien no tiene acompañante', () => {
     const plano = maquetarA4({
       ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
     }, ROSTER, grupo, medirFalso)
@@ -149,7 +152,7 @@ describe('hoja A4 por cancha', () => {
       && o.tipo === 'texto' && /^Acompaña/.test(o.texto))).toBe(false)
     expect(plano.ordenes.some((o) => o.fila === 'p4'
       && o.tipo === 'texto' && /sin acompañante/i.test(o.texto))).toBe(false)
-    expect(plano.ordenes.some((o) => o.fila === 'p4'
+    expect(plano.ordenes.some((o) => String(o.fila).includes('sin-referente')
       && o.tipo === 'rect' && o.color === '#F3E9F7')).toBe(true)
   })
 
@@ -161,8 +164,8 @@ describe('hoja A4 por cancha', () => {
     const plano = maquetarA4({
       ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
     }, roster, grupo, medirFalso)
-    const uno = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg' && o.fila === 'p1')
-    const dos = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v2.jpg' && o.fila === 'p2')
+    const uno = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
+    const dos = plano.ordenes.find((o) => o.tipo === 'imagen' && o.clave === 'v2.jpg')
     expect(uno.ancho).toBe(dos.ancho)
     expect(uno.alto).toBe(dos.alto)
   })
@@ -174,35 +177,107 @@ describe('hoja A4 por cancha', () => {
       ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
     }, roster, grupo, medirFalso)
     const etiqueta = plano.ordenes.find((o) => o.tipo === 'texto'
-      && o.fila === 'p1' && o.texto.endsWith('…'))
+      && String(o.fila).startsWith('referentes-') && o.texto.endsWith('…'))
     expect(etiqueta).toBeTruthy()
   })
 
   it('aprovecha al menos el 95 por ciento del ancho A4 con catorce participantes', () => {
+    const participantes = Array.from({ length: 14 }, (_, i) => ({
+      id: `px${i}`, nombre: `Persona ${i}`, grupo: 1, foto: `px${i}.jpg`, activo: true, notas: '',
+    }))
     const filas = Array.from({ length: 14 }, (_, i) => ({
-      participantes: [`p${(i % 4) + 1}`],
+      participantes: [`px${i}`],
       voluntarios: i % 3 === 0 ? ['v2', 'v3'] : ['v1'],
     }))
+    const roster = { ...ROSTER, participantes }
     const plano = maquetarA4({
       ...lista, opcionesImagen: {
         ...lista.opcionesImagen,
         formato: 'retratos',
         esquinaVoluntario: 'superpuesto-abajo-derecha',
       },
-    }, ROSTER, { ...grupo, filas }, medirFalso)
-    expect(plano.ajustesImpresion.columnasPorFila).toBe(5)
+    }, roster, { ...grupo, filas }, medirFalso)
+    expect(plano.ajustesImpresion.columnasPorFila).toBeGreaterThanOrEqual(5)
     expect(plano.contenido.ancho).toBe(ANCHO_A4)
     expect(plano.contenido.ancho * plano.escala).toBeGreaterThanOrEqual(ANCHO_A4 * 0.95)
     expect(plano.x).toBeLessThanOrEqual(ANCHO_A4 * 0.025)
   })
 
   it('alinea simétricamente las bandas de cancha y apoyo con la grilla', () => {
+    const participantes = Array.from({ length: 14 }, (_, i) => ({
+      id: `px${i}`, nombre: `Persona ${i}`, grupo: 1, foto: `px${i}.jpg`, activo: true, notas: '',
+    }))
+    const filas = Array.from({ length: 14 }, (_, i) => ({
+      participantes: [`px${i}`],
+      voluntarios: ['v1'],
+    }))
+    const roster = { ...ROSTER, participantes }
     const plano = maquetarA4({
-      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
-    }, ROSTER, grupo, medirFalso)
+      ...lista, opcionesImagen: {
+        ...lista.opcionesImagen,
+        formato: 'retratos',
+        esquinaVoluntario: 'superpuesto-abajo-derecha',
+      },
+    }, roster, { ...grupo, filas }, medirFalso)
     const bandas = plano.ordenes.filter((o) => o.tipo === 'rect'
       && o.x === 56 && o.ancho === ANCHO_A4 - 112)
     expect(bandas.length).toBeGreaterThanOrEqual(2)
+    const fotos = plano.ordenes.filter((o) => o.tipo === 'imagen' && /^px\d/.test(o.clave))
+    expect(Math.min(...fotos.map((o) => o.x))).toBe(56)
+    expect(Math.abs(Math.max(...fotos.map((o) => o.x + o.ancho)) - (ANCHO_A4 - 56))).toBeLessThanOrEqual(4)
+  })
+
+  it('ancla el pie abajo y ocupa todo el alto A4 con un grupo pequeño', () => {
+    const participantes = Array.from({ length: 7 }, (_, i) => ({
+      id: `pe${i}`, nombre: `Persona ${i}`, grupo: 1, foto: `pe${i}.jpg`, activo: true, notas: '',
+    }))
+    const filas = participantes.map((p) => ({ participantes: [p.id], voluntarios: [] }))
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, { ...ROSTER, participantes }, { ...grupo, filas, apoyo: [] }, medirFalso)
+    const pie = plano.ordenes.filter((o) => o.tipo === 'rect' && o.x === 0
+      && o.ancho === ANCHO_A4 && o.color === '#662D7D').at(-1)
+    expect(plano.alto).toBe(ALTO_A4)
+    expect((pie.y + pie.alto) * plano.escala).toBeCloseTo(ALTO_A4, 5)
+  })
+
+  it('centra como bloque la última fila incompleta', () => {
+    const participantes = Array.from({ length: 7 }, (_, i) => ({
+      id: `pc${i}`, nombre: `Persona ${i}`, grupo: 1, foto: `pc${i}.jpg`, activo: true, notas: '',
+    }))
+    const filas = participantes.map((p) => ({ participantes: [p.id], voluntarios: [] }))
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, { ...ROSTER, participantes }, { ...grupo, filas, apoyo: [] }, medirFalso)
+    const fotos = plano.ordenes.filter((o) => o.tipo === 'imagen' && /^pc\d/.test(o.clave))
+    const ultimoY = Math.max(...fotos.map((o) => o.y))
+    const ultima = fotos.filter((o) => o.y === ultimoY).sort((a, b) => a.x - b.x)
+    const margenIzquierdo = ultima[0].x
+    const margenDerecho = ANCHO_A4 - (ultima.at(-1).x + ultima.at(-1).ancho)
+    expect(ultima).toHaveLength(3)
+    expect(Math.abs(margenIzquierdo - margenDerecho)).toBeLessThanOrEqual(1)
+    expect(ultima[1].x - (ultima[0].x + ultima[0].ancho)).toBeLessThan(40)
+  })
+
+  it('comparte un referente y lo centra entre sus participantes', () => {
+    const roster = structuredClone(ROSTER)
+    roster.participantes.find((p) => p.id === 'p1').foto = 'p1.jpg'
+    roster.participantes.find((p) => p.id === 'p2').foto = 'p2.jpg'
+    roster.voluntarios.find((v) => v.id === 'v1').foto = 'v1.jpg'
+    const filas = [
+      { participantes: ['p1'], voluntarios: ['v1'] },
+      { participantes: ['p2'], voluntarios: ['v1'] },
+    ]
+    const plano = maquetarA4({
+      ...lista, opcionesImagen: { ...lista.opcionesImagen, formato: 'retratos' },
+    }, roster, { ...grupo, filas, apoyo: [] }, medirFalso)
+    const participantes = plano.ordenes.filter((o) => o.tipo === 'imagen' && ['p1.jpg', 'p2.jpg'].includes(o.clave))
+    const referentes = plano.ordenes.filter((o) => o.tipo === 'imagen' && o.clave === 'v1.jpg')
+    const centroParticipantes = (Math.min(...participantes.map((o) => o.x))
+      + Math.max(...participantes.map((o) => o.x + o.ancho))) / 2
+    const centroReferente = referentes[0].x + referentes[0].ancho / 2
+    expect(referentes).toHaveLength(1)
+    expect(Math.abs(centroParticipantes - centroReferente)).toBeLessThanOrEqual(1)
   })
 
   it('hereda la opción de ocultar fotos', () => {

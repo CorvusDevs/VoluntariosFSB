@@ -14,7 +14,7 @@ const SERVICIO_KEYCHAIN = 'aletea-cpanel-deploy'
 const ULTIMO_RECIBO = join(RAIZ, '.aletea-publicacion', 'ultimo-recibo.txt')
 
 export function opcionesDesde(argumentos) {
-  const opciones = { simular: false, sinConstruir: false, webRoot: '', recibo: '', forzarTodo: false }
+  const opciones = { simular: false, sinConstruir: false, webRoot: '', recibo: '', forzarTodo: false, filtroAceptacion: '' }
   for (let i = 0; i < argumentos.length; i += 1) {
     const argumento = argumentos[i]
     if (argumento === '--simular') opciones.simular = true
@@ -22,8 +22,14 @@ export function opcionesDesde(argumentos) {
     else if (argumento === '--web-root') opciones.webRoot = argumentos[++i] || ''
     else if (argumento === '--recibo') opciones.recibo = argumentos[++i] || ''
     else if (argumento === '--forzar-todo') opciones.forzarTodo = true
+    else if (argumento === '--filtro-aceptacion') opciones.filtroAceptacion = argumentos[++i] || ''
     else throw new Error(`Opción desconocida: ${argumento}`)
   }
+  if (opciones.filtroAceptacion && (opciones.filtroAceptacion.length < 3 || opciones.filtroAceptacion.length > 120 || opciones.filtroAceptacion.startsWith('-'))) {
+    throw new Error('--filtro-aceptacion debe describir una prueba concreta entre 3 y 120 caracteres.')
+  }
+  if (opciones.forzarTodo && opciones.filtroAceptacion) throw new Error('--forzar-todo no se puede combinar con una validación enfocada.')
+  if (opciones.recibo && opciones.filtroAceptacion) throw new Error('--recibo ya identifica pruebas ejecutadas y no acepta otro filtro.')
   return opciones
 }
 export { rutaRelativaCuenta }
@@ -85,6 +91,54 @@ export async function huellaFuentesPagina(webRoot) {
   return hash.digest('hex')
 }
 
+function normalizarSelloGenerado(relativa, contenido) {
+  if (['version.json', 'js/version.js'].includes(relativa)) return Buffer.from('__SELLO_GENERADO__')
+  if (!['sw.js', 'index.html', 'formulario.html', 'actualizar.html'].includes(relativa)) return contenido
+  const texto = contenido.toString('utf8')
+    .replace(/(VERSION\s*=\s*')[^']*'/g, '$1__BUILD__\'')
+    .replace(/(version\s*=\s*')[^']*'/g, '$1__BUILD__\'')
+    .replace(/([?&]v=)[^"&]+/g, '$1__BUILD__')
+  return Buffer.from(texto)
+}
+
+export async function huellaFuentesGestor(raiz = RAIZ) {
+  const entradasProduccion = [
+    'assets', 'css', 'js',
+    'index.html', 'formulario.html', 'actualizar.html', 'sw.js', 'version.json',
+    'app.js', 'package.json', 'package-lock.json',
+    'functions/api/[[ruta]].js',
+    'servidor-cpanel/app.mjs', 'servidor-cpanel/base-mysql.mjs', 'servidor-cpanel/cache-estaticos.mjs',
+    'servidor-cpanel/cargar-entorno.mjs', 'servidor-cpanel/migraciones.mjs', 'servidor-cpanel/rutas-web.mjs',
+    'servidor-cpanel/procesar-cola-correos.mjs', 'servidor-cpanel/registro-operaciones.mjs',
+    'servidor-cpanel/mantenimiento-sistema.mjs', 'servidor-cpanel/procesar-publicacion.mjs',
+    'servidor-cpanel/ejecutar-trabajo.sh',
+    'herramientas/sellar.sh', 'herramientas/preparar-cloudflare.mjs', 'herramientas/preparar-cpanel.sh',
+    'herramientas/auditar-publicacion.mjs', 'herramientas/publicar-cpanel-api.mjs',
+    'herramientas/publicacion-cpanel-recibo.mjs',
+  ]
+  const archivos = []
+  async function recorrer(carpeta, prefijo = '') {
+    for (const entrada of await readdir(carpeta, { withFileTypes: true })) {
+      if (entrada.name === '.DS_Store') continue
+      const relativa = prefijo ? `${prefijo}/${entrada.name}` : entrada.name
+      const absoluta = join(carpeta, entrada.name)
+      if (entrada.isDirectory()) await recorrer(absoluta, relativa)
+      else if (entrada.isFile()) archivos.push({ absoluta, relativa })
+    }
+  }
+  for (const entrada of entradasProduccion) {
+    const absoluta = join(raiz, entrada)
+    if (!(await existe(absoluta))) continue
+    if ((await stat(absoluta)).isDirectory()) await recorrer(absoluta, entrada)
+    else archivos.push({ absoluta, relativa: entrada })
+  }
+  const hash = createHash('sha256')
+  for (const archivo of archivos.sort((a, b) => a.relativa.localeCompare(b.relativa))) {
+    hash.update(archivo.relativa).update('\0').update(normalizarSelloGenerado(archivo.relativa, await readFile(archivo.absoluta))).update('\0')
+  }
+  return hash.digest('hex')
+}
+
 export function huellaPaginaConContenido(fuentePaginaSha256, contenidoPublicado) {
   return createHash('sha256')
     .update(fuentePaginaSha256)
@@ -111,18 +165,47 @@ async function paginaValidadaAnterior(fuentePaginaSha256) {
   } catch { return null }
 }
 
-export async function prepararPaquetes({ sinConstruir, webRoot, etapa, paginaReutilizada = null }) {
+async function gestorValidadoAnterior(fuenteGestorSha256) {
+  try {
+    const ruta = (await readFile(ULTIMO_RECIBO, 'utf8')).trim()
+    const plan = await planDesdeRecibo(ruta)
+    if (!fuenteGestorSha256 || plan.fuenteGestorSha256 !== fuenteGestorSha256) return null
+    const gestorRoot = plan.paquetes.find((item) => item.clave === 'gestor-root')
+    const gestorDist = plan.paquetes.find((item) => item.clave === 'gestor-dist')
+    return gestorRoot && gestorDist ? { paquetes: [gestorRoot, gestorDist], versionGestor: plan.versionGestor } : null
+  } catch { return null }
+}
+
+export function comandosValidacionWeb(filtroAceptacion = '') {
+  if (!filtroAceptacion) return [
+    ['npm', ['run', 'release:staging']],
+  ]
+  return [
+    ['npm', ['test']],
+    ['npm', ['run', 'test:acceptance', '--', '--grep', filtroAceptacion]],
+    ['npm', ['run', 'build:staging']],
+  ]
+}
+
+export async function prepararPaquetes({ sinConstruir, webRoot, etapa, paginaReutilizada = null, gestorReutilizado = null, filtroAceptacion = '' }) {
   const gestorRoot = join(etapa, 'gestor-root.zip')
   const gestorDist = join(etapa, 'gestor-dist.zip')
   const pagina = join(etapa, 'pagina-prueba.zip')
   const entorno = { ...process.env, SALIDA_CPANEL: gestorRoot }
 
-  if (!sinConstruir) ejecutar('npm', ['test'], { cwd: RAIZ })
-  ejecutar('bash', ['herramientas/preparar-cpanel.sh', ...(sinConstruir ? ['--sin-construir'] : [])], { cwd: RAIZ, env: entorno })
-  comprimirDirectorio(join(RAIZ, 'dist'), gestorDist)
+  if (gestorReutilizado) {
+    await copyFile(gestorReutilizado.paquetes.find((item) => item.clave === 'gestor-root').local, gestorRoot)
+    await copyFile(gestorReutilizado.paquetes.find((item) => item.clave === 'gestor-dist').local, gestorDist)
+  } else {
+    if (!sinConstruir) ejecutar('npm', ['test'], { cwd: RAIZ })
+    ejecutar('bash', ['herramientas/preparar-cpanel.sh', ...(sinConstruir ? ['--sin-construir'] : [])], { cwd: RAIZ, env: entorno })
+    comprimirDirectorio(join(RAIZ, 'dist'), gestorDist)
+  }
 
   if (!sinConstruir && !paginaReutilizada) {
-    ejecutar('npm', ['run', 'release:staging'], { cwd: webRoot, env: { ...process.env, PLAYWRIGHT_PORT: puertoPruebasPublicacion() } })
+    for (const [comando, argumentos] of comandosValidacionWeb(filtroAceptacion)) {
+      ejecutar(comando, argumentos, { cwd: webRoot, env: { ...process.env, PLAYWRIGHT_PORT: puertoPruebasPublicacion() } })
+    }
   }
   if (paginaReutilizada) await copyFile(paginaReutilizada.paquete.local, pagina)
   else {
@@ -130,7 +213,7 @@ export async function prepararPaquetes({ sinConstruir, webRoot, etapa, paginaReu
     comprimirDirectorio(join(webRoot, 'dist'), pagina, ['.htaccess'])
   }
 
-  const versionGestor = JSON.parse(await readFile(join(RAIZ, 'dist', 'version.json'), 'utf8')).version
+  const versionGestor = gestorReutilizado?.versionGestor || JSON.parse(await readFile(join(RAIZ, 'dist', 'version.json'), 'utf8')).version
   const versionPagina = paginaReutilizada?.versionPagina || JSON.parse(await readFile(join(webRoot, 'dist', 'version.json'), 'utf8'))
   return {
     versionGestor,
@@ -271,12 +354,24 @@ async function planPreparado(opciones, webRoot, etapa) {
     return { plan, rutaRecibo: plan.recibo, reutilizado: true }
   }
   if (opciones.sinConstruir) throw new Error('--sin-construir requiere --recibo para publicar exactamente un artefacto ya validado.')
+  const fuenteGestorSha256 = await huellaFuentesGestor()
+  const gestorReutilizado = opciones.forzarTodo ? null : await gestorValidadoAnterior(fuenteGestorSha256)
   const fuentePaginaSha256 = await huellaPublicacionPagina(webRoot)
   const paginaReutilizada = opciones.forzarTodo ? null : await paginaValidadaAnterior(fuentePaginaSha256)
-  const planCrudo = await prepararPaquetes({ sinConstruir: false, webRoot, etapa, paginaReutilizada })
+  const filtroAceptacion = opciones.filtroAceptacion && gestorReutilizado && !paginaReutilizada ? opciones.filtroAceptacion : ''
+  if (opciones.filtroAceptacion && !filtroAceptacion && !paginaReutilizada) {
+    console.log('La huella del gestor cambió o falta un recibo compatible: se escaló automáticamente a validación completa.')
+  }
+  const planCrudo = await prepararPaquetes({
+    sinConstruir: false, webRoot, etapa, paginaReutilizada, gestorReutilizado, filtroAceptacion,
+  })
   const packageLockSha256 = await sha256(join(RAIZ, 'package-lock.json'))
-  const guardado = await guardarRecibo(planCrudo, { packageLockSha256, fuentePaginaSha256 })
+  const validacion = { modo: filtroAceptacion ? 'web-enfocada' : 'completa' }
+  if (filtroAceptacion) validacion.filtro_aceptacion = filtroAceptacion
+  const guardado = await guardarRecibo(planCrudo, { packageLockSha256, fuentePaginaSha256, fuenteGestorSha256, validacion })
   if (paginaReutilizada) console.log('Página sin cambios: se reutilizó el último artefacto validado y se omitieron sus pruebas y construcción.')
+  if (gestorReutilizado) console.log('Gestor sin cambios: se reutilizaron sus artefactos validados y se omitieron sus pruebas y construcción.')
+  if (filtroAceptacion) console.log(`Validación web enfocada: pruebas unitarias, aceptación «${filtroAceptacion}» y construcción completa.`)
   return { plan: await completarMetadatosPlan(guardado.plan), rutaRecibo: guardado.ruta, reutilizado: false }
 }
 
@@ -323,5 +418,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 export const _pruebas = {
   prepararPaquetes, verificarArchivo, obtener, completarMetadatosPlan, comprobarSalidasLocales, planPreparado,
-  huellaFuentesPagina, huellaPublicacionPagina, paginaValidadaAnterior, SERVICIO_KEYCHAIN, CONFIG_LOCAL, ULTIMO_RECIBO,
+  huellaFuentesPagina, huellaFuentesGestor, huellaPublicacionPagina, paginaValidadaAnterior, gestorValidadoAnterior,
+  comandosValidacionWeb, SERVICIO_KEYCHAIN, CONFIG_LOCAL, ULTIMO_RECIBO,
 }

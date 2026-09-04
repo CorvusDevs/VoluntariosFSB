@@ -48,10 +48,15 @@ describe('recibo inmutable de publicación', () => {
 
   it('guarda las tres capas y solo las vuelve a abrir si tamaño, huella y listado coinciden', async () => {
     const { raiz, plan } = await planTemporal()
-    const guardado = await guardarRecibo(plan, { directorio: join(raiz, 'artefactos'), packageLockSha256: 'a'.repeat(64) })
+    const guardado = await guardarRecibo(plan, {
+      directorio: join(raiz, 'artefactos'), packageLockSha256: 'a'.repeat(64),
+      fuenteGestorSha256: 'c'.repeat(64), validacion: { modo: 'web-enfocada', filtro_aceptacion: 'recorrido electoral' },
+    })
     const recuperado = await planDesdeRecibo(guardado.ruta)
     expect(recuperado.versionGestor).toBe(plan.versionGestor)
     expect(recuperado.packageLockSha256).toBe('a'.repeat(64))
+    expect(recuperado.fuenteGestorSha256).toBe('c'.repeat(64))
+    expect(recuperado.validacion).toEqual({ modo: 'web-enfocada', filtro_aceptacion: 'recorrido electoral' })
     expect(recuperado.paquetes.map((paquete) => paquete.clave).sort()).toEqual(['gestor-dist', 'gestor-root', 'pagina-prueba'])
     expect(recuperado.paquetes.every((paquete) => paquete.entradas.includes('version.json'))).toBe(true)
     expect(recuperado.paquetes.every((paquete) => /^[a-f0-9]{64}$/.test(paquete.contenidoSha256))).toBe(true)
@@ -69,7 +74,9 @@ describe('recibo inmutable de publicación', () => {
 
   it('bloquea un artefacto modificado después de la simulación', async () => {
     const { raiz, plan } = await planTemporal()
-    const guardado = await guardarRecibo(plan, { directorio: join(raiz, 'artefactos'), packageLockSha256: 'b'.repeat(64) })
+    const guardado = await guardarRecibo(plan, {
+      directorio: join(raiz, 'artefactos'), packageLockSha256: 'b'.repeat(64), fuenteGestorSha256: 'd'.repeat(64),
+    })
     await appendFile(guardado.plan.paquetes[0].local, 'alterado')
     await expect(planDesdeRecibo(guardado.ruta)).rejects.toThrow(/tamaño|SHA-256/)
   })

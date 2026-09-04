@@ -46,8 +46,10 @@
     const medirTexto = (texto, fuente) => { medida.font = fuente; return medida.measureText(texto).width }
     const logo = new Image()
     logo.src = '../../assets/logo-aletea.png'
-    await logo.decode()
-    const { lienzo } = crearLienzoWhatsApp({ lista, roster, imagenes: { logo }, medirTexto })
+    const logoColor = new Image()
+    logoColor.src = '../../assets/logo-aletea-violeta.png'
+    await Promise.all([logo.decode(), logoColor.decode()])
+    const { lienzo } = crearLienzoWhatsApp({ lista, roster, imagenes: { logo, logoColor }, medirTexto })
     document.getElementById('resultado').append(lienzo)
   </script>
 </body>

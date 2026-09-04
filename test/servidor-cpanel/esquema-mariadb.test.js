@@ -3,10 +3,10 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 describe('esquema MariaDB para cPanel', () => {
-  it('se regenera desde las 60 migraciones y contiene el modelo completo', () => {
+  it('se regenera desde las 61 migraciones y contiene el modelo completo', () => {
     execFileSync(process.execPath, ['servidor-cpanel/generar-esquema.mjs'])
     const esquema = readFileSync('servidor-cpanel/esquema-mariadb.sql', 'utf8')
-    expect(esquema.match(/^CREATE TABLE/gm)).toHaveLength(55)
+    expect(esquema.match(/^CREATE TABLE/gm)).toHaveLength(56)
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS usuarios')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS intentos_ingreso_cms')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS historial_entradas_cms')
@@ -17,6 +17,7 @@ describe('esquema MariaDB para cPanel', () => {
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS metricas_web_diarias')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS metricas_web_paginas_diarias')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS metricas_web_acciones_diarias')
+    expect(esquema).toContain('CREATE TABLE IF NOT EXISTS metricas_ayuda_sin_resultados')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS cuentas_fsb')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS movimientos_fsb')
     expect(esquema).toContain('CREATE TABLE IF NOT EXISTS compromisos_pago_fsb')

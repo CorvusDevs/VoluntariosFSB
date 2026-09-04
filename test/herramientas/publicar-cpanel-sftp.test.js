@@ -37,6 +37,39 @@ describe('publicación SFTP de cPanel', () => {
     expect(_pruebas.requiereRespaldo('version.json')).toBe(true)
   })
 
+  it('sube solamente archivos nuevos o modificados y conserva las versiones inmutables', async () => {
+    const raiz = await mkdtemp(join(tmpdir(), 'aletea-sftp-diferencial-test-'))
+    const carpeta = join(raiz, 'nueva')
+    const respaldo = join(raiz, 'anterior')
+    await mkdir(join(carpeta, 'release', 'v2'), { recursive: true })
+    await mkdir(respaldo, { recursive: true })
+    await writeFile(join(carpeta, 'igual.txt'), 'igual')
+    await writeFile(join(respaldo, 'igual.txt'), 'igual')
+    await writeFile(join(carpeta, 'cambio.txt'), 'nuevo')
+    await writeFile(join(respaldo, 'cambio.txt'), 'anterior')
+    await writeFile(join(carpeta, 'nuevo.txt'), 'nuevo')
+    await writeFile(join(carpeta, 'release', 'v2', 'app.js'), 'inmutable')
+    const capas = [{ carpeta, respaldo, archivos: ['cambio.txt', 'igual.txt', 'nuevo.txt', 'release/v2/app.js'] }]
+
+    expect(await _pruebas.limitarAArchivosCambiados(capas)).toEqual({ total: 4, cambiados: 3, omitidos: 1 })
+    expect(capas[0].archivosPublicacion).toEqual(['cambio.txt', 'nuevo.txt', 'release/v2/app.js'])
+  })
+
+  it('usa un manifiesto privado para decidir cambios antes de descargar respaldos', async () => {
+    const raiz = await mkdtemp(join(tmpdir(), 'aletea-sftp-manifiesto-test-'))
+    const carpeta = join(raiz, 'nueva')
+    await mkdir(carpeta)
+    await writeFile(join(carpeta, 'igual.txt'), 'igual')
+    await writeFile(join(carpeta, 'cambio.txt'), 'nuevo')
+    const capas = [{ clave: 'gestor-root', carpeta, archivos: ['cambio.txt', 'igual.txt'] }]
+    const actual = await _pruebas.crearManifiesto(capas)
+    const anterior = structuredClone(actual)
+    anterior.archivos['gestor-root']['cambio.txt'] = 'huella-anterior'
+
+    expect(await _pruebas.limitarAArchivosCambiados(capas, anterior)).toEqual({ total: 2, cambiados: 1, omitidos: 1 })
+    expect(capas[0].archivosPublicacion).toEqual(['cambio.txt'])
+  })
+
   it('solo solicita dependencias cuando cambió el archivo de bloqueo', async () => {
     const raiz = await mkdtemp(join(tmpdir(), 'aletea-deps-test-'))
     const carpeta = join(raiz, 'nueva')

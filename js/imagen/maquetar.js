@@ -71,7 +71,12 @@ export function maquetar(lista, roster, opciones = {}) {
   // adentro para que la geometria salga con la separacion normal.
   const retratos = medidasRetratos({
     margen: base.margen, columnas: columnasGrilla,
-    esquina: formato === 'retratos-nombre' ? ESQUINA_POR_DEFECTO : esquinaVoluntario,
+    // La bandeja integrada coloca a los voluntarios debajo y no sobresale hacia
+    // los costados. Usar aqui la esquina superpuesta reservaba ancho fantasma y
+    // empujaba la ultima foto 40 px mas alla de las bandas del A4.
+    esquina: formato === 'retratos-nombre' || ajustesImpresion.bandejaVoluntariosIntegrada
+      || ajustesImpresion.bandejaVoluntariosCompartida
+      ? ESQUINA_POR_DEFECTO : esquinaVoluntario,
     tamano: tamanoVoluntario, asomo: asomoVoluntario,
     anchoLienzo: ajustesImpresion.anchoLienzo,
   })
@@ -84,12 +89,25 @@ export function maquetar(lista, roster, opciones = {}) {
     colorVoluntario: ajustesImpresion.colorVoluntario,
     bandejaVoluntariosMultiples: ajustesImpresion.bandejaVoluntariosMultiples,
     bandejaVoluntariosIntegrada: ajustesImpresion.bandejaVoluntariosIntegrada,
+    bandejaVoluntariosCompartida: ajustesImpresion.bandejaVoluntariosCompartida,
+    centrarRenglonComoBloque: ajustesImpresion.centrarRenglonComoBloque,
+    centrarCuerpoVerticalmente: ajustesImpresion.centrarCuerpoVerticalmente,
+    anclarPieAbajo: ajustesImpresion.anclarPieAbajo,
+    distribuirRenglonesVerticalmente: Boolean(
+      ajustesImpresion.distribuirRenglonesVerticalmente
+      && lista.grupos.length === 1
+      && !lista.grupos[0]?.apoyo?.length
+      && !(lista.opcionesImagen?.saludo && saludo.trim())
+      && !(lista.opcionesImagen?.despedida && despedida.trim())
+    ),
+    altoLienzo: ajustesImpresion.altoLienzo,
   }
 
   const ordenes = []
   let y = 0
 
   y = bandaSuperior(ordenes, lista, m, y, medirTexto)
+  const indiceContenidoPrincipal = ordenes.length
 
   if (lista.opcionesImagen?.saludo && saludo.trim()) {
     y = parrafo(ordenes, saludo, m, y, medirTexto)
@@ -114,7 +132,16 @@ export function maquetar(lista, roster, opciones = {}) {
   }
 
   y += m.margen / 2
-  const alto = y + m.altoBandaInferior
+  const altoNatural = y + m.altoBandaInferior
+  const altoObjetivo = Number(m.altoLienzo)
+  if (Number.isFinite(altoObjetivo) && altoObjetivo > altoNatural) {
+    const espacioLibre = altoObjetivo - altoNatural
+    if (m.centrarCuerpoVerticalmente) {
+      desplazarOrdenesVerticalmente(ordenes, indiceContenidoPrincipal, espacioLibre / 2)
+    }
+    if (m.centrarCuerpoVerticalmente || m.anclarPieAbajo) y += espacioLibre
+  }
+  const alto = Number.isFinite(altoObjetivo) ? Math.max(altoObjetivo, y + m.altoBandaInferior) : y + m.altoBandaInferior
   bandaInferior(ordenes, m, y, alto, medirTexto)
 
   const bordeDerecho = ordenes.reduce((maximo, o) => {
@@ -139,6 +166,14 @@ export function maquetar(lista, roster, opciones = {}) {
     recorteProbable: relacion > RELACION_RECORTE,
     bordeDerecho, desborde: bordeDerecho > m.ancho - m.margen,
   }
+}
+
+function desplazarOrdenesVerticalmente(ordenes, desde, desplazamiento) {
+  ordenes.slice(desde).forEach((orden) => {
+    if (Number.isFinite(orden.y)) orden.y += desplazamiento
+    if (Number.isFinite(orden.y1)) orden.y1 += desplazamiento
+    if (Number.isFinite(orden.y2)) orden.y2 += desplazamiento
+  })
 }
 
 function indexar(roster) {
@@ -454,12 +489,64 @@ function posicionEnRenglon(indice, cantidadTotal, columnas) {
   return { renglon: extras + Math.floor(desdeCorte / base), columna: desdeCorte % base, cantidad: base }
 }
 
-function xDeCeldaEnRenglon(indice, cantidadTotal, columnas, anchoCelda, separacion, margen, anchoLienzo) {
-  const { columna, cantidad } = posicionEnRenglon(indice, cantidadTotal, columnas)
+function posicionesAgrupadasPorReferente(filas, columnas) {
+  const bloques = []
+  const porFirma = new Map()
+  filas.forEach((fila, indice) => {
+    const voluntarios = [...new Set(fila.voluntarios ?? [])].sort()
+    const firma = voluntarios.length ? voluntarios.join('|') : `sin-referente-${indice}`
+    let bloque = porFirma.get(firma)
+    if (!bloque) {
+      bloque = []
+      porFirma.set(firma, bloque)
+      bloques.push(bloque)
+    }
+    bloque.push(indice)
+  })
+
+  const renglones = []
+  let actual = []
+  const cerrar = () => {
+    if (actual.length) renglones.push(actual)
+    actual = []
+  }
+  bloques.forEach((bloqueOriginal) => {
+    let bloque = [...bloqueOriginal]
+    while (bloque.length > columnas) {
+      cerrar()
+      renglones.push(bloque.splice(0, columnas))
+    }
+    if (actual.length && actual.length + bloque.length > columnas) cerrar()
+    actual.push(...bloque)
+  })
+  cerrar()
+
+  const posiciones = Array(filas.length)
+  renglones.forEach((indices, renglon) => {
+    indices.forEach((indice, columna) => {
+      posiciones[indice] = { renglon, columna, cantidad: indices.length }
+    })
+  })
+  return posiciones
+}
+
+function xDeCeldaEnPosicion(posicion, columnas, anchoCelda, separacion, margen, anchoLienzo, centrarComoBloque = false) {
+  const { columna, cantidad } = posicion
   if (cantidad === columnas) return margen + columna * (anchoCelda + separacion)
   if (cantidad === 1) return Math.round((anchoLienzo - anchoCelda) / 2)
+  if (centrarComoBloque) {
+    const anchoBloque = cantidad * anchoCelda + (cantidad - 1) * separacion
+    return Math.round((anchoLienzo - anchoBloque) / 2 + columna * (anchoCelda + separacion))
+  }
   const espacio = (anchoLienzo - margen * 2 - anchoCelda * cantidad) / (cantidad - 1)
   return Math.round(margen + columna * (anchoCelda + espacio))
+}
+
+function xDeCeldaEnRenglon(indice, cantidadTotal, columnas, anchoCelda, separacion, margen, anchoLienzo) {
+  return xDeCeldaEnPosicion(
+    posicionEnRenglon(indice, cantidadTotal, columnas),
+    columnas, anchoCelda, separacion, margen, anchoLienzo,
+  )
 }
 
 function cuerpoEnGrilla(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
@@ -630,8 +717,17 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
   // El sobresalido se reserva por renglon y solo donde de verdad hay medallones.
   // Reservarlo siempre dejaba 76 px muertos en cada renglon: en una planilla de
   // 18 chicos con un solo acompañante eran 304 px, el 16% del alto de la imagen.
-  const renglonDe = (i) => posicionEnRenglon(i, grupo.filas.length, columnas).renglon
+  const posiciones = m.bandejaVoluntariosCompartida
+    ? posicionesAgrupadasPorReferente(grupo.filas, columnas)
+    : grupo.filas.map((_, i) => posicionEnRenglon(i, grupo.filas.length, columnas))
+  const renglonDe = (i) => posiciones[i].renglon
   const extraDeFila = (fila) => {
+    if (m.bandejaVoluntariosCompartida) {
+      // En A4 cada participante conserva una zona de acompañamiento reconocible.
+      // Si no tiene referente, queda la bandeja tenue vacía en lugar de cambiar
+      // la estructura visual de esa tarjeta.
+      return altoDeBandeja(Math.max(1, new Set(fila.voluntarios).size)) + 6
+    }
     if (!superpuesto) return 0
     if (fila.voluntarios.length === 0 && !m.bandejaVoluntariosIntegrada) return 0
     if (m.bandejaVoluntariosIntegrada || (m.bandejaVoluntariosMultiples && fila.voluntarios.length > 1)) {
@@ -645,18 +741,36 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     return acc
   }, [])
   const extraEn = (i) => extraEnRenglon[renglonDe(i)] ?? 0
+  const indicesVisuales = posiciones.map((_, indice) => indice).sort((a, b) =>
+    posiciones[a].renglon - posiciones[b].renglon || posiciones[a].columna - posiciones[b].columna)
 
-  let cursor = y
-  grupo.filas.forEach((fila, i) => {
-    const { renglon } = posicionEnRenglon(i, grupo.filas.length, columnas)
-    const x = xDeCeldaEnRenglon(i, grupo.filas.length, columnas, ancho, separacion, m.margen, m.ancho)
+  const renglonesVisuales = [...new Set(indicesVisuales.map((i) => posiciones[i].renglon))]
+  const altoNaturalDelCuerpo = renglonesVisuales.reduce(
+    (total, renglon) => total + alto + (extraEnRenglon[renglon] ?? 0), 0,
+  ) + Math.max(0, renglonesVisuales.length - 1) * m.espacioBajoTitulo
+  const limiteDelCuerpo = Number(m.altoLienzo) - m.altoBandaInferior - m.margen / 2
+  const sobranteVertical = m.distribuirRenglonesVerticalmente && Number.isFinite(limiteDelCuerpo)
+    ? Math.max(0, limiteDelCuerpo - y - altoNaturalDelCuerpo)
+    : 0
+  // El sobrante se reparte en huecos iguales antes, entre y después de las
+  // filas. El pie conserva así su altura normal y la hoja respira de forma
+  // uniforme sin convertir el espacio libre en una banda de color.
+  const aireVertical = sobranteVertical / Math.max(1, renglonesVisuales.length + 1)
+  let cursor = y + aireVertical
+  indicesVisuales.forEach((i, indiceVisual) => {
+    const fila = grupo.filas[i]
+    const posicion = posiciones[i]
+    const { renglon } = posicion
+    const x = xDeCeldaEnPosicion(
+      posicion, columnas, ancho, separacion, m.margen, m.ancho, m.centrarRenglonComoBloque,
+    )
     const extraFila = extraEn(i)
     const clave = fila.participantes[0]
     const participantes = fila.participantes.map((id) => buscar(porId, id))
     if (participantes.length === 0) throw new Error('Una fila no tiene ningun participante')
     const voluntarios = fila.voluntarios.map((id) => buscar(porId, id))
-    const usaBandeja = Boolean(m.bandejaVoluntariosIntegrada
-      || (voluntarios.length > 1 && m.bandejaVoluntariosMultiples))
+    const usaBandeja = Boolean(!m.bandejaVoluntariosCompartida && (m.bandejaVoluntariosIntegrada
+      || (voluntarios.length > 1 && m.bandejaVoluntariosMultiples)))
     // Superpuesto arriba, la celda baja para dejarle lugar al medallon que asoma por
     // encima. Superpuesto abajo, lo que asoma cae por debajo y la celda no se mueve.
     const arriba = cursor + (superpuesto && !abajo && !usaBandeja ? extraFila : 0)
@@ -664,7 +778,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // El hueco solo existe si esta fila tiene a alguien acompañando y el medallon
     // va abajo. Reservarlo siempre dejaba a los chicos sin voluntario con el
     // nombre corrido contra el borde, sin nada que lo justificara.
-    const hueco = !usaBandeja && abajo && voluntarios.length > 0
+    const hueco = !m.bandejaVoluntariosCompartida && !usaBandeja && abajo && voluntarios.length > 0
       ? (superpuesto ? anchoMed - asomaLado + inset : anchoMed + inset * 2)
       : 0
     dibujarRetrato(ordenes, {
@@ -695,7 +809,7 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
           m.colorVoluntario ?? color, clave, medirTexto,
           m.abreviar?.voluntario ?? abreviarApellido)
       })
-    } else voluntarios.forEach((voluntario, n) => {
+    } else if (!m.bandejaVoluntariosCompartida) voluntarios.forEach((voluntario, n) => {
       // Superpuesto: pegado al borde de la celda y corrido hacia afuera, arrancando
       // por encima del techo. Apoyado: adentro, separado del borde por el inset.
       const mx = superpuesto
@@ -723,13 +837,86 @@ function cuerpoEnRetratos(ordenes, grupo, porId, m, y, conFotos, medirTexto) {
     // grupos y el margen del titulo siguiente. Sumandolo igual daban 92 px al pie
     // de cada grupo contra 20 entre renglones, que es lo que se veia como un
     // hueco muerto.
-    const ultimo = i === grupo.filas.length - 1
-    const ultimoDelRenglon = ultimo || posicionEnRenglon(i + 1, grupo.filas.length, columnas).renglon !== renglon
+    const ultimo = indiceVisual === indicesVisuales.length - 1
+    const siguiente = indicesVisuales[indiceVisual + 1]
+    const ultimoDelRenglon = ultimo || posiciones[siguiente].renglon !== renglon
     if (ultimoDelRenglon) {
-      cursor += alto + extraFila + (ultimo ? 0 : m.espacioBajoTitulo)
+      if (m.bandejaVoluntariosCompartida) {
+        dibujarBandejasCompartidas({
+          ordenes, grupo, porId, posiciones, renglon, cursor, ancho, alto,
+          separacion, columnas, margen: m.margen, anchoLienzo: m.ancho,
+          color: m.colorVoluntario ?? color, medirTexto,
+          altoDeBandeja, padBandeja, altoEtiquetaBandeja,
+          anchoMedBandeja, altoMedBandeja, separacionBandeja,
+          corto: m.abreviar?.voluntario ?? abreviarApellido,
+          centrarComoBloque: m.centrarRenglonComoBloque,
+        })
+      }
+      cursor += alto + extraFila
+        + (ultimo ? aireVertical : m.espacioBajoTitulo + aireVertical)
     }
   })
   return cursor
+}
+
+function dibujarBandejasCompartidas({
+  ordenes, grupo, porId, posiciones, renglon, cursor, ancho, alto,
+  separacion, columnas, margen, anchoLienzo, color, medirTexto,
+  altoDeBandeja, padBandeja, altoEtiquetaBandeja,
+  anchoMedBandeja, altoMedBandeja, separacionBandeja, corto, centrarComoBloque,
+}) {
+  const porFirma = new Map()
+  grupo.filas.forEach((fila, indice) => {
+    if (posiciones[indice].renglon !== renglon) return
+    const ids = [...new Set(fila.voluntarios)].sort()
+    // Las bandejas sin referente no se fusionan. Cada participante conserva su
+    // propio fondo tenue, mientras que una firma real sí se comparte.
+    const firma = ids.length ? ids.join('|') : `sin-referente-${indice}`
+    const entrada = porFirma.get(firma) ?? { ids, indices: [] }
+    entrada.indices.push(indice)
+    porFirma.set(firma, entrada)
+  })
+
+  porFirma.forEach(({ ids, indices }) => {
+    const xs = indices.map((indice) => xDeCeldaEnPosicion(
+      posiciones[indice], columnas, ancho, separacion, margen, anchoLienzo, centrarComoBloque,
+    ))
+    const x = Math.min(...xs)
+    const derecha = Math.max(...xs) + ancho
+    const anchoBandeja = derecha - x
+    const yBandeja = cursor + alto + 6
+    const altoBandeja = altoDeBandeja(Math.max(1, ids.length))
+    const claveBandeja = ids.length
+      ? `referentes-${renglon}-${ids.join('-')}`
+      : `referentes-${renglon}-sin-referente-${indices[0]}`
+    ordenes.push({
+      tipo: 'rect', x, y: yBandeja, ancho: anchoBandeja, alto: altoBandeja,
+      color: COLORES.violetaTenue, radio: 12, fila: claveBandeja,
+    })
+    const voluntarios = ids.map((id) => buscar(porId, id))
+    const anchoDisponible = anchoBandeja - padBandeja * 2
+    const anchoMedActual = Math.min(
+      anchoMedBandeja,
+      Math.floor((anchoDisponible - separacionBandeja) / 2),
+    )
+    const altoMedActual = Math.round(anchoMedActual * 1.36)
+    voluntarios.forEach((voluntario, n) => {
+      const renglonBandeja = Math.floor(n / 2)
+      const columna = n % 2
+      const cantidadEnRenglon = Math.min(2, voluntarios.length - renglonBandeja * 2)
+      const anchoRenglon = cantidadEnRenglon * anchoMedActual
+        + Math.max(0, cantidadEnRenglon - 1) * separacionBandeja
+      const inicio = x + (anchoBandeja - anchoRenglon) / 2
+      medallonDeVoluntario(
+        ordenes, voluntario,
+        inicio + columna * (anchoMedActual + separacionBandeja),
+        yBandeja + padBandeja + altoEtiquetaBandeja
+          + renglonBandeja * (altoMedActual + separacionBandeja),
+        anchoMedActual, Math.min(altoMedBandeja, altoMedActual),
+        color, claveBandeja, medirTexto, corto,
+      )
+    })
+  })
 }
 
 // La celda de Retratos: la foto ocupa todo y el nombre del chico va adentro, al

@@ -33,7 +33,7 @@ describe('migraciones incrementales de MariaDB', () => {
     expect(alteraciones).toHaveLength(11)
     expect(alteraciones.some((sql) => sql.includes('cumplida_en'))).toBe(false)
     expect(alteraciones.some((sql) => sql.includes('usuarios ADD COLUMN acceso_hasta'))).toBe(true)
-    expect(conexion.commit).toHaveBeenCalledTimes(11)
+    expect(conexion.commit).toHaveBeenCalledTimes(12)
     expect(conexion.execute.mock.calls.some(([sql]) => sql.includes('INSERT INTO migraciones_cms'))).toBe(true)
     const crearHistorial = conexion.query.mock.calls.map(([sql]) => sql).find((sql) => sql.includes('CREATE TABLE IF NOT EXISTS historial_entradas_cms'))
     expect(crearHistorial).toContain('id VARCHAR(191) PRIMARY KEY')
@@ -55,12 +55,13 @@ describe('migraciones incrementales de MariaDB', () => {
     expect(conexion.query.mock.calls.some(([sql]) => sql.includes("'unidad-gwp', 'gwp'"))).toBe(true)
     expect(conexion.query.mock.calls.some(([sql]) => sql.includes("'unidad-adultos-autistas', 'adultos_autistas', 'Adultos autistas'"))).toBe(true)
     expect(conexion.query.mock.calls.some(([sql]) => sql.includes('CREATE TABLE IF NOT EXISTS permisos_capacidades_cms'))).toBe(true)
+    expect(conexion.query.mock.calls.some(([sql]) => sql.includes('CREATE TABLE IF NOT EXISTS metricas_ayuda_sin_resultados'))).toBe(true)
     expect(conexion.query.mock.calls.filter(([sql]) => sql.includes("SET unidad_id = 'unidad-daea'"))).toHaveLength(6)
     expect(conexion.release).toHaveBeenCalledOnce()
   })
 
   it('no repite una migración ya aplicada', async () => {
-    const { base, conexion } = baseFalsa({ aplicadas: ['0052_cumplimientos_formularios_cms', '0053_unidades_operativas_cms', '0054_vigencia_cuentas', '0055_comunicaciones_newsletters', '0056_operaciones_sistema', '0057_ajuste_unidades_feedback', '0058_configuracion_publica_formularios', '0059_permisos_capacidades_cms', '0060_unidad_adultos_autistas', '0061_contenido_web_secciones_separadas', '0062_recuperar_redes_web_del_historial'] })
+    const { base, conexion } = baseFalsa({ aplicadas: ['0052_cumplimientos_formularios_cms', '0053_unidades_operativas_cms', '0054_vigencia_cuentas', '0055_comunicaciones_newsletters', '0056_operaciones_sistema', '0057_ajuste_unidades_feedback', '0058_configuracion_publica_formularios', '0059_permisos_capacidades_cms', '0060_unidad_adultos_autistas', '0061_contenido_web_secciones_separadas', '0062_recuperar_redes_web_del_historial', '0063_metricas_ayuda_sin_resultados'] })
     await aplicarMigracionesMariaDb(base)
     expect(conexion.beginTransaction).not.toHaveBeenCalled()
     expect(conexion.query.mock.calls.some(([sql]) => sql.includes('ADD COLUMN'))).toBe(false)

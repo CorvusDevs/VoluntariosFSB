@@ -1,7 +1,82 @@
-export const VERSION_NOVEDADES = '2.0.9'
+export const VERSION_NOVEDADES = '2.1.2'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.1.2', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Fútbol sin Barreras', 'Planillas A4', 'Impresión'],
+    resumen: ['Espaciado uniforme en A4', 'Referentes compartidos', 'Bandejas consistentes'],
+    descripcion: 'Las hojas por cancha aprovechan el alto completo del papel y muestran una sola vez a cada referente compartido junto a sus participantes.',
+    actualizaciones: [
+      'El encabezado queda arriba, el pie se ancla al borde inferior y el contenido se centra en el espacio disponible.',
+      'Las filas incompletas forman un bloque centrado en lugar de separarse de extremo a extremo.',
+      'El espacio libre se reparte alrededor de las filas y el pie conserva su altura normal.',
+      'Las personas sin acompañante mantienen una bandeja tenue vacía para conservar la estructura visual.',
+    ],
+    adiciones: [
+      'Dos o más participantes con los mismos referentes permanecen juntos y comparten una sola bandeja.',
+      'El retrato del referente queda centrado debajo del grupo de participantes que acompaña.',
+    ],
+    arreglos: [
+      'Las filas sin referente ya no generan rectángulos vacíos.',
+      'El pie ya no queda flotando sobre una zona blanca sin utilizar.',
+      'Un referente compartido ya no se repite una vez por participante dentro del mismo renglón.',
+    ],
+  },
+  {
+    version: '2.1.1', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Ayuda', 'Búsqueda', 'Accesibilidad'],
+    resumen: ['Resultados visibles al escribir', 'Búsqueda tolerante a errores', 'Más respuestas prácticas'],
+    descripcion: 'La ayuda encuentra tareas con palabras cotidianas, variantes y errores breves, y muestra la respuesta útil sin esconderla debajo de los atajos.',
+    actualizaciones: [
+      'Los resultados aparecen inmediatamente debajo del buscador y los atajos se ocultan mientras hay una consulta activa.',
+      'Enter abre la mejor coincidencia y lleva el foco al resultado para que el teclado tenga una respuesta clara.',
+      'El buscador reconoce tildes, singular y plural, términos equivalentes y errores breves sin mezclar temas lejanos.',
+      'Cada resultado explica qué palabra coincidió y resalta el texto relevante.',
+    ],
+    adiciones: [
+      'Las búsquedas sin respuesta se cuentan de forma agregada y anónima para orientar nuevas ayudas, sin guardar cuenta, correo, IP ni recorridos.',
+      'Se agregaron respuestas sobre Centro de control, reuniones, Fútbol sin Barreras, asistencia, privacidad y registro.',
+      'Administración puede ver los temas agregados que todavía no encontraron respuesta.',
+    ],
+    arreglos: [
+      'Buscar Formularios ya no parece no hacer nada aunque existan respuestas.',
+      'Las consultas form, forms y errores como formulairo encuentran primero contenido de formularios.',
+      'Una consulta sin coincidencias ofrece una corrección posible y accesos útiles para continuar.',
+    ],
+  },
+  {
+    version: '2.1.0', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Centro de control', 'Personas', 'Documentos', 'Guardado', 'Navegación móvil'],
+    resumen: ['Tres prioridades al entrar', 'Documentos fáciles de crear', 'Contexto y guardado más claros'],
+    descripcion: 'El gestor prioriza el trabajo cotidiano y conecta la información necesaria sin obligar a recorrer módulos separados.',
+    actualizaciones: [
+      'El inicio responde qué necesita atención hoy y limita la primera bandeja a tres acciones urgentes.',
+      'Prioridad del día se puede minimizar y conserva la preferencia de cada cuenta.',
+      'Agenda y actividad reciente aparecen antes que métricas y paneles de seguimiento.',
+      'En teléfonos, la navegación inferior prioriza Hoy, Tareas y Agenda, y agrupa el resto en Más.',
+      'Las tarjetas conservan una acción principal visible y reúnen las opciones menos frecuentes en Más.',
+      'Crear, programas, proyectos y Biblioteca usan la misma acción Nuevo documento o enlace.',
+    ],
+    adiciones: [
+      'Buscar una persona abre una ficha conectada con equipos, tareas, proyectos, eventos, formularios y documentos visibles dentro del alcance de la cuenta.',
+      'El indicador distingue Guardando, Guardado, Cambios pendientes, Sin conexión y Error al guardar.',
+      'Postergar una alerta ofrece Deshacer sin interrumpir el trabajo con otra confirmación.',
+      'Ayuda explica el nuevo orden diario, las fichas conectadas, los estados de guardado y la navegación móvil.',
+      'Las carpetas de Drive vinculadas a un proyecto se destacan como acceso principal dentro de su seguimiento.',
+    ],
+    arreglos: [
+      'Las acciones secundarias dejan de competir visualmente con Abrir, Resolver, Agregar tarea o Cerrar reunión.',
+      'El Centro de control deja de repetir indicadores y bloques de prioridad antes de la información útil del día.',
+      'Los formularios usan la misma expresión Cambios pendientes que el indicador global.',
+      'Documentos deja de aparecer como un contador sin una acción para agregar el primer elemento.',
+      'Las secciones de un programa dejan de superponerse dentro de Más, la opción activa siempre queda visible y las pantallas angostas usan un selector sin botones cortados.',
+      'Al abrir Documentos, la acción principal cambia a Agregar documento o enlace y deja de ofrecer Crear tarea aquí fuera de contexto.',
+      'Los formularios dejan de ocupar toda la pantalla cuando su contenido es corto, ofrecen Cerrar junto al título y mantienen el pie accesible en pantallas pequeñas.',
+      'Los campos obligatorios se identifican, los formularios nuevos comienzan en Sin cambios y la visibilidad de documentos explica quién puede acceder.',
+      'Al elegir un programa o espacio, el equipo correspondiente se completa automáticamente y evita vínculos institucionales contradictorios.',
+    ],
+  },
   {
     version: '2.0.9', estado: 'Preparada el 2 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Fútbol sin Barreras', 'Planillas', 'Vista previa'],

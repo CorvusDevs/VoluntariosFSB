@@ -9,6 +9,7 @@ import { completarMedicionUX, iniciarMedicionUX } from '../modelo/metricas-ux.js
 import { MENSAJE_ENLACE_INVALIDO, normalizarCampoEnlace } from '../util/enlaces.js'
 
 const SITIO_PRUEBA = 'https://prueba.aletea.org'
+const ORIGEN_SITIO_PRUEBA = new URL(SITIO_PRUEBA).origin
 const SITIO_PRINCIPAL = 'https://aletea.org'
 const BORRADOR_LOCAL_CLAVE = 'aletea:pagina-web:borrador-visual:v1'
 const HISTORIAL_MAXIMO = 30
@@ -83,6 +84,30 @@ const GRUPOS_EDITOR_WEB = Object.freeze([
   { id: 'contenido', titulo: 'Páginas y contenido', ayuda: 'Familias, adultos autistas, actividades, formación, recursos, tienda y materiales publicados.', secciones: ['familias', 'adultos-autistas', 'actividades', 'formacion', 'biblioteca', 'recursos', 'tienda', 'actualidad'] },
   { id: 'participacion', titulo: 'Participación', ayuda: 'Orientación, formas de colaborar y perfiles sociales.', secciones: ['orientacion', 'participacion', 'donaciones', 'contacto', 'redes'] },
   { id: 'ajustes', titulo: 'Ajustes', ayuda: 'Apariencia, calidad, aviso público y reglas de operación.', secciones: ['general', 'apariencia', 'calidad', 'privacidad', 'operacion'] },
+])
+
+// Este catálogo describe la arquitectura que una persona recorre en el sitio
+// público. Varias páginas reutilizan el mismo contenido editorial, por eso se
+// mantienen separadas de SECCIONES_PAGINA_WEB, que sigue siendo el contrato de
+// datos que guarda la API.
+const PAGINAS_EDITOR_WEB = Object.freeze([
+  { id: 'inicio', titulo: 'Inicio', ruta: '/', secciones: ['portada', 'orientacion', 'actividades', 'formacion', 'impacto', 'areas', 'institucion', 'participacion', 'redes'] },
+  { id: 'agenda', titulo: 'Agenda', ruta: '/agenda/', secciones: ['actividades', 'formacion'] },
+  { id: 'actividades', titulo: 'Qué hacemos', ruta: '/actividades/', secciones: ['actividades'] },
+  { id: 'futbol', titulo: 'Fútbol sin Barreras', ruta: '/actividades/futbol-sin-barreras/', secciones: ['actividades'] },
+  { id: 'plastica', titulo: 'Estimulación y plástica', ruta: '/actividades/estimulacion-motriz-plastica/', secciones: ['actividades'] },
+  { id: 'familias', titulo: 'Para familias', ruta: '/familias/', secciones: ['familias'] },
+  { id: 'adultos', titulo: 'Adultos autistas', ruta: '/adultos-autistas/', secciones: ['adultos-autistas'] },
+  { id: 'formacion', titulo: 'Formación', ruta: '/formacion/', secciones: ['formacion'] },
+  { id: 'biblioteca', titulo: 'Biblioteca', ruta: '/biblioteca/', secciones: ['biblioteca', 'recursos'] },
+  { id: 'institucion', titulo: 'Quiénes somos', ruta: '/quienes-somos/', secciones: ['institucion', 'areas'] },
+  { id: 'elecciones', titulo: 'Elecciones', ruta: '/elecciones/', secciones: ['institucion', 'general', 'calidad'] },
+  { id: 'transparencia', titulo: 'Transparencia', ruta: '/transparencia/', secciones: ['institucion', 'general', 'privacidad', 'calidad'] },
+  { id: 'voluntariado', titulo: 'Voluntariado', ruta: '/voluntariado/', secciones: ['participacion', 'contacto'] },
+  { id: 'preguntas', titulo: 'Preguntas frecuentes', ruta: '/preguntas-frecuentes/', secciones: ['contacto', 'general'] },
+  { id: 'contacto', titulo: 'Contacto', ruta: '/contacto/', secciones: ['contacto', 'participacion'] },
+  { id: 'donaciones', titulo: 'Donaciones', ruta: '/donaciones/', secciones: ['donaciones'] },
+  { id: 'privacidad', titulo: 'Privacidad', ruta: '/privacidad/', secciones: ['privacidad', 'operacion'] },
 ])
 
 async function pedir(url, opciones = {}) {
@@ -170,10 +195,11 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
   let indiceHistorial = -1
   let animacionCifrasFrame = 0
   let grupoEditorActivo = 'inicio'
+  let paginaEditorActiva = 'inicio'
   let modoEnfocado = false
-  let mapaAbierto = true
+  let mapaAbierto = false
   let filtroSecciones = 'todas'
-  let anchoInspector = 400
+  let anchoInspector = 360
   let zoomVista = 100
   let ultimaRecuperacionEn = ''
   let medios = []
@@ -202,8 +228,17 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
       dibujar()
     }
   }
+  const mensajeLienzoReal = (evento) => {
+    const iframe = raiz.querySelector('[data-pagina-web-lienzo-real]')
+    if (!iframe || evento.source !== iframe.contentWindow || evento.origin !== new URL(iframe.src).origin || evento.data?.tipo !== 'aletea:editor:seleccionar') return
+    const ruta = String(evento.data.ruta || '')
+    if (!ruta) return
+    const seccion = SECCIONES_PAGINA_WEB.find((item) => item.rutas.some((base) => ruta === base || ruta.startsWith(`${base}.`)))
+    if (seccion) abrirSeccion(seccion.id, { ruta, enfocar: true })
+  }
   window.addEventListener('beforeunload', confirmarSalida)
   window.addEventListener('keydown', atajosEditor)
+  window.addEventListener('message', mensajeLienzoReal)
 
   function guardarRecuperacionLocal() {
     try {
@@ -265,6 +300,30 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
         : raiz.querySelector('[data-pagina-web-editor] input, [data-pagina-web-editor] textarea, [data-pagina-web-editor] select, [data-pagina-web-editor] button')
       control?.focus()
       control?.scrollIntoView?.({ block: 'center', behavior: 'smooth' })
+    })
+  }
+
+  function paginaEditorActual() {
+    return PAGINAS_EDITOR_WEB.find((pagina) => pagina.id === paginaEditorActiva) || null
+  }
+
+  function abrirPaginaEditor(paginaId) {
+    const pagina = PAGINAS_EDITOR_WEB.find((item) => item.id === paginaId)
+    if (!pagina) return
+    paginaEditorActiva = pagina.id
+    const siguiente = pagina.secciones.includes(seccionActiva) ? seccionActiva : pagina.secciones[0]
+    abrirSeccion(siguiente)
+  }
+
+  function cambiarDispositivoVista(dispositivo) {
+    dispositivoVista = dispositivo
+    const marco = raiz.querySelector('[data-pagina-web-preview]')
+    marco?.classList.toggle('pagina-web-preview-movil', dispositivo === 'telefono')
+    marco?.classList.toggle('pagina-web-preview-tablet', dispositivo === 'tablet')
+    raiz.querySelectorAll('[data-pagina-web-dispositivo]').forEach((control) => {
+      const activo = control.dataset.paginaWebDispositivo === dispositivo
+      control.classList.toggle('activa', activo)
+      control.setAttribute('aria-pressed', String(activo))
     })
   }
 
@@ -1586,6 +1645,40 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
   function dibujarVistaPrevia() {
     const marco = raiz.querySelector('[data-pagina-web-preview]')
     if (!marco || !contenido) return
+    const paginaReal = paginaEditorActual()
+    const lienzoRealActivo = Boolean(paginaReal) && (
+      window.location.hostname === 'gestor.aletea.org'
+      || new URLSearchParams(window.location.search).get('lienzo') === 'real'
+    )
+    if (lienzoRealActivo) {
+      marco.classList.add('pagina-web-preview-real')
+      marco.classList.toggle('pagina-web-preview-movil', dispositivoVista === 'telefono')
+      marco.classList.toggle('pagina-web-preview-tablet', dispositivoVista === 'tablet')
+      let iframe = marco.querySelector('[data-pagina-web-lienzo-real]')
+      const rutaEsperada = paginaReal.ruta
+      const origenLienzo = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost'
+        ? 'http://127.0.0.1:4322'
+        : ORIGEN_SITIO_PRUEBA
+      if (!iframe || iframe.dataset.paginaWebRuta !== rutaEsperada) {
+        vaciar(marco)
+        iframe = document.createElement('iframe')
+        iframe.dataset.paginaWebLienzoReal = ''
+        iframe.dataset.paginaWebRuta = rutaEsperada
+        iframe.title = `Editar ${paginaReal.titulo} como se verá en el sitio público`
+        iframe.src = `${origenLienzo}${rutaEsperada}?editor=gestor`
+        iframe.setAttribute('loading', 'eager')
+        marco.appendChild(iframe)
+      }
+      const sincronizar = () => iframe.contentWindow?.postMessage({
+        tipo: 'aletea:editor:contenido',
+        contenido,
+        publicado: publicado || contenido,
+      }, origenLienzo)
+      iframe.addEventListener('load', sincronizar, { once: true })
+      sincronizar()
+      return
+    }
+    marco.classList.remove('pagina-web-preview-real')
     vaciar(marco)
     marco.classList.toggle('pagina-web-preview-movil', dispositivoVista === 'telefono')
     marco.classList.toggle('pagina-web-preview-tablet', dispositivoVista === 'tablet')
@@ -1992,16 +2085,34 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     estado.append(estadoTexto, estadoDetalle)
     const navegacionEditor = elemento('section', ['pagina-web-navegacion-editor'])
     navegacionEditor.setAttribute('aria-label', 'Organización del contenido de la página web')
+    const cabeceraNavegacion = elemento('div', ['pagina-web-navegacion-cabecera'])
+    const identidadNavegacion = elemento('div')
+    identidadNavegacion.append(elemento('span', ['pagina-web-navegacion-sobrelinea'], 'Sitio público'), elemento('strong', [], 'Páginas y secciones'))
+    cabeceraNavegacion.append(
+      identidadNavegacion,
+      elemento('small', [], `${PAGINAS_EDITOR_WEB.length} páginas`),
+    )
+    const paginas = elemento('nav', ['pagina-web-paginas'])
+    paginas.setAttribute('aria-label', 'Páginas del sitio público')
+    const consultaPaginas = busquedaSeccion.trim().toLocaleLowerCase('es')
+    PAGINAS_EDITOR_WEB.filter((pagina) => !consultaPaginas || `${pagina.titulo} ${pagina.ruta}`.toLocaleLowerCase('es').includes(consultaPaginas)).forEach((pagina) => {
+      const control = boton('', () => abrirPaginaEditor(pagina.id))
+      control.dataset.paginaWebPagina = pagina.id
+      control.append(elemento('span', [], pagina.titulo), elemento('small', [], pagina.ruta))
+      if (pagina.id === paginaEditorActiva) { control.classList.add('activa'); control.setAttribute('aria-current', 'page') }
+      paginas.appendChild(control)
+    })
     const grupos = elemento('nav', ['pagina-web-grupos'])
-    grupos.setAttribute('aria-label', 'Subsecciones de Página web')
+    grupos.setAttribute('aria-label', 'Filtrar por tipo de contenido')
     GRUPOS_EDITOR_WEB.forEach((grupo) => {
       const control = boton(grupo.titulo, () => {
+        paginaEditorActiva = ''
         grupoEditorActivo = grupo.id
         if (!grupo.secciones.includes(seccionActiva)) seccionActiva = grupo.secciones[0]
         rutaSeleccionada = ''
         dibujar()
       })
-      if (grupo.id === grupoEditorActivo) { control.classList.add('activa'); control.setAttribute('aria-current', 'true') }
+      if (!paginaEditorActiva && grupo.id === grupoEditorActivo) { control.classList.add('activa'); control.setAttribute('aria-current', 'true') }
       grupos.appendChild(control)
     })
     const buscarSeccion = document.createElement('input')
@@ -2014,9 +2125,13 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     buscarSeccion.setAttribute('aria-label', 'Buscar una sección de la página')
     buscarSeccion.setAttribute('aria-keyshortcuts', 'Meta+K Control+K')
     buscarSeccion.addEventListener('input', () => { busquedaSeccion = buscarSeccion.value; dibujar() })
+    const paginaActual = paginaEditorActual()
     const grupoActual = GRUPOS_EDITOR_WEB.find((grupo) => grupo.id === grupoEditorActivo) || GRUPOS_EDITOR_WEB[0]
     const contextoGrupo = elemento('div', ['pagina-web-grupo-contexto'])
-    contextoGrupo.append(elemento('strong', [], grupoActual.titulo), elemento('span', [], grupoActual.ayuda))
+    contextoGrupo.append(
+      elemento('strong', [], paginaActual?.titulo || grupoActual.titulo),
+      elemento('span', [], paginaActual ? `${paginaActual.ruta} · elegí una sección para editarla` : grupoActual.ayuda),
+    )
     const herramientasMapa = elemento('div', ['pagina-web-mapa-herramientas'])
     const alternarMapa = boton(mapaAbierto ? 'Ocultar mapa' : 'Mostrar mapa', () => { mapaAbierto = !mapaAbierto; dibujar() })
     alternarMapa.setAttribute('aria-expanded', String(mapaAbierto))
@@ -2035,7 +2150,7 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     const seccionesVisibles = SECCIONES_PAGINA_WEB.filter((seccion) => {
       const coincideTexto = consulta
         ? `${seccion.titulo} ${seccion.ayuda}`.toLocaleLowerCase('es').includes(consulta)
-        : grupoActual.secciones.includes(seccion.id)
+        : (paginaActual?.secciones || grupoActual.secciones).includes(seccion.id)
       return coincideTexto && (filtroSecciones === 'todas' || estadoVisualSeccion(seccion) === filtroSecciones)
     })
     seccionesVisibles.forEach((seccion) => {
@@ -2051,36 +2166,44 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     const mapa = elemento('div', ['pagina-web-mapa'])
     mapa.hidden = !mapaAbierto
     mapa.setAttribute('aria-label', 'Mapa visual de las secciones de la página')
-    const trazo = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    trazo.setAttribute('viewBox', '0 0 1000 260'); trazo.setAttribute('preserveAspectRatio', 'none'); trazo.setAttribute('aria-hidden', 'true')
-    trazo.innerHTML = '<defs><linearGradient id="pagina-web-infinito-color" x1="0" x2="1"><stop offset="0" stop-color="#55c9c4"/><stop offset=".48" stop-color="#6b2e83"/><stop offset="1" stop-color="#ed1e79"/></linearGradient></defs><path d="M70 130 C180 12 355 12 500 130 C645 248 820 248 930 130 C820 12 645 12 500 130 C355 248 180 248 70 130"></path>'
-    mapa.appendChild(trazo)
-    SECCIONES_PAGINA_WEB.forEach((seccion, indice) => {
-      const angulo = (Math.PI * 2 * indice) / SECCIONES_PAGINA_WEB.length
-      const seno = Math.sin(angulo); const coseno = Math.cos(angulo); const divisor = 1 + seno * seno
-      const x = 50 + (42 * coseno) / divisor
-      const y = 50 + (37 * seno * coseno) / divisor
-      const nodo = document.createElement('button')
-      nodo.type = 'button'; nodo.className = 'pagina-web-mapa-nodo'; nodo.style.left = `${x}%`; nodo.style.top = `${y}%`
-      nodo.dataset.estado = estadoVisualSeccion(seccion); nodo.dataset.grupo = GRUPOS_EDITOR_WEB.find((grupo) => grupo.secciones.includes(seccion.id))?.id || 'inicio'
-      nodo.setAttribute('aria-label', `${seccion.titulo}: ${nodo.dataset.estado}`); nodo.title = seccion.titulo
-      if (seccion.id === seccionActiva) { nodo.classList.add('activo'); nodo.setAttribute('aria-current', 'page') }
-      nodo.append(elemento('span', ['pagina-web-mapa-punto']), elemento('strong', [], seccion.titulo))
-      nodo.addEventListener('click', () => abrirSeccion(seccion.id))
-      mapa.appendChild(nodo)
-    })
-    navegacionEditor.append(grupos, buscarSeccion, contextoGrupo, herramientasMapa, mapa, selector)
+    if (mapaAbierto) {
+      const trazo = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+      trazo.setAttribute('viewBox', '0 0 1000 260'); trazo.setAttribute('preserveAspectRatio', 'none'); trazo.setAttribute('aria-hidden', 'true')
+      trazo.innerHTML = '<defs><linearGradient id="pagina-web-infinito-color" x1="0" x2="1"><stop offset="0" stop-color="#55c9c4"/><stop offset=".48" stop-color="#6b2e83"/><stop offset="1" stop-color="#ed1e79"/></linearGradient></defs><path d="M70 130 C180 12 355 12 500 130 C645 248 820 248 930 130 C820 12 645 12 500 130 C355 248 180 248 70 130"></path>'
+      mapa.appendChild(trazo)
+      SECCIONES_PAGINA_WEB.forEach((seccion, indice) => {
+        const angulo = (Math.PI * 2 * indice) / SECCIONES_PAGINA_WEB.length
+        const seno = Math.sin(angulo); const coseno = Math.cos(angulo); const divisor = 1 + seno * seno
+        const x = 50 + (42 * coseno) / divisor
+        const y = 50 + (37 * seno * coseno) / divisor
+        const nodo = document.createElement('button')
+        nodo.type = 'button'; nodo.className = 'pagina-web-mapa-nodo'; nodo.style.left = `${x}%`; nodo.style.top = `${y}%`
+        nodo.dataset.estado = estadoVisualSeccion(seccion); nodo.dataset.grupo = GRUPOS_EDITOR_WEB.find((grupo) => grupo.secciones.includes(seccion.id))?.id || 'inicio'
+        nodo.setAttribute('aria-label', `${seccion.titulo}: ${nodo.dataset.estado}`); nodo.title = seccion.titulo
+        if (seccion.id === seccionActiva) { nodo.classList.add('activo'); nodo.setAttribute('aria-current', 'page') }
+        nodo.append(elemento('span', ['pagina-web-mapa-punto']), elemento('strong', [], seccion.titulo))
+        nodo.addEventListener('click', () => abrirSeccion(seccion.id))
+        mapa.appendChild(nodo)
+      })
+    }
+    navegacionEditor.append(cabeceraNavegacion, buscarSeccion, paginas, contextoGrupo, selector, grupos, herramientasMapa, mapa)
     const trabajo = elemento('div', ['pagina-web-trabajo'])
     trabajo.style.setProperty('--pagina-web-inspector-ancho', `${anchoInspector}px`)
     const editor = elemento('section', ['pagina-web-editor']); editor.dataset.paginaWebEditor = ''
     const vista = elemento('aside', ['pagina-web-vista'])
     const vistaCabecera = elemento('div', ['pagina-web-vista-cabecera'])
     const vistaTitulo = elemento('div', ['pagina-web-vista-titulo'])
-    vistaTitulo.append(elemento('strong', [], 'Editá sobre la maqueta'), elemento('small', [], 'Hacé clic sobre un texto y escribí.'))
+    const paginaVista = paginaEditorActual()
+    vistaTitulo.append(
+      elemento('strong', [], paginaVista ? paginaVista.titulo : 'Editá sobre la maqueta'),
+      elemento('small', [], paginaVista ? `${paginaVista.ruta} · ${SECCIONES_PAGINA_WEB.find((item) => item.id === seccionActiva)?.titulo || ''}` : 'Hacé clic sobre un texto y escribí.'),
+    )
+    if (paginaVista) vistaTitulo.appendChild(elemento('span', ['pagina-web-vista-instruccion'], 'Hacé clic sobre un texto y escribí.'))
     vistaCabecera.append(vistaTitulo)
     const modos = elemento('div', ['pagina-web-vista-modos'])
     ;[['escritorio', 'Escritorio'], ['tablet', 'Tablet'], ['telefono', 'Teléfono']].forEach(([id, textoModo]) => {
-      const control = boton(textoModo, () => { dispositivoVista = id; dibujarVistaPrevia(); dibujar() })
+      const control = boton(textoModo, () => cambiarDispositivoVista(id))
+      control.dataset.paginaWebDispositivo = id
       control.classList.toggle('activa', dispositivoVista === id)
       control.setAttribute('aria-pressed', String(dispositivoVista === id))
       modos.appendChild(control)
@@ -2089,6 +2212,11 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
       const completa = boton('Vista completa', (evento) => abrirVistaCompleta(evento.currentTarget))
       completa.dataset.paginaWebAbrirVistaCompleta = ''
       modos.appendChild(completa)
+    }
+    if (paginaVista) {
+      const publicada = elemento('a', ['boton', 'boton-secundario', 'pagina-web-vista-publicada'], 'Ver resultado publicado')
+      publicada.href = `${SITIO_PRUEBA}${paginaVista.ruta}`; publicada.target = '_blank'; publicada.rel = 'noopener noreferrer'
+      modos.appendChild(publicada)
     }
     vistaCabecera.appendChild(modos)
     const zoom = elemento('label', ['pagina-web-vista-zoom'])
@@ -2112,9 +2240,9 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
     }
     const marco = elemento('div', ['pagina-web-preview']); marco.dataset.paginaWebPreview = ''
     vista.append(vistaCabecera, marco)
-    trabajo.append(vista, editor)
+    trabajo.append(navegacionEditor, vista, editor)
     if (!puedeEditar) pantalla.appendChild(elemento('p', ['pagina-web-solo-lectura'], 'Tu perfil puede revisar el contenido, pero no modificarlo.'))
-    pantalla.append(cabecera, transicion, estado, navegacionEditor, trabajo)
+    pantalla.append(cabecera, transicion, estado, trabajo)
     raiz.appendChild(pantalla)
     dibujarEditor(); dibujarVistaPrevia(); dibujarEstadoAcciones()
   }
@@ -2148,6 +2276,10 @@ export function crearPantallaPaginaWeb(raiz, { sesion, alIrA = null }) {
   dibujar()
   cargar()
   return {
-    destruir() { window.removeEventListener('beforeunload', confirmarSalida); window.removeEventListener('keydown', atajosEditor) },
+    destruir() {
+      window.removeEventListener('beforeunload', confirmarSalida)
+      window.removeEventListener('keydown', atajosEditor)
+      window.removeEventListener('message', mensajeLienzoReal)
+    },
   }
 }

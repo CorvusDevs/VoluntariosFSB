@@ -46,7 +46,17 @@ npm run publicar:cpanel:simular -- --web-root "/ruta/local/a/aletea-web"
 
 El recibo queda en `.aletea-publicacion/<sello>/recibo.json`. Esa carpeta es local, está ignorada por Git y no contiene credenciales. El comando informa la ruta exacta que debe usarse para publicar el mismo artefacto sin volver a construir ni repetir la matriz de aceptación.
 
-La página pública tiene además una huella combinada de sus fuentes y del contenido publicado por el CMS. Solo si ninguno cambió, una simulación posterior reutiliza su último ZIP validado y omite sus pruebas y construcción. Un cambio editorial, como activar una red social, invalida automáticamente el paquete anterior. La suite completa, construcción y auditoría del gestor se mantienen porque sí pueden existir cambios allí.
+La página pública tiene además una huella combinada de sus fuentes y del contenido publicado por el CMS. El gestor tiene una huella separada de sus fuentes de producción. Si una capa no cambió desde el último recibo válido, se reutiliza exactamente su ZIP anterior y se omiten sus pruebas y construcción. Un cambio editorial, como activar una red social, invalida automáticamente el paquete de la página.
+
+Para una corrección web pequeña y confinada a una sola sección se puede reducir la matriz de aceptación con un filtro que identifique sus pruebas:
+
+```sh
+npm run publicar:cpanel:simular -- --web-root "/ruta/local/a/aletea-web" --filtro-aceptacion "recorrido electoral"
+```
+
+Este modo siempre ejecuta las pruebas unitarias de la web, las pruebas de aceptación coincidentes y la construcción completa de staging. Solo omite pruebas de aceptación ajenas y la auditoría de enlaces externos. El recibo registra que la validación fue `web-enfocada` y conserva el filtro utilizado.
+
+Usar validación completa, sin filtro, cuando el cambio afecte navegación compartida, estilos globales, accesibilidad transversal, enlaces externos, configuración de Astro o Playwright, dependencias, service worker, contrato del CMS, autenticación, servidor o más de una sección. Ante cualquier duda se usa la validación completa. Si la huella del gestor cambió o todavía no existe un recibo compatible, el comando ignora el modo enfocado y escala automáticamente a la batería completa.
 
 Modificar un ZIP, cambiar su listado o intentar usarlo desde otra carpeta invalida el recibo. `--sin-construir` sin `--recibo` se rechaza para evitar publicar un conjunto que no sea el que pasó las puertas.
 
@@ -55,26 +65,30 @@ Modificar un ZIP, cambiar su listado o intentar usarlo desde otra carpeta invali
 - Conservar el `.htaccess` y la configuración Passenger que ya pertenecen al servidor.
 - Generar el paquete de cPanel únicamente con `npm run empaquetar:cpanel`.
 - El paquete debe tener `version.json`, `index.html`, `js/` y `css/` en su raíz. La auditoría rechaza un ZIP que conserve `dist/` como carpeta superior.
-- La publicación habitual reutiliza el recibo exacto y opera mediante las API de archivos de cPanel:
+- La publicación habitual reutiliza el recibo exacto y envía un solo paquete por SFTP al buzón privado de cPanel:
 
 ```sh
-npm run publicar:cpanel -- --recibo "/ruta/al/proyecto/.aletea-publicacion/<sello>/recibo.json" --web-root "/ruta/local/a/aletea-web"
+npm run publicar:cpanel:paquete -- --recibo "/ruta/al/proyecto/.aletea-publicacion/<sello>/recibo.json" --web-root "/ruta/local/a/aletea-web"
 ```
 
-- El flujo sube un ZIP por capa a un directorio privado, verifica su tamaño, extrae en staging y compara las entradas y el sello con el recibo antes de activar nada.
-- Cada capa se omite cuando su huella determinista de contenido coincide con el último estado confirmado. Esto no depende de fechas u otros metadatos internos del ZIP. El SHA-256 del archivo se conserva para comprobar que el artefacto aprobado no fue alterado. `--forzar-todo` permite un reemplazo completo y explícito cuando se necesita reparar deriva.
+- El paquete exterior contiene las tres capas aprobadas y un manifiesto con tamaños, SHA-256, destinos y listados internos.
+- El archivo se sube primero con nombre temporal. La solicitud solo queda visible después de renombrar tanto el paquete como su marcador de ejecución única.
+- Un Cron por minuto ejecuta `servidor-cpanel/ejecutar-trabajo.sh publicacion`. El trabajador reclama el marcador, verifica todo, extrae en staging y activa localmente en el servidor.
+- El trabajador conserva `.htaccess`, archivos de entorno, migraciones, `node_modules`, temporales y registros. Los destinos están limitados a `gestor.aletea.org`, su `dist` y `prueba.aletea.org`.
+- Antes de confirmar, crea un respaldo privado, reinicia Passenger y exige que las versiones vivas del gestor y la página coincidan. Ante un fallo restaura las capas anteriores.
+- El comando local consulta el recibo privado cada cinco segundos y repite después la verificación completa de hashes y rutas vivas.
 - Los elementos administrados se mueven primero a un respaldo privado y los nuevos se promueven por grupos desde staging. Se conservan los dos respaldos más recientes.
 - Si falla extracción, dependencias, reinicio, hashes o rutas vivas, el comando restaura las capas anteriores y reinicia Passenger con esa versión.
 - `.htaccess` se excluye de las tres capas. El sistema los busca recursivamente y compara la huella de cada archivo activo antes y después, por lo que también detecta un `.htaccess` anidado y revierte cualquier cambio.
-- `package-lock.json` se compara mediante SHA-256. Application Manager solamente instala dependencias cuando esa huella cambia y vuelve a resolverlas si resulta necesario restaurar.
+- `package-lock.json` se compara mediante SHA-256 antes de subir. Un cambio de dependencias se detiene y usa deliberadamente el flujo de recuperación, que puede resolverlas mediante Application Manager.
 - La publicación no descarga ni reemplaza cientos de archivos uno por uno. El estado y los respaldos viven fuera de los documentos públicos, dentro de `.aletea-deploy`.
-- Una falla de limpieza posterior no desactiva una versión ya verificada. Los temporales quedan disponibles para revisión y se retiran en la siguiente ejecución.
+- Los marcadores son de ejecución única. El trabajador elimina el paquete procesado y conserva su recibo y los dos respaldos más recientes.
 - No armar ni corregir los ZIP manualmente. El recibo y el empaquetador aplican la lista permitida y excluyen `.htaccess`, secretos, migraciones y `node_modules`.
 - El Administrador de archivos queda como vía manual de recuperación, no como procedimiento normal.
 - La matriz visual usa dos trabajadores por defecto. Ejecuta todo el comportamiento en escritorio y teléfono de 390 px, y reserva los otros seis tamaños para los casos marcados como responsivos, de accesibilidad y regresión visual. Puede volver temporalmente a un trabajador con `PLAYWRIGHT_WORKERS=1` para diagnosticar una prueba inestable.
-- El flujo API usa `cpanel.aletea.org`, que entrega JSON en `/execute/...` y `/json-api/cpanel`. El hostname `adriana.servidorlinux11.com` se reserva para SFTP y no debe reutilizarse como endpoint API.
+- El flujo API anterior queda disponible como alternativa con `npm run publicar:cpanel:api` cuando el proveedor permita JSON en `/execute/...` y `/json-api/cpanel`. Si la protección frontal devuelve HTML, se usa el paquete único sin degradar a cientos de transferencias.
 
-## 6. Recuperación por SFTP
+## 6. Recuperación archivo por archivo
 
 La ruta anterior se conserva como fallback independiente con clave dedicada, host verificado, respaldo archivo por archivo y rollback automático:
 

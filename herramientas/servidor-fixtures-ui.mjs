@@ -6,9 +6,12 @@ const raiz = resolve(new URL('..', import.meta.url).pathname)
 const puerto = Number(process.argv[2] || 8765)
 const fixtures = new Set([
   '/test/fixtures/cms-overhaul.html',
+  '/test/fixtures/cms-mobile-frame.html',
   '/test/fixtures/formulario-publico.html',
   '/test/fixtures/requisitos-acceso.html',
   '/test/fixtures/novedades-popout.html',
+  '/test/fixtures/ayuda.html',
+  '/test/fixtures/ayuda-mobile-frame.html',
 ])
 const prefijosPublicos = ['/css/', '/js/', '/assets/']
 const tipos = new Map([

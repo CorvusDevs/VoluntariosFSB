@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { agregarRecursoADescripcion, asistirPegadoEnlace, claseEstadoSemantico, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, etiquetaAtajoBusqueda, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
+import { agregarRecursoADescripcion, asistirPegadoEnlace, claseEstadoSemantico, crearPantallaCMS as crearPantallaCMSReal, enlaceWebDesdeTexto, equipoFundacionalCms, etiquetaAtajoBusqueda, fechaHoraHumana, textoAvisoManualTarea, textoResumenManualEquipo } from '../../js/ui/pantalla-cms.js'
 
 // La auditoría conserva una superficie completa para probar todos los flujos.
 // La aplicación real abre esos mismos flujos desde la vista de cada equipo.
@@ -20,6 +20,13 @@ describe('atajo de búsqueda', () => {
     expect(etiquetaAtajoBusqueda({ platform: 'MacIntel' })).toBe('⌘ K')
     expect(etiquetaAtajoBusqueda({ userAgentData: { platform: 'Windows' } })).toBe('Ctrl K')
     expect(etiquetaAtajoBusqueda({ platform: 'Linux x86_64' })).toBe('Ctrl K')
+  })
+})
+
+describe('hora institucional', () => {
+  it('muestra los instantes del servidor en la hora de Uruguay', () => {
+    expect(fechaHoraHumana('2026-09-03T11:04:00Z')).toContain('08:04')
+    expect(fechaHoraHumana('2026-09-02 11:13:00')).toContain('08:13')
   })
 })
 
@@ -84,7 +91,10 @@ beforeEach(() => {
       eventos: [{ id: 'ep1', proyecto_id: 'p1', titulo: 'Jornada abierta', estado: 'planificado', fecha_hora: '2026-08-24T15:00', lugar: 'Sede Aletea', descripcion: 'Actividad de cierre.' }],
       reuniones: [],
       decisiones: [{ id: 'dp1', titulo: 'Priorizar accesibilidad', estado: 'vigente', reunion_titulo: 'Coordinación semanal', responsable_nombre: 'Claudia', motivo: 'Acordado con el equipo.' }],
-      documentos: [{ id: 'doc1', proyecto_id: 'p1', titulo: 'Guía de jornada', tipo: 'guia', sensibilidad: 'interno', descripcion: 'Material para coordinar.' }],
+      documentos: [
+        { id: 'doc-carpeta', proyecto_id: 'p1', titulo: 'Archivos compartidos de Fútbol sin Barreras', tipo: 'enlace', sensibilidad: 'interno', url: 'https://drive.google.com/drive/folders/carpeta-fsb', descripcion: 'Carpeta de trabajo.' },
+        { id: 'doc1', proyecto_id: 'p1', titulo: 'Guía de jornada', tipo: 'guia', sensibilidad: 'interno', descripcion: 'Material para coordinar.' },
+      ],
       riesgos: [], hitos: [{ id: 'h1', proyecto_id: 'p1', titulo: 'Confirmar equipos', descripcion: 'Equipos de trabajo definidos.', fecha_objetivo: '2026-08-20', estado: 'en_marcha', responsable_nombre: 'Claudia' }], gastos: [{ id: 'g1', proyecto_id: 'p1', concepto: 'Traslado', monto: 2250, fecha: '2026-08-15', notas: 'Jornada inaugural.' }],
     }), { status: 200 })
     if (url === '/api/cms/tablero') return new Response(JSON.stringify({
@@ -657,7 +667,12 @@ describe('tablero institucional', () => {
     const panel = raiz.querySelector('.cms-captura-rama')
     expect(panel.textContent).toContain('Interinstitucional')
     expect(panel.textContent).toContain('Trabajo conjunto con otras instituciones y redes.')
-    expect(panel.textContent).toContain('Crear tarea en esta rama')
+    expect(panel.classList.contains('cms-captura-resumen-compacto')).toBe(true)
+    expect(panel.querySelector('[aria-label="Cerrar detalle de Interinstitucional"]')).not.toBeNull()
+    expect(panel.querySelector('.cms-captura-acciones').textContent).not.toContain('Cerrar')
+    expect(panel.querySelector('[aria-label="Crear tarea en Interinstitucional"]')).not.toBeNull()
+    expect([...panel.querySelectorAll('.cms-rama-resumen > span')].every((dato) => !dato.textContent.startsWith('0'))).toBe(true)
+    expect(panel.querySelector('.cms-rama-sin-actividad')).not.toBeNull()
   })
 
   it('muestra unidades propias y vistas transversales sin duplicar su origen', async () => {
@@ -705,6 +720,31 @@ describe('tablero institucional', () => {
     expect(panel.querySelector('[aria-label="Cerrar ficha de Grupo Apoyo Familias"]')).not.toBeNull()
     const tareas = [...raiz.querySelectorAll('.cms-captura-unidad-resumen a')].find((enlace) => enlace.textContent.includes('Ver trabajo de la unidad'))
     expect(tareas.getAttribute('href')).toContain('/tareas?filtro=todas&unidad=uo1')
+  })
+
+  it('abre Documentos desde su contador y crea el primero con la unidad preseleccionada', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'familias' })
+    await esperar()
+    raiz.querySelector('[aria-label="Abrir Grupo Apoyo Familias"]').click()
+    raiz.querySelector('[aria-label="Ver documentos de Grupo Apoyo Familias, 0"]').click()
+    expect(raiz.querySelector('.cms-unidad-contenido').textContent).toContain('Todavía no hay documentos')
+    const panel = raiz.querySelector('.cms-captura-unidad-resumen')
+    const pestanaActiva = panel.querySelector('[role="tab"][aria-selected="true"]')
+    expect(pestanaActiva.textContent).toBe('Documentos (0)')
+    expect(pestanaActiva.closest('.cms-unidad-mas-pestanas-menu')).toBeNull()
+    expect(panel.querySelector('.cms-unidad-mas-pestanas').open).toBe(false)
+    expect(panel.querySelector('.cms-captura-acciones .boton-principal').textContent).toBe('Agregar documento o enlace')
+    expect(panel.querySelector('.cms-captura-acciones').textContent).not.toContain('Crear tarea aquí')
+    expect(panel.querySelector('.cms-unidad-contenido').textContent).not.toContain('Agregar primer documento')
+    ;[...panel.querySelectorAll('button')].find((boton) => boton.textContent === 'Agregar documento o enlace').click()
+    expect(raiz.textContent).toContain('Nuevo documento o enlace')
+    expect(raiz.querySelector('select[aria-label="Programa o espacio del documento"]').value).toBe('uo1')
+    expect(raiz.querySelector('select[aria-label="Equipo del documento"]').value).toBe('e1')
+    expect(raiz.querySelector('.cms-cambios-pendientes').textContent).toBe('Sin cambios')
+    expect(raiz.querySelector('[aria-label="Cerrar Nuevo documento o enlace"]')).not.toBeNull()
+    expect([...raiz.querySelectorAll('.cms-campo-obligatorio')].map((item) => item.textContent)).toEqual(['Obligatorio', 'Obligatorio'])
+    expect(raiz.querySelector('select[aria-label="Quién puede ver el documento"]').textContent).toContain('Sólo administración')
+    expect(raiz.querySelector('.cms-captura-acciones .boton-principal').textContent).toBe('Guardar documento')
   })
 
   it('abre Fútbol sin Barreras desde su unidad sin repetir un módulo separado', async () => {
@@ -793,6 +833,50 @@ describe('tablero institucional', () => {
     expect(resultado).not.toBeNull()
     resultado.click()
     expect(raiz.querySelector('.cms-captura-unidad-resumen').textContent).toContain('Grupo Apoyo Familias')
+  })
+
+  it('abre una ficha conectada desde una persona sin salir del contexto', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    const buscar = raiz.querySelector('input[aria-label="Buscar en Aletea"]')
+    buscar.value = 'Claudia'; buscar.dispatchEvent(new Event('input', { bubbles: true }))
+    ;[...raiz.querySelectorAll('.cms-busqueda-resultado')].find((control) => control.textContent.includes('Persona: Claudia')).click()
+    const ficha = raiz.querySelector('.cms-captura-persona-relacionada')
+    expect(ficha).not.toBeNull()
+    expect(ficha.textContent).toContain('Contexto conectado')
+    expect(ficha.textContent).toContain('Equipos (1)')
+    expect(ficha.textContent).toContain('Tareas (2)')
+    expect(alIrA).not.toHaveBeenCalled()
+  })
+
+  it('prioriza solo tres acciones antes de agenda y actividad reciente', async () => {
+    tareaBloqueadaCms = true
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    expect(raiz.querySelector('h1').textContent).toBe('Qué necesita tu atención hoy')
+    expect(raiz.querySelectorAll('.cms-atencion-hoy-tarjeta').length).toBeLessThanOrEqual(3)
+    const bloques = [...raiz.querySelector('.cms-control-principal').children]
+    expect(bloques[0].classList.contains('cms-atencion-hoy')).toBe(true)
+    expect(bloques[1].classList.contains('cms-proximo-evento')).toBe(true)
+    expect(bloques[2].classList.contains('cms-actividad-reciente')).toBe(true)
+  })
+
+  it('permite minimizar la prioridad del día y recuerda la preferencia', async () => {
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'claudia@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    const prioridad = raiz.querySelector('details.cms-atencion-hoy')
+    const resumen = prioridad.querySelector('summary')
+    expect(prioridad.open).toBe(true)
+    expect(resumen.textContent).toContain('Ocultar')
+    resumen.click()
+    await esperar()
+    expect(prioridad.open).toBe(false)
+    expect(resumen.textContent).toContain('Mostrar')
+    expect(window.localStorage.setItem).toHaveBeenCalledWith(expect.stringContaining('aletea:prioridad-dia:v1:'), 'cerrado')
+    resumen.click()
+    await esperar()
+    expect(prioridad.open).toBe(true)
+    expect(resumen.textContent).toContain('Ocultar')
   })
 
   it('no abre los recientes solamente por enfocar el buscador', async () => {
@@ -1703,23 +1787,46 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Jornada abierta')
     expect(raiz.textContent).toContain('Priorizar accesibilidad')
     expect(raiz.textContent).toContain('Guía de jornada')
+    expect(raiz.textContent).toContain('Carpeta principal del proyecto')
+    expect(raiz.querySelector('a[href="https://drive.google.com/drive/folders/carpeta-fsb"]').textContent).toContain('Abrir carpeta principal')
+  })
+
+  it('incluye Nuevo documento o enlace dentro de Crear', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Nuevo documento o enlace').click()
+    expect(raiz.textContent).toContain('El archivo no se sube al gestor')
   })
 
   it('agrega un documento con enlace y contexto institucional', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
-    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
-    raiz.querySelector('input[aria-label="Título del recurso"]').value = 'Guía de familias'
-    raiz.querySelector('input[aria-label="Enlace del recurso"]').value = 'https://drive.google.com/guia'
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo documento o enlace')).click()
+    raiz.querySelector('input[aria-label="Título del documento o enlace"]').value = 'Guía de familias'
+    raiz.querySelector('input[aria-label="Enlace del documento o recurso"]').value = 'https://drive.google.com/guia'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/documentos')
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Guía de familias', url: 'https://drive.google.com/guia', tipo: 'enlace' })
   })
 
+  it('ofrece Carpeta de Drive sin cambiar el contrato seguro de documentos', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo documento o enlace')).click()
+    const tipo = raiz.querySelector('select[aria-label="Tipo de documento"]')
+    tipo.value = 'carpeta_drive'
+    tipo.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.querySelector('input[aria-label="Título del documento o enlace"]').value).toBe('Carpeta principal de Drive')
+    raiz.querySelector('input[aria-label="Enlace del documento o recurso"]').value = 'https://drive.google.com/drive/folders/proyecto'
+    raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await esperar()
+    const llamadas = globalThis.fetch.mock.calls.filter(([url]) => url === '/api/cms/documentos')
+    expect(JSON.parse(llamadas.at(-1)[1].body)).toMatchObject({ titulo: 'Carpeta principal de Drive', tipo: 'enlace' })
+  })
+
   it('normaliza el dominio simple antes de guardar un documento', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
-    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
-    raiz.querySelector('input[aria-label="Título del recurso"]').value = 'Sitio de prueba'
-    raiz.querySelector('input[aria-label="Enlace del recurso"]').value = 'prueba.aletea.org'
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo documento o enlace')).click()
+    raiz.querySelector('input[aria-label="Título del documento o enlace"]').value = 'Sitio de prueba'
+    raiz.querySelector('input[aria-label="Enlace del documento o recurso"]').value = 'prueba.aletea.org'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/documentos')
     expect(JSON.parse(opciones.body).url).toBe('https://prueba.aletea.org/')
@@ -1727,8 +1834,8 @@ describe('tablero institucional', () => {
 
   it('acepta texto copiado desde Google Drive y confirma el enlace reconocido', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
-    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
-    const entrada = raiz.querySelector('input[aria-label="Enlace del recurso"]')
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo documento o enlace')).click()
+    const entrada = raiz.querySelector('input[aria-label="Enlace del documento o recurso"]')
     const pegado = new Event('paste', { bubbles: true, cancelable: true })
     Object.defineProperty(pegado, 'clipboardData', { value: { getData: () => 'Formulario de inscripciones\nhttps://docs.google.com/spreadsheets/d/1euOvZjE1Sd4CgNvmZckarDWPWmadLRKfrrf30b--gOs?usp=drive_fs' } })
     entrada.dispatchEvent(pegado)
@@ -1742,7 +1849,7 @@ describe('tablero institucional', () => {
   it('ofrece pegar el enlace y explica la alternativa si el navegador bloquea el portapapeles', async () => {
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { readText: vi.fn(async () => { throw new Error('sin permiso') }), writeText: vi.fn(async () => {}) } })
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
-    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Agregar documento')).click()
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo documento o enlace')).click()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Pegar enlace').click()
     await esperar()
     expect(raiz.textContent).toContain('Presioná Ctrl+V en el campo.')
@@ -1813,9 +1920,27 @@ describe('tablero institucional', () => {
     await esperar()
     expect(raiz.textContent).toContain('Coordinación de esta semana')
     expect(raiz.textContent).toContain('Cómo usar este panel')
+    expect(raiz.textContent).not.toContain('Cómo se organizan las tareas')
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === 'Cómo usar este panel').click()
+    expect(raiz.textContent).toContain('Cómo se organizan las tareas')
+    expect(raiz.textContent).toContain('Entendido')
+    ;[...raiz.querySelectorAll('.cms-orientacion button')].find((control) => control.textContent === 'Entendido').click()
+    expect(raiz.textContent).not.toContain('Coordinación de esta semana')
+    expect(raiz.textContent).toContain('? Ayuda del panel')
+    expect(window.localStorage.setItem).toHaveBeenCalledWith('aletea:orientacion-panel:v1:cuenta', 'cerrado')
+    ;[...raiz.querySelectorAll('button')].find((control) => control.textContent === '? Ayuda del panel').click()
+    expect(raiz.textContent).toContain('Cómo se organizan las tareas')
     const indicador = [...raiz.querySelectorAll('.cms-indicador')].find((control) => control.textContent.includes('Atrasadas'))
     indicador.click()
     expect(alIrA).toHaveBeenCalledWith('cms-trabajo', { filtroTrabajo: 'atrasadas' })
+  })
+
+  it('recuerda por cuenta que la orientación del inicio fue cerrada', async () => {
+    window.localStorage.setItem('aletea:orientacion-panel:v1:ale@aletea.org', 'cerrado')
+    crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale', correo: 'ale@aletea.org' }, alIrA, area: 'control' })
+    await esperar()
+    expect(raiz.textContent).not.toContain('Mirada institucional')
+    expect(raiz.textContent).toContain('? Ayuda del panel')
   })
 
   it('concentra los indicadores en el inicio y no los repite dentro de Mis tareas', async () => {

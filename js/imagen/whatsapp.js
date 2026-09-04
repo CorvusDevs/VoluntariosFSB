@@ -45,6 +45,7 @@ export function calcularComposicionWhatsApp(planos) {
     const ancho = plano.ancho * escala
     const alto = altoContenido * escala
     const panel = {
+      slotX: cursorX,
       x: cursorX + (anchoAsignado - ancho) / 2,
       y: yPaneles + (altoDisponible - alto) / 2,
       ancho,
@@ -84,6 +85,21 @@ function cabeceraCompartida(ctx, lista, imagenes) {
     ctx, MARGEN_WHATSAPP, MARGEN_WHATSAPP,
     ANCHO_WHATSAPP - MARGEN_WHATSAPP * 2, ALTO_CABECERA_WHATSAPP, 30, COLORES.violeta,
   )
+
+  const logoColor = imagenes.logoColor
+  if (logoColor) {
+    // El isotipo institucional ocupa el aire central como marca de agua. Se
+    // recorta desde el logo de color para no repetir la palabra Aletea.
+    ctx.save()
+    ctx.globalAlpha = 0.2
+    ctx.drawImage(
+      logoColor,
+      0, 0, logoColor.width, Math.round(logoColor.height * 0.48),
+      930, 44, 330, 86,
+    )
+    ctx.restore()
+  }
+
   ctx.fillStyle = COLORES.blanco
   ctx.font = FUENTES.titulo(52)
   ctx.textBaseline = 'top'
@@ -160,10 +176,9 @@ export function crearLienzoWhatsApp({ lista, roster, imagenes, medirTexto, crear
     pintar(fuente.getContext('2d'), plano, imagenes, 1)
     const panel = composicion.paneles[indice]
     ctx.save()
-    const aire = 12
     rectanguloRedondeado(
-      ctx, panel.x - aire, panel.y - aire,
-      panel.ancho + aire * 2, panel.alto + aire * 2, 24, COLORES.blanco,
+      ctx, panel.slotX, panel.y - 12,
+      panel.anchoAsignado, panel.alto + 24, 24, COLORES.blanco,
     )
     ctx.beginPath()
     ctx.roundRect(panel.x, panel.y, panel.ancho, panel.alto, 20)

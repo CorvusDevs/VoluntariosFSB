@@ -1,4 +1,5 @@
 import { execFileSync } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { mkdtemp, mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
@@ -12,6 +13,7 @@ const HOST_PREDETERMINADO = 'adriana.servidorlinux11.com'
 const USUARIO_PREDETERMINADO = 'aleteaor'
 const PUERTO_PREDETERMINADO = 2200
 const CLAVE_PREDETERMINADA = join(homedir(), '.ssh', 'aletea_deploy_ed25519')
+const MANIFIESTO_REMOTO = '/home/aleteaor/.aletea-publicacion/manifiesto-sftp.json'
 
 export function opcionesDesde(argumentos) {
   const opciones = { simular: false, sinConstruir: false, webRoot: '' }
@@ -105,7 +107,7 @@ async function descargarRespaldos(conexion, capas, etapa) {
   for (const capa of capas) {
     capa.respaldo = join(etapa, 'respaldo', capa.clave)
     await mkdir(capa.respaldo, { recursive: true })
-    for (const archivo of capa.archivos) {
+    for (const archivo of capa.archivosPublicacion || capa.archivos) {
       if (!requiereRespaldo(archivo)) continue
       const local = join(capa.respaldo, archivo)
       await mkdir(dirname(local), { recursive: true })
@@ -115,6 +117,62 @@ async function descargarRespaldos(conexion, capas, etapa) {
   await ejecutarBatch(conexion, comandos, etapa, 'respaldar')
 }
 
+async function sha256Archivo(ruta) {
+  return createHash('sha256').update(await readFile(ruta)).digest('hex')
+}
+
+async function crearManifiesto(capas) {
+  const archivos = {}
+  for (const capa of capas) {
+    archivos[capa.clave] = {}
+    for (const archivo of capa.archivos) archivos[capa.clave][archivo] = await sha256Archivo(join(capa.carpeta, archivo))
+  }
+  return { formato: 1, archivos }
+}
+
+async function limitarAArchivosCambiados(capas, manifiestoAnterior = null) {
+  let total = 0
+  let cambiados = 0
+  for (const capa of capas) {
+    capa.archivosPublicacion = []
+    for (const archivo of capa.archivos) {
+      total += 1
+      const huellaAnterior = manifiestoAnterior?.archivos?.[capa.clave]?.[archivo]
+      const cambio = huellaAnterior
+        ? await sha256Archivo(join(capa.carpeta, archivo)) !== huellaAnterior
+        : capa.respaldo
+          ? !requiereRespaldo(archivo) || !(await existe(join(capa.respaldo, archivo))) || !(await readFile(join(capa.carpeta, archivo))).equals(await readFile(join(capa.respaldo, archivo)))
+          : true
+      if (cambio) capa.archivosPublicacion.push(archivo)
+    }
+    cambiados += capa.archivosPublicacion.length
+  }
+  return { total, cambiados, omitidos: total - cambiados }
+}
+
+async function descargarManifiesto(conexion, etapa) {
+  const local = join(etapa, 'manifiesto-anterior.json')
+  await ejecutarBatch(conexion, [`-get ${escaparSftp(MANIFIESTO_REMOTO)} ${escaparSftp(local)}`], etapa, 'manifiesto')
+  try {
+    const manifiesto = JSON.parse(await readFile(local, 'utf8'))
+    return manifiesto?.formato === 1 && manifiesto?.archivos ? manifiesto : null
+  } catch {
+    return null
+  }
+}
+
+async function publicarManifiesto(conexion, manifiesto, etapa, marca) {
+  const local = join(etapa, 'manifiesto-nuevo.json')
+  const temporal = `${MANIFIESTO_REMOTO}.${marca}.tmp`
+  await writeFile(local, `${JSON.stringify(manifiesto)}\n`, { mode: 0o600 })
+  await ejecutarBatch(conexion, [
+    '-mkdir "/home/aleteaor/.aletea-publicacion"',
+    `put ${escaparSftp(local)} ${escaparSftp(temporal)}`,
+    `-rm ${escaparSftp(MANIFIESTO_REMOTO)}`,
+    `rename ${escaparSftp(temporal)} ${escaparSftp(MANIFIESTO_REMOTO)}`,
+  ], etapa, 'guardar-manifiesto')
+}
+
 function requiereRespaldo(archivo) {
   return !archivo.startsWith('release/')
 }
@@ -122,6 +180,7 @@ function requiereRespaldo(archivo) {
 async function cambiaronDependencias(capas) {
   const gestor = capas.find((capa) => capa.clave === 'gestor-root')
   if (!gestor) return false
+  if (gestor.archivosPublicacion) return gestor.archivosPublicacion.includes('package-lock.json')
   const nueva = join(gestor.carpeta, 'package-lock.json')
   const anterior = join(gestor.respaldo, 'package-lock.json')
   if (!(await existe(anterior))) return true
@@ -168,8 +227,9 @@ async function dependenciasInstaladas({ carpeta, dependencias }) {
 async function comandosPublicacion(capas, marca) {
   const comandos = []
   for (const capa of capas) {
-    for (const carpeta of await directoriosDe(capa.archivos)) comandos.push(`-mkdir ${escaparSftp(`${capa.remoto}/${carpeta}`)}`)
-    for (const archivo of capa.archivos) {
+    const archivos = capa.archivosPublicacion || capa.archivos
+    for (const carpeta of await directoriosDe(archivos)) comandos.push(`-mkdir ${escaparSftp(`${capa.remoto}/${carpeta}`)}`)
+    for (const archivo of archivos) {
       const remoto = `${capa.remoto}/${archivo}`
       const temporal = `${remoto}.aletea-${marca}.tmp`
       comandos.push(`put ${escaparSftp(join(capa.carpeta, archivo))} ${escaparSftp(temporal)}`)
@@ -183,7 +243,7 @@ async function comandosPublicacion(capas, marca) {
 async function comandosRestauracion(capas, marca) {
   const comandos = []
   for (const capa of [...capas].reverse()) {
-    for (const archivo of capa.archivos) {
+    for (const archivo of capa.archivosPublicacion || capa.archivos) {
       const remoto = `${capa.remoto}/${archivo}`
       const respaldo = join(capa.respaldo, archivo)
       if (await existe(respaldo)) {
@@ -232,6 +292,11 @@ export async function principal(argumentos = process.argv.slice(2)) {
       return
     }
     capas = await expandirPaquetes(plan, etapa)
+    const manifiestoAnterior = await descargarManifiesto(conexion, etapa)
+    const manifiestoNuevo = await crearManifiesto(capas)
+    const diferencial = await limitarAArchivosCambiados(capas, manifiestoAnterior)
+    if (!manifiestoAnterior) console.log('No hay manifiesto remoto válido: se usa una comparación completa segura por única vez.')
+    console.log(`Transferencia incremental: ${diferencial.cambiados} de ${diferencial.total} archivos cambiaron; ${diferencial.omitidos} no se vuelven a subir.`)
     await descargarRespaldos(conexion, capas, etapa)
     const lockCambio = await cambiaronDependencias(capas)
     const estadoDependencias = lockCambio ? await descargarManifiestosDependencias(conexion, capas, etapa) : null
@@ -251,6 +316,7 @@ export async function principal(argumentos = process.argv.slice(2)) {
       }
       await reiniciar(conexion, etapa, plan.versionGestor, 'publicar')
       await verificarVivo(plan, webRoot)
+      await publicarManifiesto(conexion, manifiestoNuevo, etapa, marca)
     } catch (error) {
       console.error(`La verificación falló. Restaurando la versión anterior: ${error.message}`)
       await ejecutarBatch(conexion, await comandosRestauracion(capas, marca), etapa, 'restaurar')
@@ -272,5 +338,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
 
 export const _pruebas = {
   archivosDe, directoriosDe, escaparSftp, comandosPublicacion, cambiaronDependencias,
-  dependenciasProduccion, dependenciasInstaladas, requiereRespaldo,
+  dependenciasProduccion, dependenciasInstaladas, requiereRespaldo, limitarAArchivosCambiados, crearManifiesto,
 }

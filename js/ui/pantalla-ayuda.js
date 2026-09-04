@@ -1,17 +1,31 @@
 import { boton, enlaceBoton, elemento } from './componentes.js'
 import { rutaParaPantalla } from '../rutas-gestor.js'
 
-const VERSION_AYUDA_RECIENTE = '2.0.9'
+const VERSION_AYUDA_RECIENTE = '2.1.2'
 
 const PREGUNTAS_AYUDA_BASE = [
-  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.0.9', pregunta: '¿Cómo descargo una hoja A4 por cada cancha?', respuesta: 'Abrí la lista del sábado y entrá en Vista previa. Elegí Cancha 1 A4 o Cancha 2 A4 para revisar la hoja exacta y después usá Descargar junto al nombre de esa cancha. La hoja conserva el formato, las fotos y las opciones elegidas, aprovecha prácticamente todo el ancho y adapta entre tres y seis columnas para usar mejor el papel.', palabrasClave: 'a4 imprimir cancha planilla descargar vista previa participante voluntario apoyo estilo formato columnas papel' },
+  { categoria: 'Centro de control', fuente: 'Versión 2.1.0', pregunta: '¿Qué aparece primero al entrar al gestor?', respuesta: 'El Centro de control muestra como máximo tres acciones urgentes. Podés minimizar Prioridad del día con Ocultar y volver a abrirla con Mostrar. El gestor recuerda esa preferencia. Después presenta el próximo evento de la agenda y la actividad reciente.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'hoy urgente prioridad minimizar ocultar mostrar agenda actividad reciente inicio tablero' },
+  { categoria: 'Centro de control', fuente: 'Versión 2.1.1', pregunta: '¿Cuál es la diferencia entre Prioridad del día y Radar institucional?', respuesta: 'Prioridad del día reúne hasta tres acciones concretas que conviene resolver ahora, como una actividad próxima sin preparación o un proyecto sin responsable. Radar institucional ofrece una mirada más amplia sobre alertas, próximos plazos y estado general. Ambos paneles se pueden minimizar y el gestor recuerda cada elección.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'diferencia prioridad radar urgente hoy alertas plazos minimizar panel' },
+  { categoria: 'Centro de control', fuente: 'Versión 2.1.1', pregunta: '¿Qué significa que todo lo urgente está al día?', respuesta: 'Significa que el gestor no detecta en ese momento una de las situaciones urgentes que controla. Podés seguir con la agenda, la actividad reciente o abrir el Radar institucional para revisar el horizonte completo. No significa que todos los proyectos estén terminados.', destino: 'inicio', accion: 'Revisar el día', palabrasClave: 'sin prioridades todo al dia vacio urgente proyectos terminados agenda actividad' },
+  { categoria: 'Centro de control', fuente: 'Versión 2.1.1', pregunta: '¿Por qué Prioridad del día muestra solamente tres acciones?', respuesta: 'La primera vista limita la lista a tres acciones para que puedas decidir por dónde empezar sin recorrer una bandeja extensa. Resolvé o abrí una de ellas y la siguiente prioridad disponible ocupará su lugar. El Radar institucional conserva la mirada más amplia.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'tres máximo limite lista acciones urgentes siguiente radar atención hoy' },
+  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.1.1', pregunta: '¿Dónde empiezo a trabajar con Fútbol sin Barreras?', respuesta: 'Abrí Fútbol sin Barreras desde el Centro de control. Allí encontrás el acceso a Planilla, Personas, Asistencias, Agenda y Reportes del programa. Elegí Planilla antes de la jornada y Asistencias después de que ocurra.', destino: 'operacion', accion: 'Abrir Fútbol sin Barreras', palabrasClave: 'futbol empezar inicio programa planilla personas asistencia agenda reporte jornada' },
+  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.1.1', pregunta: '¿Qué diferencia hay entre Planilla, Asistencias y Reporte?', respuesta: 'Planilla organiza los grupos previstos para un sábado. Asistencias permite corregir lo que realmente ocurrió después de la jornada. Reporte reúne por mes las presencias, faltas y seguimientos. Cada pantalla conserva una función distinta para no confundir planificación con registro real.', destino: 'operacion', accion: 'Abrir Fútbol sin Barreras', palabrasClave: 'diferencia planilla asistencia reporte mensual previsto real sabado jornada' },
+  { categoria: 'Asistencia', fuente: 'Versión 2.1.1', pregunta: '¿Cómo corrijo la asistencia de un sábado anterior?', respuesta: 'Abrí Asistencias y elegí un sábado que ya haya ocurrido. Cada persona comienza con el estado derivado de la planilla de ese día. Tocá solamente a quien no coincida con lo ocurrido; el cambio se guarda como una corrección y la planilla original permanece intacta.', destino: 'asistencias', accion: 'Corregir asistencia', palabrasClave: 'corregir sabado anterior pasado cambiar vino falto planilla original' },
+  { categoria: 'Asistencia', fuente: 'Versión 2.1.1', pregunta: '¿Qué significan Vino, Faltó y No estaba?', respuesta: 'Vino indica presencia y Faltó indica una ausencia registrada. No estaba significa que esa persona no formaba parte de la planilla de ese sábado, por lo que no se cuenta como falta. Al tocar una fila podés recorrer los estados permitidos y volver al dato original.', destino: 'asistencias', accion: 'Revisar estados', palabrasClave: 'vino falto no estaba estado presencia ausencia cambiar deshacer' },
+  { categoria: 'Privacidad y registro', fuente: 'Versión 2.1.1', pregunta: '¿Quién puede gestionar una solicitud de privacidad?', respuesta: 'La gestión requiere una cuenta de Administración y acceso vigente a datos personales sensibles. Si falta alguna de esas condiciones, el gestor muestra el requisito y no expone el contenido de las solicitudes.', destino: 'cms-privacidad', accion: 'Revisar solicitudes', soloAdmin: true, palabrasClave: 'quien puede privacidad administracion datos sensibles permiso acceso solicitud' },
+  { categoria: 'Privacidad y registro', fuente: 'Versión 2.1.1', pregunta: '¿Cerrar una solicitud elimina información automáticamente?', respuesta: 'No. Cerrar una solicitud registra la constancia escrita del proceso. Una exportación, corrección o eliminación real debe revisarse y ejecutarse mediante el procedimiento autorizado correspondiente, fuera de ese botón.', destino: 'cms-privacidad', accion: 'Abrir solicitudes', soloAdmin: true, palabrasClave: 'cerrar solicitud elimina borrar automaticamente constancia procedimiento autorizado' },
+  { categoria: 'Personas', fuente: 'Versión 2.1.0', pregunta: '¿Cómo veo todo lo relacionado con una persona?', respuesta: 'Buscá su nombre desde la búsqueda del gestor. La ficha conectada reúne sus equipos, tareas, proyectos, eventos, formularios y documentos, siempre limitada a la información que tu cuenta ya puede consultar.', destino: 'inicio', accion: 'Buscar una persona', palabrasClave: 'persona equipo tareas proyectos eventos formularios documentos relacionado contexto' },
+  { categoria: 'Uso del sistema', fuente: 'Versión 2.1.0', pregunta: '¿Qué significan los estados de guardado?', respuesta: 'Guardando indica que el cambio se está enviando. Guardado confirma que llegó al gestor. Cambios pendientes aparece mientras un formulario fue modificado pero todavía no se envió. Sin conexión conserva el aviso para que no confundas un cambio local con uno guardado. Error al guardar indica que debés revisar la conexión o reintentar.', palabrasClave: 'guardando guardado cambios pendientes sin conexión error recuperar reintentar' },
+  { categoria: 'Uso del sistema', fuente: 'Versión 2.1.0', pregunta: '¿Dónde están las acciones secundarias de una tarjeta?', respuesta: 'La acción cotidiana queda visible. Editar, postergar, archivar, duplicar y otras opciones menos frecuentes se agrupan en Más. En el teléfono, la navegación inferior prioriza Hoy, Tareas y Agenda, mientras las demás secciones permanecen en Más.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'más acciones editar archivar duplicar postergar teléfono móvil navegación' },
+  { categoria: 'Equipos', fuente: 'Versión 2.1.0', pregunta: '¿Cómo cambio de sección dentro de un programa?', respuesta: 'Abrí el programa y elegí Resumen, Tareas, Proyectos, Personas, Formularios, Documentos o Historial. La sección activa permanece visible aunque todavía esté vacía. En pantallas angostas, estas opciones se reúnen en un selector para que ninguna quede cortada. La acción principal inferior cambia según la sección abierta.', destino: 'cms-areas', accion: 'Abrir Áreas', palabrasClave: 'programa unidad pestañas sección documentos botones cortados móvil resolución pantalla angosta' },
+  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.1.2', pregunta: '¿Cómo descargo una hoja A4 por cada cancha?', respuesta: 'Abrí la lista del sábado y entrá en Vista previa. Elegí Cancha 1 A4 o Cancha 2 A4 para revisar la hoja exacta y después usá Descargar junto al nombre de esa cancha. La hoja centra las filas, mantiene el pie con altura normal junto al borde inferior y reparte el espacio blanco entre los renglones. También adapta entre tres y seis columnas para aprovechar el papel sin achicar innecesariamente las fotos.', palabrasClave: 'a4 imprimir cancha planilla descargar vista previa participante voluntario apoyo estilo formato columnas papel centrar pie espacio' },
   { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.0.9', pregunta: '¿Cómo se organiza la imagen horizontal cuando las canchas tienen distinta cantidad de personas?', respuesta: 'La vista horizontal entrega más ancho a la cancha con más participantes y mantiene una escala común para que las caras tengan un tamaño consistente. En el formato Retratos, las personas voluntarias aparecen debajo de cada participante y no cubren su foto ni su nombre.', palabrasClave: 'horizontal cancha participantes voluntarios tamaño ancho escala foto' },
-  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.0.9', pregunta: '¿Qué pasa si una asignación tiene varias personas?', respuesta: 'La hoja A4 conserva la relación completa usando el formato visual elegido. Debajo de cada participante, una bandeja alineada reúne a todas las personas asignadas en retratos violetas sin tapar la foto ni el nombre. Si un voluntario acompaña a varios participantes, aparece dentro de cada unidad correspondiente. Cuando no hay una asignación, se conserva el fondo para mantener la grilla ordenada, sin agregar textos innecesarios.', palabrasClave: 'varios participantes voluntarios compartido multiple bandeja acompaña acompañan asignación' },
+  { categoria: 'Fútbol sin Barreras', fuente: 'Versión 2.1.2', pregunta: '¿Qué pasa si una asignación tiene varias personas?', respuesta: 'La hoja A4 mantiene juntos a los participantes que comparten exactamente los mismos referentes. Debajo aparece una sola bandeja que abarca ese conjunto, con los referentes centrados entre las personas acompañadas. Si una persona no tiene referente, conserva una bandeja tenue vacía para mantener la alineación, sin mostrar textos innecesarios.', palabrasClave: 'varios participantes voluntarios referentes compartido multiple bandeja acompaña acompañan asignación juntos centro sin acompañante' },
   { categoria: 'Tareas', fuente: 'Versión 2.0.8', pregunta: '¿Cómo veo las tareas que asigné y otra persona completó?', respuesta: 'Abrí Mis tareas, elegí Completadas y en Mostrar seleccioná Asignadas por mí. También podés elegir Completadas por mí o Todas las visibles. El alcance respeta tus permisos y los equipos que administrás.', destino: 'cms-trabajo', accion: 'Ver tareas completadas', palabrasClave: 'administrador asigné otra persona completó completadas por mi todas visibles alcance equipo' },
   { categoria: 'Tareas', fuente: 'Versión 2.0.8', pregunta: '¿Dónde están los filtros de tareas que ya no aparecen como botones?', respuesta: 'Las cuatro vistas de uso frecuente quedan visibles. Vencidas, Próximas, Bloqueadas, Seguimientos, Sin responsable, Esperando respuesta y Canceladas están agrupadas en Más vistas. Ningún filtro fue eliminado.', destino: 'cms-trabajo', accion: 'Abrir Mis tareas', palabrasClave: 'más vistas filtros botones vencidas próximas bloqueadas seguimiento canceladas' },
   { categoria: 'Tareas', fuente: 'Versión 2.0.7', pregunta: '¿Dónde veo las tareas que ya completé?', respuesta: 'Abrí Mis tareas y elegí Completadas. La sección muestra primero las más recientes e incluye la fecha de cierre, el contexto y la cantidad de comentarios. Podés buscar por el título o por palabras de la descripción.', destino: 'cms-trabajo', accion: 'Ver tareas completadas', palabrasClave: 'completé completada terminada cerrada historial dónde etiqueta encontrar llamada' },
   { categoria: 'Tareas', fuente: 'Versión 2.0.7', pregunta: '¿Cómo retomo una tarea completada si aparece un nuevo paso?', respuesta: 'En Mis tareas, abrí Completadas y elegí Reactivar y agendar en la tarea. Indicá una nueva fecha de seguimiento y el estado. La tarea vuelve a Mis pendientes sin perder el cierre ni los comentarios anteriores, por lo que podés continuar la conversación desde el mismo lugar.', destino: 'cms-trabajo', accion: 'Reactivar una tarea', palabrasClave: 'reactivar reabrir retomar nuevo paso seguimiento comentario llamada agendar fecha' },
-  { categoria: 'Agenda', fuente: 'Versión 2.0.6', pregunta: '¿Cómo me recuerdo preparar algo antes de una reunión?', respuesta: 'Al crear o editar la reunión, elegí Seguimiento previo y la fecha en que querés volver a verla. Podés anotar en Preparación qué material, presentación o confirmación necesitás. La fecha queda destacada en la tarjeta de la reunión. Si además necesitás una persona responsable y marcar el trabajo como completado, creá una tarea vinculada.', destino: 'cms-agenda', accion: 'Abrir reuniones', palabrasClave: 'reunión seguimiento aviso recordatorio preparar presentación materiales fecha previa' },
+  { categoria: 'Reuniones', fuente: 'Versión 2.0.6', pregunta: '¿Cómo me recuerdo preparar algo antes de una reunión?', respuesta: 'Al crear o editar la reunión, elegí Seguimiento previo y la fecha en que querés volver a verla. Podés anotar en Preparación qué material, presentación o confirmación necesitás. La fecha queda destacada en la tarjeta de la reunión. Si además necesitás una persona responsable y marcar el trabajo como completado, creá una tarea vinculada.', destino: 'cms-agenda', accion: 'Abrir reuniones', palabrasClave: 'reunión seguimiento aviso recordatorio preparar presentación materiales fecha previa' },
   { categoria: 'Tareas', fuente: 'Versión 2.0.6', pregunta: '¿Cómo creo una tarea que se repita todos los meses?', respuesta: 'En Nueva tarea elegí Repetición y después Cada mes. Indicá la primera fecha límite y guardá. La primera tarea aparece de inmediato. El gestor conserva cada mes como una tarea separada, para que completar una no borre el historial ni cierre las siguientes.', destino: 'cms-trabajo', accion: 'Crear tarea recurrente', palabrasClave: 'tarea recurrente repetir mensual todos los meses semanal rutina vencimiento' },
   { categoria: 'Uso del sistema', fuente: 'Versión 2.0.6', pregunta: '¿Por qué el nombre del área ya no tapa el logo?', respuesta: 'El encabezado de Aletea queda reservado en la parte superior del panel lateral. Al recorrer una lista larga de secciones, el menú se desplaza sin cubrir la marca ni perder el contexto de navegación.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'logo tapado área sector menú lateral trabajo solapado' },
   { categoria: 'Página web', fuente: 'Versión 2.0.5', pregunta: '¿Dónde edito las secciones Familias y Adultos autistas?', respuesta: 'Abrí Página web y elegí Páginas y contenido. Familias y Adultos autistas son secciones independientes: cada una tiene su propia presentación, fotografía, bloques y botones. En Inicio también podés cambiar el acceso que lleva a cada recorrido.', destino: 'cms-pagina-web', accion: 'Editar secciones', palabrasClave: 'familias adultos autistas separado seccion foto orientación vida adulta' },
@@ -28,7 +42,7 @@ const PREGUNTAS_AYUDA_BASE = [
   { categoria: 'Agenda', fuente: 'Versión 1.9.10', pregunta: '¿Por qué una recurrencia puede parecer un conflicto con varias fechas?', respuesta: 'Cada encuentro tiene su propia duración y la serie tiene otra fecha para indicar hasta cuándo se repite. Si una finalización antigua abarca varios días, el gestor ya no la usa para unir encuentros posteriores. Al crear una serie nueva, la finalización de cada actividad debe quedar dentro de las 24 horas siguientes.', destino: 'cms-agenda', accion: 'Revisar Agenda', palabrasClave: 'recurrente duplicada conflicto duración finalización fecha repetir clases consejo' },
   { categoria: 'Finanzas', fuente: 'Versión 1.9.9', pregunta: '¿Qué pasa si corrijo una beca mientras preparo las cuotas?', respuesta: 'El gestor conserva el mes, el importe y las fechas. Después de guardar el porcentaje vuelve automáticamente a la revisión, recalcula la cuota y permite generar el mes sin empezar de nuevo.', destino: 'cms-finanzas', accion: 'Preparar cuotas', palabrasClave: 'beca fabian corregir volver generar borrador porcentaje' },
   { categoria: 'Finanzas', fuente: 'Versión 1.9.9', pregunta: '¿Cuándo se aplica el recargo por atraso?', respuesta: 'Desde el día 16 se agrega una sola vez el 10 por ciento a cada cuota común pendiente del mes. No se acumula y no se aplica a cuotas con beca. Si la cuota común quedó pagada hasta el día 15, no recibe recargo.', destino: 'cms-finanzas', accion: 'Abrir Finanzas', palabrasClave: 'recargo atraso mora 10 beca día 16 no acumulable' },
-  { categoria: 'Agenda', fuente: 'Versión 1.9.9', pregunta: '¿Cómo repito una reunión el segundo jueves de cada mes?', respuesta: 'Elegí La misma semana y día. Agenda conserva la posición, por ejemplo segundo jueves, aunque la fecha numérica cambie entre meses. Usá El mismo día de cada mes solamente cuando querés conservar un número, como el día 10.', destino: 'cms-agenda', accion: 'Crear reunión', palabrasClave: 'segundo jueves mensual posición recurrente fecha día 10 consejo asesor' },
+  { categoria: 'Reuniones', fuente: 'Versión 1.9.9', pregunta: '¿Cómo repito una reunión el segundo jueves de cada mes?', respuesta: 'Elegí La misma semana y día. Agenda conserva la posición, por ejemplo segundo jueves, aunque la fecha numérica cambie entre meses. Usá El mismo día de cada mes solamente cuando querés conservar un número, como el día 10.', destino: 'cms-agenda', accion: 'Crear reunión', palabrasClave: 'segundo jueves mensual posición recurrente fecha día 10 consejo asesor' },
   { categoria: 'Agenda', fuente: 'Versión 1.9.8', pregunta: '¿Una actividad recurrente puede aparecer como conflicto consigo misma?', respuesta: 'No. El gestor reconoce cada serie y compara solamente actividades distintas. Si dos series diferentes coinciden en horario y comparten lugar, responsable o equipo, muestra un único aviso con una actividad por serie. Las actividades independientes cargadas dos veces sí continúan marcadas como posible duplicado.', destino: 'cms-agenda', accion: 'Revisar Agenda', palabrasClave: 'recurrente serie repetida duplicada conflicto misma actividad ocurrencia' },
   { categoria: 'Agenda', fuente: 'Versión 1.9.6', pregunta: '¿Por qué varias actividades aparecen como un conflicto de agenda?', respuesta: 'El gestor agrupa por horario las actividades que se superponen y comparten lugar, responsable o equipo. Revisá primero las marcadas como prioridad alta. Si el cruce fue coordinado a propósito, elegí Es intencional para retirarlo de la lista principal.', destino: 'cms-agenda', accion: 'Abrir Agenda' },
   { categoria: 'Navegación', fuente: 'Versión 1.9.6', pregunta: '¿Cómo vuelvo a una sección visitada recientemente?', respuesta: 'Elegí Recientes junto a la búsqueda o enfocá el campo vacío. El panel muestra hasta tres destinos anteriores y se cierra al salir, navegar o presionar Escape.', destino: 'inicio', accion: 'Abrir Centro de control' },
@@ -70,7 +84,7 @@ const PREGUNTAS_AYUDA_BASE = [
   { categoria: 'Finanzas', fuente: 'Versión 1.6.7', pregunta: '¿Cómo cambio el grupo, la beca o el tipo de cuota?', respuesta: 'Abrí el perfil en Personas y usá Cuota mensual. Elegí cuota completa, cuota con beca, sin cuota por voluntariado o participante inactivo. Si elegís beca, indicá el porcentaje. Finanzas se actualiza al guardar y conserva el historial anterior.', destino: 'personas', accion: 'Abrir Personas' },
   { categoria: 'Finanzas', fuente: 'Versión 1.8.9', pregunta: '¿Cómo elimino un participante que agregué para probar?', respuesta: 'Abrí su detalle en Finanzas y elegí Archivar participante. El gestor abre directamente su perfil y explica el cambio antes de confirmarlo. Archivar lo quita de las listas activas y evita nuevas cuotas, pero conserva su ficha, pagos e historial. Si fue un error, podés usar Deshacer o restaurarlo desde Personas archivadas.', destino: 'cms-finanzas', accion: 'Abrir Finanzas' },
   { categoria: 'Personas', fuente: 'Versión 1.8.9', pregunta: '¿Puedo registrar hoy a alguien que comienza más adelante?', respuesta: 'Sí. En el perfil, En la organización desde admite una fecha futura para registrar incorporaciones ya confirmadas. La persona queda preparada con su fecha real de inicio. Las fechas de nacimiento, consentimiento y revisión mantienen el límite de hoy porque documentan hechos ya ocurridos.', destino: 'personas', accion: 'Abrir Personas' },
-  { categoria: 'Uso del sistema', fuente: 'Versión 1.8.9', pregunta: '¿Puedo ocultar el Radar institucional?', respuesta: 'Sí. Usá Ocultar en el encabezado del Radar institucional para dejar más espacio al contenido principal. Elegí Mostrar para abrirlo nuevamente. El gestor recuerda esta preferencia en ese navegador.', destino: 'inicio', accion: 'Abrir Centro de control' },
+  { categoria: 'Centro de control', fuente: 'Versión 1.8.9', pregunta: '¿Puedo ocultar el Radar institucional?', respuesta: 'Sí. Usá Ocultar en el encabezado del Radar institucional para dejar más espacio al contenido principal. Elegí Mostrar para abrirlo nuevamente. El gestor recuerda esta preferencia en ese navegador.', destino: 'inicio', accion: 'Abrir Centro de control' },
   { categoria: 'Finanzas', fuente: 'Versión 1.6.6', pregunta: '¿Cómo guardo un control externo del mes?', respuesta: 'Elegí el mes que querés revisar y usá Exportar mes. Se descarga un archivo CSV con cuentas, cargos, pagos, fechas, vencimientos, comprobantes, notas y saldos. El historial del gestor sigue siendo la fuente oficial.', destino: 'cms-finanzas', accion: 'Abrir Finanzas' },
   { categoria: 'Finanzas', fuente: 'Versión 1.6.3', pregunta: '¿Qué permiso necesito para abrir Finanzas?', respuesta: 'Necesitás acceso vigente a Datos personales completos y pertenecer al equipo Finanzas. Administración también puede acceder por su alcance institucional. La propia pantalla indica qué requisito está cumplido y cuál falta. Si administrás accesos, podés abrir directamente la persona correspondiente para resolverlo.', destino: 'cms-finanzas', accion: 'Abrir Finanzas' },
   { categoria: 'Finanzas', fuente: 'Versión 1.6.3', pregunta: '¿Qué muestra el estado de cuenta mensual?', respuesta: 'Resume el saldo anterior, los cargos del mes, los pagos registrados y el saldo al cierre. También conserva los movimientos para que el resultado se pueda revisar. Cambiar de mes no modifica ningún pago ni cargo.', destino: 'cms-finanzas', accion: 'Abrir Finanzas' },
@@ -104,7 +118,7 @@ const PREGUNTAS_AYUDA_BASE = [
   { categoria: 'Proyectos y tareas', fuente: 'Audio 1', pregunta: '¿Qué diferencia hay entre proyecto, actividad y tarea?', respuesta: 'Un proyecto organiza un objetivo amplio. Una actividad representa un encuentro o evento con fecha. Una tarea es una acción concreta que una persona debe completar. Las actividades y tareas pueden quedar vinculadas al proyecto.' },
   { categoria: 'Proyectos y tareas', fuente: 'Audio 1', pregunta: '¿Cómo agrego tareas o actividades a un proyecto?', respuesta: 'Usá Nueva tarea o Nueva actividad y seleccioná el proyecto relacionado. Podés indicar responsable, equipo, prioridad, fecha y contexto.', destino: 'cms-trabajo', accion: 'Abrir Mis tareas' },
   { categoria: 'Proyectos y tareas', fuente: 'Versión 1.2', pregunta: '¿Cómo agendo una actividad recurrente?', respuesta: 'En Agenda elegí Nueva actividad, completá la primera fecha y seleccioná una repetición semanal, quincenal o mensual. Para una repetición mensual podés conservar el número de día o la posición, como segundo jueves. Indicá hasta qué día debe repetirse. El gestor crea la serie completa, hasta un año, y después podés editar cada actividad por separado.', destino: 'cms-agenda', accion: 'Abrir Agenda' },
-  { categoria: 'Proyectos y tareas', fuente: 'Versión 1.2', pregunta: '¿Cómo agendo una reunión recurrente?', respuesta: 'En Preparar reunión elegí una repetición semanal, quincenal o mensual y una fecha final. Para reuniones como el segundo jueves, elegí La misma semana y día. El gestor crea cada reunión de la serie. La preparación, la minuta y las decisiones se registran de forma independiente en cada fecha.', destino: 'cms-agenda', accion: 'Abrir Agenda' },
+  { categoria: 'Reuniones', fuente: 'Versión 1.2', pregunta: '¿Cómo agendo una reunión recurrente?', respuesta: 'En Preparar reunión elegí una repetición semanal, quincenal o mensual y una fecha final. Para reuniones como el segundo jueves, elegí La misma semana y día. El gestor crea cada reunión de la serie. La preparación, la minuta y las decisiones se registran de forma independiente en cada fecha.', destino: 'cms-agenda', accion: 'Abrir Agenda' },
   { categoria: 'Proyectos y tareas', fuente: 'Versión 1.2', pregunta: '¿Cuándo uso una tarea recurrente en lugar de una actividad recurrente?', respuesta: 'Usá una tarea recurrente para una acción que vuelve a vencer, como revisar un informe. Usá una actividad recurrente para algo que ocupa una fecha en la agenda, como un curso. Usá una reunión recurrente cuando además necesitás preparación, minuta y decisiones por encuentro.' },
   { categoria: 'Proyectos y tareas', fuente: 'Versión 1.2', pregunta: '¿Qué significa esfuerzo estimado?', respuesta: 'Es la cantidad aproximada de horas de trabajo activo que requiere una tarea. No es el tiempo que falta hasta la fecha límite. Sirve para comparar la carga asignada con la disponibilidad semanal de las personas.' },
   { categoria: 'Proyectos y tareas', fuente: 'Versión 1.2', pregunta: '¿Qué es el programa de un proyecto?', respuesta: 'Un programa es una línea de trabajo estable que agrupa varios proyectos relacionados bajo un objetivo común. Por ejemplo, un programa de apoyo a familias puede reunir talleres, campañas y encuentros. Si el proyecto es independiente, podés elegir Sin programa.' },
@@ -123,9 +137,11 @@ const PREGUNTAS_AYUDA_BASE = [
   { categoria: 'Uso del sistema', fuente: 'Audio 3', pregunta: '¿Cómo sé quién todavía no está usando el gestor?', respuesta: 'Administración puede abrir Accesos. El resumen muestra quién nunca ingresó y quién lleva siete días o más sin entrar, para ofrecer acompañamiento sin depender de mensajes masivos.', destino: 'accesos', accion: 'Abrir Accesos', soloAdmin: true },
   { categoria: 'Materiales y enlaces', fuente: 'Audios del 27 de agosto', pregunta: '¿Puedo compartir un enlace de Canva en una tarea?', respuesta: 'Sí. En la edición de la tarea usá Instrucciones y materiales. Indicá un nombre, pegá el enlace y elegí Agregar enlace a la tarea. También podés usar la guía de entrega para ordenar objetivo, pasos, materiales, correo y resultado esperado. La persona responsable verá todo junto y podrá abrir el material con un clic.', destino: 'cms-trabajo', accion: 'Crear o revisar una tarea' },
   { categoria: 'Proyectos y tareas', fuente: 'Audios del 27 de agosto', pregunta: '¿Qué ve una persona cuando le comparto el enlace de una tarea?', respuesta: 'Al abrir el enlace después de ingresar, ve primero qué hay que hacer, los materiales con enlaces, la persona responsable, la fecha, el proyecto y la actividad. Debajo quedan las dependencias y la conversación. Así WhatsApp solamente transporta el enlace y la información operativa permanece en el gestor.', destino: 'cms-trabajo', accion: 'Abrir Mis tareas' },
-  { categoria: 'Materiales y enlaces', fuente: 'Versión 1.2', pregunta: '¿Cómo agrego un enlace de Google Drive o Canva a la Biblioteca?', respuesta: 'Abrí Biblioteca y elegí Agregar documento. En Enlace del recurso podés usar Pegar enlace o presionar Ctrl+V. El gestor reconoce la dirección aunque lo copiado incluya un título. Antes de guardar, comprobá en Drive o Canva que las personas destinatarias tengan permiso para abrir el material.', destino: 'cms-biblioteca', accion: 'Abrir Biblioteca' },
-  { categoria: 'Materiales y enlaces', fuente: 'Audio 2', pregunta: '¿Dónde guardo documentos generales de un proyecto?', respuesta: 'Usá Biblioteca para registrar un documento o enlace y asociarlo al equipo o proyecto. Elegí la sensibilidad correcta antes de guardarlo.', destino: 'cms-biblioteca', accion: 'Abrir Biblioteca' },
-  { categoria: 'Materiales y enlaces', fuente: 'Audio 2', pregunta: '¿Puedo subir un archivo directamente?', respuesta: 'Todavía no. La versión actual registra enlaces a materiales externos y documentos. Los archivos adjuntos requieren reglas de tamaño, privacidad, almacenamiento y respaldo antes de habilitarse.' },
+  { categoria: 'Materiales y enlaces', fuente: 'Versión 2.1.0', pregunta: '¿Dónde creo un documento o enlace?', respuesta: 'Elegí Crear y después Nuevo documento o enlace. También podés hacerlo desde Documentos dentro de un programa, desde el seguimiento de un proyecto o desde Biblioteca. El formulario usa el mismo nombre en todos esos lugares.', destino: 'cms-biblioteca', accion: 'Abrir Documentos y enlaces', palabrasClave: 'crear nuevo documento enlace recurso drive biblioteca programa proyecto' },
+  { categoria: 'Materiales y enlaces', fuente: 'Versión 2.1.0', pregunta: '¿Cómo agrego un enlace de Google Drive o Canva?', respuesta: 'Elegí Nuevo documento o enlace. Pegá la dirección de una carpeta o archivo de Drive, Canva u otra herramienta, indicá dónde debe aparecer y revisá su visibilidad. El gestor reconoce la dirección aunque lo copiado incluya un título.', destino: 'cms-biblioteca', accion: 'Abrir Documentos y enlaces' },
+  { categoria: 'Materiales y enlaces', fuente: 'Versión 2.1.0', pregunta: '¿Quién puede ver un documento enlazado?', respuesta: 'Todas las cuentas permite abrirlo a cualquier cuenta activa del gestor. Coordinación y dirección lo limita a esos perfiles. Sólo administración reserva la referencia a las cuentas administradoras. Estos permisos organizan la referencia dentro del gestor: también debés conceder acceso al archivo en Drive, Canva o la herramienta de origen.', destino: 'cms-biblioteca', accion: 'Abrir Documentos y enlaces', palabrasClave: 'visibilidad compartido interno restringido permisos drive canva' },
+  { categoria: 'Materiales y enlaces', fuente: 'Versión 2.1.0', pregunta: '¿Dónde guardo la carpeta principal de Drive de un proyecto?', respuesta: 'Abrí el proyecto, elegí Agregar documento o enlace y seleccioná Carpeta de Drive. Al pegar un enlace de carpeta, el seguimiento del proyecto la destaca como Carpeta principal del proyecto.', destino: 'cms-biblioteca', accion: 'Abrir Documentos y enlaces', palabrasClave: 'carpeta principal drive proyecto documentos enlace' },
+  { categoria: 'Materiales y enlaces', fuente: 'Versión 2.1.0', pregunta: '¿Puedo subir un archivo directamente?', respuesta: 'No. El gestor guarda el enlace y su contexto, pero el archivo permanece en Drive, Canva u otra herramienta. Antes de guardar, comprobá que las personas destinatarias tengan permiso para abrirlo.' },
   { categoria: 'Uso del sistema', fuente: 'Ambos audios', pregunta: '¿Qué hago si no encuentro una función?', respuesta: 'Buscá aquí una palabra relacionada con lo que querés hacer. Si la respuesta no existe o no coincide con la pantalla, registrá la duda para ampliar esta guía antes de modificar el sistema.' },
   { categoria: 'Uso del sistema', fuente: 'Ambos audios', pregunta: '¿Cómo sé qué cambió en una versión nueva?', respuesta: 'El gestor abre Cambios del sistema una vez cuando detecta una versión que todavía no viste. También podés abrir Cambios manualmente desde el final del panel lateral.' },
 ]
@@ -212,7 +228,7 @@ const PREGUNTAS_NUEVAS = [
   { categoria: 'Uso del sistema', fuente: 'Versión 2.0.0', pregunta: '¿Cómo uso el gestor desde el teléfono?', respuesta: 'Abrí el menú para cambiar de grupo y usá las acciones principales que ocupan el ancho disponible. Algunas filas de filtros se recorren horizontalmente cuando no entran, pero ninguna función esencial queda escondida. Los controles están preparados para tocarse sin precisión de ratón.', destino: 'inicio', accion: 'Abrir Centro de control', palabrasClave: 'móvil celular teléfono responsive menú tocar filtros horizontal' },
   { categoria: 'Accesos', fuente: 'Versión 2.0.0', pregunta: '¿Qué pasa cuando vence una cuenta o un acceso temporal?', respuesta: 'Al llegar su fecha de vencimiento, la cuenta deja de poder ingresar sin borrar la persona ni su historial. Administración puede revisar el motivo y renovar la vigencia si corresponde. El vencimiento nunca amplía permisos ni elimina registros operativos.', destino: 'accesos', accion: 'Revisar accesos', soloAdmin: true, palabrasClave: 'cuenta acceso temporal vencer vencimiento renovar vigencia historial permisos' },
   { categoria: 'Operaciones', fuente: 'Versión 2.0.0', pregunta: '¿Cómo se publica el gestor y la página de prueba en cPanel?', respuesta: 'Administración prepara y prueba una sola vez las tres capas. El sistema guarda un recibo inmutable, omite cualquier capa que ya coincida, extrae los ZIP en un área privada y respalda la versión anterior antes de activar. Después reinicia Passenger y verifica dos veces rutas, versión, servicios y archivos protegidos. Si algo falla, vuelve automáticamente al respaldo. Ningún .htaccess se incluye: el sistema también busca los que estén dentro de carpetas y revierte si alguno cambia. SFTP queda disponible como recuperación independiente.', destino: 'cms-operaciones', accion: 'Abrir Operaciones', soloAdmin: true, palabrasClave: 'publicar cPanel recibo transaccional SFTP tres destinos respaldo rollback activar verificar versión servidor .htaccess' },
-  { categoria: 'Agenda', fuente: 'Versión 1.9.7', pregunta: '¿Cómo creo una actividad o una reunión en la agenda?', respuesta: 'Abrí Agenda y elegí Nueva actividad o Nueva reunión. Indicá fecha, horario, lugar, equipo y responsable. Antes de guardar, revisá los cruces que muestra el gestor. Una reunión agrega preparación, minuta y decisiones; una actividad sirve para cursos, encuentros y otros eventos.', destino: 'cms-agenda', accion: 'Abrir Agenda', palabrasClave: 'calendario evento encuentro crear agendar horario' },
+  { categoria: 'Reuniones', fuente: 'Versión 1.9.7', pregunta: '¿Cómo creo una actividad o una reunión en la agenda?', respuesta: 'Abrí Agenda y elegí Nueva actividad o Nueva reunión. Indicá fecha, horario, lugar, equipo y responsable. Antes de guardar, revisá los cruces que muestra el gestor. Una reunión agrega preparación, minuta y decisiones; una actividad sirve para cursos, encuentros y otros eventos.', destino: 'cms-agenda', accion: 'Abrir Agenda', palabrasClave: 'calendario evento encuentro crear agendar horario' },
   { categoria: 'Agenda', fuente: 'Versión 1.9.7', pregunta: '¿Cómo recupero un cruce de agenda que marqué como intencional?', respuesta: 'Abrí Agenda y, dentro de Conflictos, elegí Mostrar cruces coordinados. El cruce vuelve a aparecer con todas las actividades involucradas. Desde allí podés revisarlo y devolverlo a la lista principal si dejó de estar coordinado.', destino: 'cms-agenda', accion: 'Revisar cruces', palabrasClave: 'conflicto oculto coordinado recuperar restaurar superposición' },
   { categoria: 'Personas', fuente: 'Versión 1.9.7', pregunta: '¿Cómo archivo o recupero a una persona sin perder su historial?', respuesta: 'Abrí Personas, entrá a la ficha y elegí Archivar. La persona deja de aparecer en los flujos activos, pero conserva su información histórica. Para recuperarla, filtrá por Archivadas, abrí la ficha y elegí Recuperar.', destino: 'personas', accion: 'Abrir Personas', palabrasClave: 'eliminar borrar quitar participante restaurar inactivo historial' },
   { categoria: 'Personas', fuente: 'Versión 1.9.7', pregunta: '¿Cuál es la diferencia entre una persona y una cuenta de acceso?', respuesta: 'Personas reúne perfiles operativos, participantes y contactos. Accesos define quién puede ingresar al gestor y qué puede hacer. Crear una persona no le da una cuenta automáticamente; crear un acceso tampoco reemplaza su ficha ni su pertenencia a equipos.', destino: 'personas', accion: 'Abrir Personas', palabrasClave: 'usuario login perfil cuenta integrante participante contacto' },
@@ -234,7 +250,13 @@ export const PREGUNTAS_AYUDA = Object.freeze([
 ])
 
 function normalizar(texto) {
-  return String(texto || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  return String(texto || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
 }
 
 const SINONIMOS_AYUDA = Object.freeze([
@@ -251,28 +273,149 @@ const SINONIMOS_AYUDA = Object.freeze([
   ['equipo', 'area'],
   ['unidad', 'programa'],
   ['operaciones', 'integracion', 'incidente', 'sistema', 'cron', 'mantenimiento'],
-  ['formulario', 'respuesta', 'consulta', 'inscripcion'],
+  ['respuesta', 'entrada', 'consulta', 'inscripcion'],
+  ['formulario', 'formularios', 'form', 'forms'],
+  ['crear', 'agregar', 'anadir', 'cargar', 'nuevo'],
+  ['encontrar', 'buscar', 'ubicar', 'ver'],
 ])
 
+const PALABRAS_VACIAS_AYUDA = new Set(['a', 'al', 'como', 'con', 'de', 'del', 'donde', 'el', 'en', 'es', 'la', 'las', 'lo', 'los', 'para', 'por', 'que', 'un', 'una', 'y'])
+
+function singularizar(termino) {
+  if (termino.length > 6 && termino.endsWith('es')) return termino.slice(0, -2)
+  if (termino.length > 4 && termino.endsWith('s')) return termino.slice(0, -1)
+  return termino
+}
+
 function variantesDe(termino) {
-  return SINONIMOS_AYUDA.find((grupo) => grupo.includes(termino)) || [termino]
+  const base = singularizar(termino)
+  const grupo = SINONIMOS_AYUDA
+    .filter((opciones) => opciones.some((opcion) => singularizar(opcion) === base))
+    .flat()
+  return [...new Set([termino, base, ...grupo, ...grupo.map(singularizar)].filter(Boolean))]
+}
+
+function terminosDe(consulta) {
+  const todos = normalizar(consulta).split(' ').filter(Boolean)
+  const significativos = todos.filter((termino) => !PALABRAS_VACIAS_AYUDA.has(termino))
+  return significativos.length ? significativos : todos
+}
+
+function distanciaDamerau(a, b) {
+  if (a === b) return 0
+  const filas = Array.from({ length: a.length + 1 }, (_, indice) => [indice])
+  filas[0] = Array.from({ length: b.length + 1 }, (_, indice) => indice)
+  for (let i = 1; i <= a.length; i += 1) {
+    for (let j = 1; j <= b.length; j += 1) {
+      const costo = a[i - 1] === b[j - 1] ? 0 : 1
+      filas[i][j] = Math.min(filas[i - 1][j] + 1, filas[i][j - 1] + 1, filas[i - 1][j - 1] + costo)
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+        filas[i][j] = Math.min(filas[i][j], filas[i - 2][j - 2] + 1)
+      }
+    }
+  }
+  return filas[a.length][b.length]
+}
+
+function umbralFuzzy(termino) {
+  if (termino.length < 5) return 0
+  return termino.length >= 7 ? 2 : 1
+}
+
+function coincidenciaToken(termino, token, permitirFuzzy = true) {
+  let mejor = null
+  const variantes = variantesDe(termino)
+  const tieneSinonimos = variantes.some((variante) => ![termino, singularizar(termino)].includes(variante))
+  for (const variante of variantes) {
+    let resultado = null
+    if (token === variante) resultado = { puntos: 12, tipo: variante === termino ? 'exacta' : 'relacionada' }
+    else if (Math.min(token.length, variante.length) >= 5 && (token.startsWith(variante) || variante.startsWith(token))) resultado = { puntos: 9, tipo: 'prefijo' }
+    else if (Math.min(token.length, variante.length) >= 5 && (token.includes(variante) || variante.includes(token))) resultado = { puntos: 7, tipo: 'parcial' }
+    else if (permitirFuzzy && !tieneSinonimos) {
+      const umbral = umbralFuzzy(variante)
+      if (umbral && Math.abs(token.length - variante.length) <= umbral) {
+        const distancia = distanciaDamerau(variante, token)
+        if (distancia <= umbral) resultado = { puntos: distancia === 1 ? 6 : 4, tipo: 'aproximada' }
+      }
+    }
+    if (resultado && (!mejor || resultado.puntos > mejor.puntos)) mejor = { ...resultado, token }
+  }
+  return mejor
+}
+
+function mejorCoincidencia(termino, item) {
+  const campos = [
+    ['pregunta', item.pregunta, 7, true],
+    ['categoria', item.categoria, 5, true],
+    ['palabras clave', item.palabrasClave || '', 3, true],
+    ['respuesta', item.respuesta, 1, false],
+  ]
+  let mejor = null
+  for (const [campo, texto, peso, permitirFuzzy] of campos) {
+    for (const token of normalizar(texto).split(' ').filter(Boolean)) {
+      const coincidencia = coincidenciaToken(termino, token, permitirFuzzy)
+      if (!coincidencia) continue
+      const candidata = { ...coincidencia, campo, puntos: coincidencia.puntos + peso }
+      if (!mejor || candidata.puntos > mejor.puntos) mejor = candidata
+    }
+  }
+  return mejor
+}
+
+export function buscarPreguntasDetalladas(consulta, guia = PREGUNTAS_AYUDA) {
+  const terminos = terminosDe(consulta)
+  if (!terminos.length) return guia.map((item, indice) => ({ item, puntos: 0, indice, coincidencias: [] }))
+  return guia.map((item, indice) => {
+    const coincidencias = terminos.map((termino) => ({ termino, ...mejorCoincidencia(termino, item) }))
+    if (coincidencias.some((coincidencia) => !coincidencia.token)) return null
+    const frase = normalizar(consulta)
+    const pregunta = normalizar(item.pregunta)
+    const categoria = normalizar(item.categoria)
+    const bonoFrase = pregunta.includes(frase) ? 20 : categoria.includes(frase) ? 12 : 0
+    return { item, puntos: coincidencias.reduce((total, coincidencia) => total + coincidencia.puntos, bonoFrase), indice, coincidencias }
+  }).filter(Boolean).sort((a, b) => b.puntos - a.puntos || a.indice - b.indice)
 }
 
 export function buscarPreguntas(consulta, guia = PREGUNTAS_AYUDA) {
-  const terminos = normalizar(consulta).trim().split(/\s+/).filter(Boolean)
-  if (!terminos.length) return [...guia]
-  return guia.map((item, indice) => {
-    const pregunta = normalizar(item.pregunta)
-    const categoria = normalizar(item.categoria)
-    const texto = normalizar(`${item.categoria} ${item.pregunta} ${item.respuesta} ${item.palabrasClave || ''}`)
-    if (!terminos.every((termino) => variantesDe(termino).some((variante) => texto.includes(variante)))) return null
-    const puntos = terminos.reduce((total, termino) => total + (pregunta.includes(termino) ? 6 : 0) + (categoria.includes(termino) ? 3 : 0) + (texto.includes(termino) ? 1 : 0), 0)
-    return { item, puntos, indice }
-  }).filter(Boolean).sort((a, b) => b.puntos - a.puntos || a.indice - b.indice).map(({ item }) => item)
+  return buscarPreguntasDetalladas(consulta, guia).map(({ item }) => item)
 }
 
 export function filtrarPreguntas(consulta, guia = PREGUNTAS_AYUDA) {
   return buscarPreguntas(consulta, guia)
+}
+
+export function sugerirBusqueda(consulta, guia = PREGUNTAS_AYUDA) {
+  const terminos = terminosDe(consulta)
+  if (!terminos.length) return ''
+  const candidatos = [...new Set(guia.flatMap((item) => [item.categoria, item.pregunta, item.palabrasClave || ''])
+    .flatMap((texto) => normalizar(texto).split(' ')).filter((token) => token.length >= 4 && !PALABRAS_VACIAS_AYUDA.has(token)))]
+  let mejor = null
+  for (const termino of terminos) {
+    for (const candidato of candidatos) {
+      const distancia = distanciaDamerau(termino, candidato)
+      if (distancia > Math.max(2, umbralFuzzy(termino))) continue
+      if (!mejor || distancia < mejor.distancia || (distancia === mejor.distancia && candidato.length < mejor.candidato.length)) mejor = { candidato, distancia }
+    }
+  }
+  return mejor?.candidato || ''
+}
+
+function preguntasRelacionadas(item, guia) {
+  const propios = new Set(terminosDe(`${item.pregunta} ${item.palabrasClave || ''}`).flatMap(variantesDe))
+  return guia.filter((otra) => otra !== item && otra.categoria === item.categoria).map((otra, indice) => {
+    const terminos = terminosDe(`${otra.pregunta} ${otra.palabrasClave || ''}`).flatMap(variantesDe)
+    return { otra, indice, afinidad: terminos.reduce((total, termino) => total + (propios.has(termino) ? 1 : 0), 0) }
+  }).sort((a, b) => b.afinidad - a.afinidad || a.indice - b.indice).slice(0, 2).map(({ otra }) => otra)
+}
+
+function textoResaltado(texto, coincidencias = []) {
+  const fragmento = document.createDocumentFragment()
+  const tokens = new Set(coincidencias.map(({ token }) => token).filter(Boolean))
+  String(texto).split(/(\p{L}[\p{L}\p{N}]*)/gu).forEach((parte) => {
+    if (tokens.has(normalizar(parte))) fragmento.appendChild(elemento('mark', ['ayuda-coincidencia-marca'], parte))
+    else fragmento.appendChild(document.createTextNode(parte))
+  })
+  return fragmento
 }
 
 const DESTACADAS_AYUDA = new Set([
@@ -297,8 +440,13 @@ const ATAJOS_AYUDA = Object.freeze([
 
 const BUSQUEDAS_SUGERIDAS = ['Ingreso a WhatsApp Familias', 'Enviar una campaña', 'Revisar una integración', 'Exportar respuestas']
 
-export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busquedaInicial = '', alCopiarEnlace = null, alCopiarTexto = null, volverA = null } = {}) {
+export function crearPantallaAyuda(raiz, {
+  alIrA = () => {}, admin = false, busquedaInicial = '', alCopiarEnlace = null, alCopiarTexto = null,
+  alRegistrarBusquedaSinResultados = null, alLeerBusquedasSinResultados = null, volverA = null,
+} = {}) {
   let categoriaActiva = busquedaInicial ? 'Todas' : 'Destacadas'
+  let temporizadorRegistro = null
+  const consultasRegistradas = new Set()
   const pantalla = elemento('main', ['pantalla-ayuda'])
   const cabecera = elemento('header', ['ayuda-cabecera'])
   const introduccion = elemento('div', ['ayuda-introduccion'])
@@ -337,7 +485,9 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
     }, ['ayuda-copiar'])
     herramientas.appendChild(copiar)
   }
-  cabecera.append(herramientas, estadoCopia)
+  const estadoBusqueda = elemento('p', ['ayuda-estado-busqueda'])
+  estadoBusqueda.setAttribute('aria-live', 'polite')
+  cabecera.append(herramientas, estadoBusqueda, estadoCopia)
   const sugerenciasBusqueda = elemento('div', ['ayuda-sugerencias'])
   sugerenciasBusqueda.setAttribute('aria-label', 'Búsquedas sugeridas')
   BUSQUEDAS_SUGERIDAS.forEach((consulta) => sugerenciasBusqueda.appendChild(boton(consulta, () => {
@@ -351,7 +501,6 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
   frecuentes.appendChild(elemento('h2', [], 'Atajos frecuentes'))
   const atajos = elemento('div', ['ayuda-atajos'])
   const resumen = elemento('p', ['ayuda-resultados'])
-  resumen.setAttribute('aria-live', 'polite')
   const lista = elemento('section', ['ayuda-lista'])
   const categorias = elemento('nav', ['ayuda-categorias'])
   categorias.setAttribute('aria-label', 'Categorías de ayuda')
@@ -378,6 +527,26 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
   })
   frecuentes.appendChild(atajos)
 
+  const oportunidades = elemento('section', ['ayuda-oportunidades'])
+  oportunidades.hidden = true
+  if (admin && alLeerBusquedasSinResultados) {
+    Promise.resolve(alLeerBusquedasSinResultados()).then((filas = []) => {
+      if (!filas.length) return
+      oportunidades.replaceChildren(
+        elemento('div', ['ayuda-oportunidades-titulo'], 'Temas que todavía no encontraron respuesta'),
+        elemento('p', ['ayuda'], 'Consultas agregadas y anónimas que pueden orientar próximas mejoras de esta guía.'),
+      )
+      const listaOportunidades = elemento('div', ['ayuda-oportunidades-lista'])
+      filas.slice(0, 6).forEach((fila) => listaOportunidades.appendChild(boton(`${fila.consulta} (${fila.cantidad})`, () => {
+        buscar.value = fila.consulta
+        categoriaActiva = 'Todas'
+        dibujar()
+      }, ['secundario'])))
+      oportunidades.appendChild(listaOportunidades)
+      oportunidades.hidden = Boolean(buscar.value.trim())
+    }).catch(() => { /* La ayuda sigue funcionando aunque no cargue esta orientación editorial. */ })
+  }
+
   const permitidasPara = () => PREGUNTAS_AYUDA.filter((item) => !item.soloAdmin || admin)
   const porCategoria = (guia, categoria) => {
     if (categoria === 'Destacadas') return guia.filter((item) => DESTACADAS_AYUDA.has(item.pregunta))
@@ -389,12 +558,19 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
     lista.replaceChildren()
     categorias.replaceChildren()
     selectorCategoria.replaceChildren()
+    const consulta = buscar.value.trim()
     const todasPermitidas = permitidasPara()
-    const permitidas = filtrarPreguntas(buscar.value, todasPermitidas)
+    const resultadosDetallados = buscarPreguntasDetalladas(consulta, todasPermitidas)
+    const permitidas = resultadosDetallados.map(({ item }) => item)
+    const detallesPorPregunta = new Map(resultadosDetallados.map((resultado) => [resultado.item.pregunta, resultado]))
+    frecuentes.hidden = Boolean(consulta)
+    sugerenciasBusqueda.hidden = Boolean(consulta)
+    oportunidades.hidden = Boolean(consulta) || !oportunidades.childElementCount
+    pantalla.classList.toggle('ayuda-con-busqueda', Boolean(consulta))
     const nombresCategorias = ['Destacadas', 'Últimas mejoras', ...new Set(todasPermitidas.map((item) => item.categoria)), 'Todas']
     if (!nombresCategorias.includes(categoriaActiva)) categoriaActiva = 'Todas'
     nombresCategorias.forEach((nombre) => {
-      const cantidad = porCategoria(todasPermitidas, nombre).length
+      const cantidad = porCategoria(consulta ? permitidas : todasPermitidas, nombre).length
       const control = boton('', () => { categoriaActiva = nombre; dibujar() }, ['ayuda-categoria-filtro'])
       control.replaceChildren(elemento('span', [], nombre), elemento('small', [], String(cantidad)))
       control.setAttribute('aria-pressed', String(categoriaActiva === nombre))
@@ -405,13 +581,19 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
       opcion.selected = categoriaActiva === nombre
       selectorCategoria.appendChild(opcion)
     })
-    const visibles = porCategoria(permitidas, categoriaActiva)
-    tituloResultados.textContent = buscar.value.trim() ? 'Resultados de búsqueda' : categoriaActiva
+    const visiblesBase = porCategoria(permitidas, categoriaActiva)
+    const visibles = consulta && categoriaActiva === 'Todas'
+      ? [...new Set(visiblesBase.map((item) => item.categoria))].flatMap((nombre) => visiblesBase.filter((item) => item.categoria === nombre))
+      : visiblesBase
+    tituloResultados.textContent = consulta ? `Resultados para “${consulta}”` : categoriaActiva
     resumen.textContent = `${visibles.length} ${visibles.length === 1 ? 'respuesta encontrada' : 'respuestas encontradas'}`
+    estadoBusqueda.textContent = consulta ? resumen.textContent : 'Escribí una palabra o una tarea. Los resultados aparecerán mientras escribís.'
     limpiar.hidden = !buscar.value
     if (!visibles.length) {
       const vacia = elemento('div', ['ayuda-vacia'])
       vacia.append(elemento('strong', [], 'No encontramos esa respuesta.'), elemento('p', [], 'Probá con la tarea que querés completar o elegí una búsqueda sugerida.'), boton('Ver preguntas destacadas', () => { buscar.value = ''; categoriaActiva = 'Destacadas'; dibujar() }))
+      const sugerencia = sugerirBusqueda(consulta, todasPermitidas)
+      if (sugerencia) vacia.appendChild(boton(`Quizás quisiste buscar “${sugerencia}”`, () => { buscar.value = sugerencia; categoriaActiva = 'Todas'; dibujar() }, ['secundario']))
       BUSQUEDAS_SUGERIDAS.slice(0, 3).forEach((consulta) => vacia.appendChild(boton(consulta, () => { buscar.value = consulta; categoriaActiva = 'Todas'; dibujar() }, ['secundario'])))
       lista.appendChild(vacia)
       return
@@ -424,6 +606,7 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
       }
       const detalle = elemento('details', ['ayuda-pregunta'])
       detalle.dataset.fuente = item.fuente
+      const coincidencia = detallesPorPregunta.get(item.pregunta)
       const respuesta = elemento('div', ['ayuda-respuesta'])
       const metadatos = elemento('div', ['ayuda-respuesta-meta'])
       metadatos.append(elemento('span', ['ayuda-categoria'], item.categoria))
@@ -440,7 +623,7 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
         estadoCopia.textContent = 'Pasos copiados.'
       }, ['secundario']))
       if (accionesRespuesta.childElementCount) respuesta.appendChild(accionesRespuesta)
-      const relacionadas = todasPermitidas.filter((otra) => otra !== item && otra.categoria === item.categoria).slice(0, 2)
+      const relacionadas = preguntasRelacionadas(item, todasPermitidas)
       if (relacionadas.length) {
         const bloqueRelacionadas = elemento('div', ['ayuda-relacionadas'])
         bloqueRelacionadas.appendChild(elemento('strong', [], 'También puede ayudarte'))
@@ -451,24 +634,56 @@ export function crearPantallaAyuda(raiz, { alIrA = () => {}, admin = false, busq
         }, ['ayuda-relacionada'])))
         respuesta.appendChild(bloqueRelacionadas)
       }
-      detalle.append(elemento('summary', [], item.pregunta), respuesta)
+      const sumario = elemento('summary')
+      sumario.appendChild(elemento('span', ['ayuda-pregunta-texto']))
+      sumario.firstChild.appendChild(textoResaltado(item.pregunta, coincidencia?.coincidencias))
+      if (consulta && coincidencia?.coincidencias?.length) {
+        const motivos = [...new Set(coincidencia.coincidencias.map(({ token }) => token).filter(Boolean))].slice(0, 3)
+        sumario.appendChild(elemento('small', ['ayuda-coincidencia'], `Coincide con: ${motivos.join(', ')}`))
+      }
+      detalle.append(sumario, respuesta)
       detalle.addEventListener('toggle', () => {
         if (!detalle.open) return
         lista.querySelectorAll('.ayuda-pregunta[open]').forEach((abierta) => { if (abierta !== detalle) abierta.open = false })
       })
       lista.appendChild(detalle)
     })
-    if (buscar.value.trim() && visibles.length === 1) lista.querySelector('.ayuda-pregunta').open = true
+    if (consulta && visibles.length === 1) lista.querySelector('.ayuda-pregunta').open = true
   }
-  buscar.addEventListener('input', () => { categoriaActiva = 'Todas'; dibujar() })
-  buscar.addEventListener('keydown', (evento) => {
-    if (evento.key !== 'Escape' || !buscar.value) return
-    buscar.value = ''
-    categoriaActiva = 'Destacadas'
+  const registrarSinResultados = () => {
+    const consulta = normalizar(buscar.value)
+    if (!alRegistrarBusquedaSinResultados || consulta.length < 3 || consultasRegistradas.has(consulta)) return
+    if (buscarPreguntas(consulta, permitidasPara()).length) return
+    consultasRegistradas.add(consulta)
+    Promise.resolve(alRegistrarBusquedaSinResultados(consulta)).catch(() => { consultasRegistradas.delete(consulta) })
+  }
+  buscar.addEventListener('input', () => {
+    categoriaActiva = 'Todas'
     dibujar()
+    clearTimeout(temporizadorRegistro)
+    temporizadorRegistro = setTimeout(registrarSinResultados, 800)
+  })
+  buscar.addEventListener('keydown', (evento) => {
+    if (evento.key === 'Enter') {
+      evento.preventDefault()
+      categoriaActiva = 'Todas'
+      dibujar()
+      registrarSinResultados()
+      const primera = lista.querySelector('.ayuda-pregunta')
+      if (primera) primera.open = true
+      resultados.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      tituloResultados.tabIndex = -1
+      tituloResultados.focus({ preventScroll: true })
+      return
+    }
+    if (evento.key === 'Escape' && buscar.value) {
+      buscar.value = ''
+      categoriaActiva = 'Destacadas'
+      dibujar()
+    }
   })
   selectorCategoria.addEventListener('change', () => { categoriaActiva = selectorCategoria.value; dibujar() })
-  pantalla.append(cabecera, frecuentes, contenidoPrincipal)
+  pantalla.append(cabecera, frecuentes, oportunidades, contenidoPrincipal)
   dibujar()
   raiz.appendChild(pantalla)
   return pantalla

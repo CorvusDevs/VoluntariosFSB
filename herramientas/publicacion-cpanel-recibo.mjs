@@ -94,7 +94,13 @@ async function describirPaquete(paquete, carpeta) {
   }
 }
 
-export async function guardarRecibo(plan, { directorio = DIRECTORIO_ARTEFACTOS, packageLockSha256 = '', fuentePaginaSha256 = '' } = {}) {
+export async function guardarRecibo(plan, {
+  directorio = DIRECTORIO_ARTEFACTOS,
+  packageLockSha256 = '',
+  fuentePaginaSha256 = '',
+  fuenteGestorSha256 = '',
+  validacion = { modo: 'completa' },
+} = {}) {
   const versionGestor = selloSeguro(plan.versionGestor)
   const versionPagina = plan.versionPagina?.build || plan.versionPagina?.version
   const carpeta = join(directorio, versionGestor)
@@ -102,13 +108,15 @@ export async function guardarRecibo(plan, { directorio = DIRECTORIO_ARTEFACTOS, 
   const paquetes = []
   for (const paquete of plan.paquetes) paquetes.push(await describirPaquete(paquete, carpeta))
   const recibo = {
-    esquema: 2,
+    esquema: 3,
     creado_en: new Date().toISOString(),
     validado: true,
     version_gestor: versionGestor,
     version_pagina: selloSeguro(versionPagina),
     package_lock_sha256: packageLockSha256,
     fuente_pagina_sha256: fuentePaginaSha256,
+    fuente_gestor_sha256: fuenteGestorSha256,
+    validacion,
     paquetes,
   }
   const ruta = join(carpeta, 'recibo.json')
@@ -119,10 +127,15 @@ export async function guardarRecibo(plan, { directorio = DIRECTORIO_ARTEFACTOS, 
 }
 
 function validarFormaRecibo(recibo) {
-  if (![1, 2].includes(recibo?.esquema) || recibo.validado !== true) throw new Error('El recibo no corresponde a una preparación validada.')
+  if (![1, 2, 3].includes(recibo?.esquema) || recibo.validado !== true) throw new Error('El recibo no corresponde a una preparación validada.')
   selloSeguro(recibo.version_gestor)
   selloSeguro(recibo.version_pagina)
   if (!/^[a-f0-9]{64}$/.test(recibo.package_lock_sha256 || '')) throw new Error('El recibo no contiene una huella válida de package-lock.json.')
+  if (recibo.esquema >= 3 && !/^[a-f0-9]{64}$/.test(recibo.fuente_gestor_sha256 || '')) throw new Error('El recibo no contiene una huella válida de las fuentes del gestor.')
+  if (recibo.esquema >= 3 && !['completa', 'web-enfocada'].includes(recibo.validacion?.modo)) throw new Error('El recibo no identifica una validación admitida.')
+  if (recibo.esquema >= 3 && recibo.validacion?.modo === 'web-enfocada' && !/^.{3,120}$/.test(recibo.validacion.filtro_aceptacion || '')) {
+    throw new Error('El recibo no identifica la prueba de aceptación enfocada.')
+  }
   if (!Array.isArray(recibo.paquetes) || recibo.paquetes.length !== 3) throw new Error('El recibo debe contener las tres capas de publicación.')
   const claves = recibo.paquetes.map((paquete) => paquete.clave).sort()
   if (claves.join(',') !== Object.keys(DESTINOS).sort().join(',')) throw new Error('El recibo no contiene las capas esperadas.')
@@ -165,6 +178,8 @@ export async function planDesdeRecibo(rutaRecibo) {
     versionPagina: { build: recibo.version_pagina },
     packageLockSha256: recibo.package_lock_sha256,
     fuentePaginaSha256: recibo.fuente_pagina_sha256 || '',
+    fuenteGestorSha256: recibo.fuente_gestor_sha256 || '',
+    validacion: recibo.validacion || { modo: 'completa' },
     paquetes,
     recibo: ruta,
   }

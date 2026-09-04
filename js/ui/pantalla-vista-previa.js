@@ -39,6 +39,7 @@ const OPCIONES = [
 // no dispara ni onload ni onerror: la promesa queda colgada para siempre y sin
 // inyeccion esta rama no se podria probar.
 const cargarLogoReal = () => cargarImagen('assets/logo-aletea.png')
+const cargarLogoColorReal = () => cargarImagen('assets/logo-aletea-violeta.png')
 const cargarIconosReales = async () => {
   const [pelota, voluntario] = await Promise.all([
     cargarImagen('assets/iconos/pelota-blanca.svg'),
@@ -485,6 +486,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
 
   async function precargarFotos() {
     const logoPendiente = (opciones.cargarLogo ?? cargarLogoReal)()
+    const logoColorPendiente = opciones.cargarLogoColor
+      ? opciones.cargarLogoColor()
+      : opciones.cargarLogo ? Promise.resolve(null) : cargarLogoColorReal()
     const iconosPendientes = (opciones.cargarIconos ?? cargarIconosReales)()
     if (cargarFoto) {
       // Los voluntarios tambien, no solo los participantes. Cuando se escribio
@@ -513,6 +517,9 @@ export function crearPantallaVistaPrevia(raiz, opciones) {
     const logo = await logoPendiente
     if (!vivo) return cerrar(logo)
     if (logo) imagenes.logo = logo
+    const logoColor = await logoColorPendiente
+    if (!vivo) return cerrar(logoColor)
+    if (logoColor) imagenes.logoColor = logoColor
     const iconos = await iconosPendientes
     if (!vivo) { Object.values(iconos).forEach(cerrar); return }
     Object.entries(iconos).forEach(([clave, imagen]) => { if (imagen) imagenes[clave] = imagen })

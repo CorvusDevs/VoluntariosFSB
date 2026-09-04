@@ -509,6 +509,40 @@ async function metricasPaginaWebCms(contexto) {
   return responder(resumenMetricasWebDesde(diarias.results || [], paginas.results || [], acciones.results || [], dias, hoy))
 }
 
+export function normalizarConsultaAyuda(valor) {
+  const consulta = String(valor || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('es').replace(/[^a-z0-9ñü\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  if (consulta.length < 3 || consulta.length > 80) return null
+  const original = String(valor || '').toLocaleLowerCase('es')
+  if (original.includes('@') || /https?:\/\/|www\./.test(original) || /\d{6,}/.test(original)) return null
+  return consulta
+}
+
+async function metricasAyudaCms(contexto, sesion) {
+  const { request, env } = contexto
+  if (request.method === 'GET') {
+    if (!puedeVerAuditoria(sesion)) return error('Solo la administración puede ver las búsquedas sin respuesta.', 403)
+    const filas = await env.BASE.prepare(`SELECT consulta, SUM(cantidad) AS cantidad, MAX(fecha) AS ultima_fecha
+      FROM metricas_ayuda_sin_resultados GROUP BY consulta
+      ORDER BY cantidad DESC, ultima_fecha DESC LIMIT 20`).all()
+    return responder({ busquedas: (filas.results || []).map((fila) => ({
+      consulta: fila.consulta, cantidad: Number(fila.cantidad || 0), ultimaFecha: fila.ultima_fecha,
+    })) })
+  }
+  if (request.method !== 'POST') return error('Método no permitido.', 405)
+  let datos
+  try { datos = await request.json() } catch { return error('La búsqueda no es válida.', 400) }
+  if (Number(datos?.resultados) !== 0) return error('Solo se registran búsquedas sin resultados.', 400)
+  const consulta = normalizarConsultaAyuda(datos?.consulta)
+  if (!consulta) return responder({ registrada: false, motivo: 'consulta_no_apta' })
+  const fecha = fechaActualCms()
+  await env.BASE.prepare(`INSERT INTO metricas_ayuda_sin_resultados
+    (fecha, consulta, cantidad, actualizado_en) VALUES (?1, ?2, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT(fecha, consulta) DO UPDATE SET cantidad = metricas_ayuda_sin_resultados.cantidad + 1,
+      actualizado_en = CURRENT_TIMESTAMP`).bind(fecha, consulta).run()
+  return responder({ registrada: true })
+}
+
 async function medioPaginaWebPublico(contexto, id) {
   if (contexto.request.method === 'OPTIONS') return responder(null, 204, { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, OPTIONS' })
   if (contexto.request.method !== 'GET' || !/^[a-f0-9-]{36}$/.test(id || '')) return error('No encontramos esa imagen.', 404)
@@ -4669,6 +4703,7 @@ export async function onRequest(contexto) {
   if (ruta === 'listas' && contexto.request.method === 'GET') return listas(contexto, sesion)
   if (ruta === 'foto') return foto(contexto, sesion)
   if (ruta === 'cms/imagen-remota') return imagenRemotaCms(contexto, sesion)
+  if (ruta === 'cms/ayuda/busquedas-sin-resultados') return metricasAyudaCms(contexto, sesion)
   if (ruta === 'cms/comunicaciones' || ruta.startsWith('cms/comunicaciones/')) return comunicacionesCms(contexto, sesion, ruta)
   if (ruta === 'cms/operaciones' || ruta.startsWith('cms/operaciones/')) return operacionesCms(contexto, sesion, ruta)
   if (ruta.startsWith('personas/') && ruta.endsWith('/protegida')) {
