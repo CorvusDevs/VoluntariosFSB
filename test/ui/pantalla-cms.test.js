@@ -992,6 +992,8 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Priorizar accesibilidad en actividades')
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva directriz')).click()
     expect(raiz.querySelector('select[aria-label="Tipo"]').value).toBe('directriz')
+    expect(raiz.querySelector('select[aria-label="Tipo"]').hidden).toBe(true)
+    expect(raiz.textContent).toContain('Una regla o criterio institucional que seguirá vigente')
   })
 
   it('ofrece una captura rápida que lleva cada cosa al módulo correspondiente', async () => {
@@ -1000,14 +1002,34 @@ describe('tablero institucional', () => {
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Crear')).click()
     expect(raiz.textContent).toContain('Captura rápida')
     expect(raiz.textContent).toContain('Actividad o evento')
-    expect(raiz.textContent).toContain('Preparar reunión')
+    expect(raiz.textContent).toContain('Algo concreto que una persona debe hacer')
+    expect(raiz.textContent).toContain('Trabajo que necesita recibir y responder otra área')
+    expect(raiz.textContent).not.toContain('Nota para ordenar')
+    expect(raiz.textContent).not.toContain('Entrada para revisar')
+    expect(raiz.textContent).not.toContain('Preparar reunión')
     expect([...raiz.querySelectorAll('.cms-captura-acciones button')].map((boton) => boton.textContent.trim())).toEqual(['Cerrar'])
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nota para ordenar')).click()
-    expect(raiz.querySelector('select[aria-label="Tipo"]').value).toBe('nota')
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Pedir a otro equipo')).click()
+    expect(raiz.querySelector('select[aria-label="Tipo de entrada"]').value).toBe('pedido')
+    expect(raiz.textContent).toContain('Indicá qué necesitás y qué equipo debería responder')
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Cancelar')).click()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Crear')).click()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Actividad o evento')).click()
     expect(raiz.textContent).toContain('Nueva actividad o evento')
+  })
+
+  it('guarda una idea sin convertirla en otra opción permanente', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
+    const consulta = raiz.querySelector('[aria-label="¿Qué necesitás registrar?"]')
+    consulta.value = 'Idea para recordar más adelante'
+    consulta.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(raiz.textContent).toContain('Sugerencia: Guardar como idea')
+    ;[...raiz.querySelectorAll('.cms-captura-sugerencia button')].find((boton) => boton.textContent.includes('Guardar como idea')).click()
+    expect(raiz.textContent).toContain('Guardar una idea para después')
+    expect(raiz.querySelector('select[aria-label="Tipo"]').value).toBe('nota')
+    expect(raiz.querySelector('select[aria-label="Tipo"]').hidden).toBe(true)
+    expect(raiz.textContent).toContain('todavía no tenga un próximo paso')
   })
 
   it('muestra notificaciones internas y permite marcarlas como leídas', async () => {
@@ -1223,11 +1245,11 @@ describe('tablero institucional', () => {
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
     expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent === 'Nueva tarea')).toBe(false)
-    expect(raiz.textContent).toContain('Pedido a un equipo')
+    expect(raiz.textContent).toContain('Pedir a otro equipo')
     const consulta = raiz.querySelector('[aria-label="¿Qué necesitás registrar?"]')
     consulta.value = 'Preparar materiales para el viernes'
     consulta.dispatchEvent(new Event('input', { bubbles: true }))
-    expect(raiz.textContent).toContain('Sugerencia: Enviar pedido a un equipo')
+    expect(raiz.textContent).toContain('Sugerencia: Pedir a otro equipo')
   })
 
   it('muestra solo proyectos compatibles con el equipo y la unidad de la tarea', async () => {
@@ -1571,7 +1593,7 @@ describe('tablero institucional', () => {
   it('crea una solicitud para un equipo y la identifica como tal', async () => {
     crearPantallaCMSReal(raiz, { sesion: { nombre: 'Ale' }, alIrA, area: 'control' })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Solicitar a un equipo')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Pedir a otro equipo')).click()
     expect(raiz.textContent).toContain('registra quién la creó')
     expect(raiz.textContent).toContain('se asigna primero a Coordinación')
     raiz.querySelector('input[aria-label="Nueva tarea"]').value = 'Confirmar transporte'
@@ -1587,7 +1609,7 @@ describe('tablero institucional', () => {
     await esperar()
     expect(raiz.textContent).toContain('Respuestas por resolver')
     expect(raiz.textContent).toContain('Camila Pérez')
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar entrada')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar consulta recibida')).click()
     raiz.querySelector('input[aria-label="Nombre o referencia de la entrada"]').value = 'Lucía García'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
@@ -1602,7 +1624,7 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Respuestas protegidas')
     expect(raiz.textContent).toContain('acceso vigente a datos personales')
     expect(raiz.textContent).not.toContain('Camila Pérez')
-    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent.includes('Registrar entrada'))).toBe(false)
+    expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent.includes('Registrar consulta recibida'))).toBe(false)
     expect([...raiz.querySelectorAll('button')].some((boton) => boton.textContent === 'Registrar respuesta')).toBe(false)
     expect(raiz.textContent).toContain('2 respuestas')
   })
@@ -1610,7 +1632,7 @@ describe('tablero institucional', () => {
   it('no deriva una entrada sin nombre ni un pedido sin sus dos equipos', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar entrada')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar consulta recibida')).click()
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
     await esperar()
     expect(globalThis.fetch.mock.calls.some(([url]) => url === '/api/cms/entradas')).toBe(false)
@@ -1631,7 +1653,7 @@ describe('tablero institucional', () => {
     })
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar entrada')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar consulta recibida')).click()
     const nombre = raiz.querySelector('input[aria-label="Nombre o referencia de la entrada"]')
     nombre.value = 'Lucía García'
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
@@ -1653,7 +1675,7 @@ describe('tablero institucional', () => {
   it('conserva ambos equipos y la prioridad de un pedido', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar entrada')).click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Registrar consulta recibida')).click()
     await esperar()
     const tipo = raiz.querySelector('select[aria-label="Tipo de entrada"]')
     tipo.value = 'pedido'; tipo.dispatchEvent(new Event('change'))
@@ -1791,11 +1813,11 @@ describe('tablero institucional', () => {
     expect(raiz.querySelector('a[href="https://drive.google.com/drive/folders/carpeta-fsb"]').textContent).toContain('Abrir carpeta principal')
   })
 
-  it('incluye Nuevo documento o enlace dentro de Crear', async () => {
+  it('incluye Documento o enlace dentro de Crear', async () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Crear').click()
-    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent === 'Nuevo documento o enlace').click()
+    ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Documento o enlace')).click()
     expect(raiz.textContent).toContain('El archivo no se sube al gestor')
   })
 

@@ -1,7 +1,27 @@
-export const VERSION_NOVEDADES = '2.1.2'
+export const VERSION_NOVEDADES = '2.1.3'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.1.3', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Gestor', 'Captura rápida', 'Ayuda'],
+    resumen: ['Menos opciones al crear', 'Nombres cotidianos', 'Pedidos con destino correcto'],
+    descripcion: 'Crear muestra solamente las acciones frecuentes y explica qué resultado produce cada una antes de abrir el formulario.',
+    actualizaciones: [
+      'Nueva tarea, Actividad o evento, Proyecto, Pedir a otro equipo y Documento o enlace quedan como las cinco decisiones principales.',
+      'Cada acción incorpora una explicación breve y el tipo de tarea seleccionado también se define con un ejemplo cotidiano.',
+      'Las directrices se crean dentro de Directrices, las reuniones desde Agenda y las consultas recibidas desde Formularios.',
+    ],
+    adiciones: [
+      'La ayuda compara tarea, directriz e idea para después y explica dónde registrar una consulta recibida.',
+      'Escribir idea o nota en la captura ofrece Guardar como idea sin sumar otra opción permanente al panel.',
+    ],
+    arreglos: [
+      'Pedir a otro equipo abre el formulario con Pedido entre equipos ya seleccionado.',
+      'Pedido a un equipo y Entrada para revisar dejan de abrir el mismo formulario indistinguible.',
+      'Las acciones equivalentes del buscador, las pantallas vacías y el encabezado usan el mismo nombre.',
+    ],
+  },
   {
     version: '2.1.2', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Fútbol sin Barreras', 'Planillas A4', 'Impresión'],
