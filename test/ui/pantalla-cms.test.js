@@ -740,7 +740,11 @@ describe('tablero institucional', () => {
     expect(raiz.textContent).toContain('Nuevo documento o enlace')
     expect(raiz.querySelector('select[aria-label="Programa o espacio del documento"]').value).toBe('uo1')
     expect(raiz.querySelector('select[aria-label="Equipo del documento"]').value).toBe('e1')
-    expect(raiz.querySelector('.cms-cambios-pendientes').textContent).toBe('Sin cambios')
+    const estadoCambios = raiz.querySelector('.cms-cambios-pendientes')
+    expect(estadoCambios.hidden).toBe(true)
+    raiz.querySelector('input[aria-label="Título del documento o enlace"]').dispatchEvent(new Event('input', { bubbles: true }))
+    expect(estadoCambios.hidden).toBe(false)
+    expect(estadoCambios.textContent).toBe('Cambios pendientes')
     expect(raiz.querySelector('[aria-label="Cerrar Nuevo documento o enlace"]')).not.toBeNull()
     expect([...raiz.querySelectorAll('.cms-campo-obligatorio')].map((item) => item.textContent)).toEqual(['Obligatorio', 'Obligatorio'])
     expect(raiz.querySelector('select[aria-label="Quién puede ver el documento"]').textContent).toContain('Sólo administración')
@@ -1722,6 +1726,11 @@ describe('tablero institucional', () => {
     crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
     await esperar()
     ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nuevo proyecto')).click()
+    expect([...raiz.querySelectorAll('.cms-formulario-opcional summary strong')].map((titulo) => titulo.textContent)).toEqual([
+      'Organización', 'Planificación', 'Notas y próximos hitos',
+    ])
+    expect([...raiz.querySelectorAll('.cms-formulario-opcional')].every((seccion) => !seccion.open)).toBe(true)
+    expect(raiz.querySelector('select[aria-label="Programa del proyecto"]')).toBeNull()
     raiz.querySelector('input[aria-label="Nombre del proyecto"]').value = 'Escuela de familias'
     raiz.querySelector('select[aria-label="Equipo del proyecto"]').value = 'e1'
     raiz.querySelector('select[aria-label="Responsable del proyecto"]').value = 'claudia@aletea.org'
@@ -1901,6 +1910,31 @@ describe('tablero institucional', () => {
     raiz.querySelector('form').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/eventos')
     expect(JSON.parse(opciones.body)).toMatchObject({ titulo: 'Jornada de familias', fecha_hora: '2026-09-04T17:30', equipo_id: 'e1', frecuencia_evento: null, repetir_hasta: null })
+  })
+
+  it('muestra primero lo esencial y guarda las opciones avanzadas de una actividad en secciones plegables', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva actividad')).click()
+    expect(raiz.querySelectorAll('.cms-formulario-esencial-evento > *')).toHaveLength(4)
+    const secciones = [...raiz.querySelectorAll('.cms-formulario-opcional')]
+    expect(secciones.map((seccion) => seccion.querySelector('summary strong').textContent)).toEqual([
+      'Agregar finalización', 'Organización y seguimiento', 'Repetición', 'Descripción y preparación',
+    ])
+    expect(secciones.every((seccion) => !seccion.open)).toBe(true)
+    expect(raiz.querySelector('.cms-ayuda-clasificacion').hidden).toBe(true)
+    expect(raiz.querySelector('.cms-cambios-pendientes').hidden).toBe(true)
+  })
+
+  it('lleva una reunión al formulario específico y conserva el título escrito', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva actividad')).click()
+    const titulo = raiz.querySelector('input[aria-label="Título de la actividad"]')
+    titulo.value = 'Coordinación de Deportes'
+    const tipo = raiz.querySelector('select[aria-label="Tipo de fecha institucional"]')
+    tipo.value = 'reunion'; tipo.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(raiz.textContent).toContain('Nueva reunión')
+    expect(raiz.querySelector('input[aria-label="Título de la reunión"]').value).toBe('Coordinación de Deportes')
+    expect(raiz.textContent).toContain('La minuta y las decisiones')
   })
 
   it('permite agendar una serie completa de actividades desde un solo formulario', async () => {
@@ -2202,6 +2236,16 @@ describe('tablero institucional', () => {
     await esperar()
     const [, opciones] = globalThis.fetch.mock.calls.find(([url]) => url === '/api/cms/reuniones')
     expect(JSON.parse(opciones.body)).toMatchObject({ frecuencia_reunion: 'mensual', repetir_hasta: '2026-12-31' })
+  })
+
+  it('organiza la reunión nueva en datos esenciales y tres secciones opcionales', async () => {
+    crearPantallaCMS(raiz, { sesion: { nombre: 'Ale' }, alIrA })
+    await esperar(); ;[...raiz.querySelectorAll('button')].find((boton) => boton.textContent.includes('Nueva reunión')).click()
+    expect(raiz.querySelectorAll('.cms-formulario-esencial-reunion > *')).toHaveLength(3)
+    expect([...raiz.querySelectorAll('.cms-formulario-opcional summary strong')].map((titulo) => titulo.textContent)).toEqual([
+      'Objetivo y preparación', 'Organización', 'Repetición',
+    ])
+    expect([...raiz.querySelectorAll('.cms-formulario-opcional')].every((seccion) => !seccion.open)).toBe(true)
   })
 
   it('ofrece repetir una reunión por posición mensual y envía la regla elegida', async () => {

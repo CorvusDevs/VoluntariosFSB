@@ -1,7 +1,28 @@
-export const VERSION_NOVEDADES = '2.1.3'
+export const VERSION_NOVEDADES = '2.1.4'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.1.4', estado: 'Preparada el 5 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Agenda', 'Reuniones', 'Proyectos', 'Formularios'],
+    resumen: ['Lo esencial primero', 'Opciones agrupadas', 'Menos recorrido al crear'],
+    descripcion: 'Crear una actividad, reunión o proyecto comienza con los datos indispensables y mantiene las opciones menos frecuentes disponibles en grupos claros.',
+    actualizaciones: [
+      'Nueva actividad muestra primero título, tipo, lugar e inicio.',
+      'Nueva reunión separa objetivo, preparación, organización y repetición de los datos esenciales.',
+      'Nuevo proyecto permite empezar con nombre y objetivo, y completar organización, planificación y notas cuando correspondan.',
+    ],
+    adiciones: [
+      'Las opciones de finalización, organización, repetición, descripción, planificación e hitos se pueden desplegar por separado.',
+      'Elegir Reunión desde el formulario de actividad abre el recorrido específico sin perder el título escrito.',
+      'La Ayuda explica qué contiene cada grupo opcional y cuándo conviene usarlo.',
+    ],
+    arreglos: [
+      'Las indicaciones de clasificación solo aparecen cuando existe una selección que necesita contexto.',
+      'El estado Cambios pendientes permanece oculto hasta que la persona modifica un campo.',
+      'Los formularios reducen su altura inicial y conservan todas las opciones anteriores sin saturar la primera vista.',
+    ],
+  },
   {
     version: '2.1.3', estado: 'Preparada el 4 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Gestor', 'Captura rápida', 'Ayuda'],

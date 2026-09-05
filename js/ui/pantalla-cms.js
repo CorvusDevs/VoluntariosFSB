@@ -1313,6 +1313,20 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     return campo
   }
 
+  function grupoOpcionalCms(titulo, descripcion, contenido, abierto = false) {
+    const grupo = elemento('details', ['cms-formulario-opcional'])
+    grupo.open = Boolean(abierto)
+    const resumen = elemento('summary', ['cms-formulario-opcional-resumen'])
+    resumen.append(
+      elemento('strong', [], titulo),
+      elemento('small', [], descripcion),
+    )
+    const cuerpo = elemento('div', ['cms-formulario-opcional-contenido'])
+    cuerpo.append(...(Array.isArray(contenido) ? contenido : [contenido]))
+    grupo.append(resumen, cuerpo)
+    return grupo
+  }
+
   function reemplazarOpciones(select, opciones, valor = '') {
     select.replaceChildren()
     opciones.forEach(([id, texto]) => {
@@ -1356,6 +1370,7 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
           ? `Solo se muestran proyectos de ${contexto}. También podés guardar sin proyecto.`
           : 'Elegí un equipo o una unidad para ver únicamente sus proyectos.'
       }
+      ayuda.hidden = !fueraDeContexto && !equipo.value && !unidad?.value && !proyecto.value
     }
     equipo.addEventListener('change', () => { actualizarUnidades(false); actualizarProyectos(false) })
     unidad?.addEventListener('change', () => {
@@ -1488,7 +1503,6 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const titulo = inputCms('Ej. Escuela de familias 2026', 'Nombre del proyecto'); titulo.required = true; titulo.maxLength = 180; titulo.value = proyecto?.titulo || capturaOrientada?.texto || ''
     const objetivo = inputCms('Qué busca lograr este proyecto', 'Objetivo del proyecto')
     objetivo.maxLength = 400; objetivo.value = proyecto?.objetivo || ''
-    const detalles = elemento('div', ['cms-captura-detalles'])
     const programa = selectorCms([['', 'Sin programa'], ...datos.programas.map((fila) => [fila.id, fila.nombre])], 'Programa del proyecto')
     const equipo = selectorCms([['', 'Sin equipo'], ...datos.equipos.map((fila) => [fila.id, fila.nombre])], 'Equipo del proyecto')
     const unidad = selectorCms([['', 'Sin unidad operativa'], ...datos.unidades.map((fila) => [fila.id, `${fila.sigla ? `${fila.sigla}: ` : ''}${fila.nombre}`])], 'Programa o espacio de trabajo')
@@ -1501,8 +1515,23 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     const notas = areaCms('Riesgos, dependencias o próximos hitos', 'Notas del proyecto')
     const equipoContextual = equipoFundacionalCms(datos.equipos, area)
     programa.value = proyecto?.programa_id || ''; equipo.value = proyecto?.equipo_id || capturaOrientada?.equipo_id || equipoContextual?.id || ''; unidad.value = proyecto?.unidad_id || ''; responsable.value = proyecto?.responsable_correo || capturaOrientada?.responsable_correo || ''; prioridad.value = proyecto?.prioridad || 'normal'; estado.value = proyecto?.estado || 'en_marcha'; fechaInicio.value = valorFechaLocal(proyecto?.fecha_inicio); fechaFin.value = valorFechaLocal(proyecto?.fecha_fin); presupuesto.value = proyecto?.presupuesto ?? ''; notas.value = proyecto?.notas || ''
-    detalles.append(campoCms('Programa anterior', programa, 'Se conserva para los proyectos existentes durante la migración.'), campoCms('Programa o espacio', unidad, 'La unidad estable donde vive el proyecto.'), equipo, responsable, estado, prioridad, fechaInicio, fechaFin, presupuesto)
-    forma.append(elemento('h3', [], proyecto ? `Editar proyecto: ${proyecto.titulo}` : 'Nuevo proyecto'), titulo, objetivo, detalles, elemento('label', ['cms-etiqueta-campo'], 'Notas y próximos hitos'), notas, accionesFormulario(() => {
+    const esenciales = elemento('div', ['cms-formulario-esencial', 'cms-formulario-esencial-proyecto'])
+    esenciales.append(campoCms('Nombre del proyecto', titulo), campoCms('Objetivo, opcional', objetivo))
+    const organizacionContenido = elemento('div', ['cms-captura-detalles'])
+    organizacionContenido.append(campoCms('Equipo', equipo), campoCms('Programa o espacio', unidad, 'El espacio estable donde vive el proyecto.'), campoCms('Responsable', responsable))
+    if (proyecto?.programa_id) organizacionContenido.append(campoCms('Programa anterior', programa, 'Se conserva únicamente para proyectos existentes durante la migración.'))
+    const planificacionContenido = elemento('div', ['cms-captura-detalles'])
+    planificacionContenido.append(campoCms('Estado', estado), campoCms('Prioridad', prioridad), fechaInicio, fechaFin, campoCms('Presupuesto estimado', presupuesto))
+    const notasContenido = elemento('div', ['cms-formulario-opcional-campo-completo'])
+    notasContenido.append(campoCms('Notas y próximos hitos', notas))
+    forma.append(
+      elemento('h3', [], proyecto ? `Editar proyecto: ${proyecto.titulo}` : 'Nuevo proyecto'),
+      elemento('p', ['ayuda'], 'Empezá por el nombre. La organización, las fechas y el presupuesto se pueden completar después.'),
+      esenciales,
+      grupoOpcionalCms('Organización', 'Equipo, programa o espacio y responsable.', organizacionContenido, Boolean(proyecto?.equipo_id || proyecto?.unidad_id || proyecto?.responsable_correo || capturaOrientada?.equipo_id || capturaOrientada?.responsable_correo)),
+      grupoOpcionalCms('Planificación', 'Estado, prioridad, fechas y presupuesto.', planificacionContenido, Boolean(proyecto?.fecha_inicio || proyecto?.fecha_fin || proyecto?.presupuesto || (proyecto?.prioridad && proyecto.prioridad !== 'normal'))),
+      grupoOpcionalCms('Notas y próximos hitos', 'Riesgos, dependencias y contexto adicional.', notasContenido, Boolean(proyecto?.notas)),
+      accionesFormulario(() => {
       if (!forma.reportValidity() || guardando) return
       guardando = true
       const cuerpo = { titulo: titulo.value, objetivo: objetivo.value, programa_id: programa.value || null, equipo_id: equipo.value || null, unidad_id: unidad.value || null, responsable_correo: responsable.value || null, estado: estado.value, prioridad: prioridad.value, fecha_inicio: fechaInicio.value || null, fecha_fin: fechaFin.value || null, presupuesto: presupuesto.value, notas: notas.value }
@@ -1521,7 +1550,8 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
           dibujar()
         })
         .catch((fallo) => { error = fallo.message; guardando = false; dibujar() })
-    }, proyecto ? 'Guardar proyecto' : 'Crear proyecto'))
+      }, proyecto ? 'Guardar proyecto' : 'Crear proyecto'),
+    )
     forma.addEventListener('submit', (evento) => { evento.preventDefault(); forma.querySelector('.boton-principal').click() })
     return forma
   }
@@ -1816,13 +1846,38 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     frecuencia.addEventListener('change', revisarRecurrencia)
     inicio.addEventListener('input', revisarRecurrencia)
     revisarRecurrencia()
+    tipo.addEventListener('change', () => {
+      if (evento || tipo.value !== 'reunion') return
+      capturaOrientada = { ...(capturaOrientada || {}), texto: titulo.value.trim().slice(0, 180) }
+      formularioAbierto = 'reunion'
+      dibujar()
+    })
     proyecto.value = evento?.proyecto_id || proyectoPreseleccionado || ''
     const proyectoContextual = datos.proyectos.find((fila) => fila.id === proyecto.value)
     descripcion.value = evento?.descripcion || ''; fin.value = evento?.fecha_fin || ''; equipo.value = evento?.equipo_id || capturaOrientada?.equipo_id || proyectoContextual?.equipo_id || ''; unidad.value = evento?.unidad_id || proyectoContextual?.unidad_id || ''; responsable.value = evento?.responsable_correo || capturaOrientada?.responsable_correo || proyectoContextual?.responsable_correo || ''; estado.value = evento?.estado || 'planificado'
-    const detalles = elemento('div', ['cms-captura-detalles']); detalles.append(tipo, inicio, fin, lugar, equipo, unidad, proyecto, responsable, estado)
-    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
-    if (!evento) detalles.append(campoCms('Repetición', frecuencia, 'Crea todas las fechas de la serie en una sola acción. Después podés editar cada actividad por separado.'), repetirHasta)
-    forma.append(elemento('h3', [], evento ? `Editar actividad: ${evento.titulo}` : 'Nueva actividad o evento'), elemento('p', ['ayuda'], 'Agendá actividades, reuniones, cursos, publicaciones, vencimientos, pagos, renovaciones, trámites, certificaciones o asambleas.'), titulo, detalles, elemento('p', ['ayuda'], 'La finalización indica cuánto dura cada encuentro. Si se repite, la fecha final de la serie se elige en Repetición.'), elemento('label', ['cms-etiqueta-campo'], 'Descripción'), descripcion, accionesFormulario(() => {
+    const esenciales = elemento('div', ['cms-formulario-esencial', 'cms-formulario-esencial-evento'])
+    const tituloEsencial = campoCms('Título de la actividad', titulo)
+    tituloEsencial.classList.add('cms-formulario-ancho')
+    inicio.classList.add('cms-formulario-ancho')
+    esenciales.append(
+      tituloEsencial,
+      campoCms('Tipo', tipo, !evento ? 'Si elegís Reunión, el gestor abrirá el formulario específico para conservar la minuta y las decisiones.' : ''),
+      campoCms('Lugar, opcional', lugar),
+      inicio,
+    )
+    const contexto = elemento('div', ['cms-captura-detalles'])
+    contexto.append(campoCms('Equipo', equipo), campoCms('Programa o espacio', unidad), campoCms('Proyecto', proyecto), campoCms('Responsable', responsable))
+    if (evento) contexto.append(campoCms('Estado', estado))
+    contexto.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
+    const finalizacion = grupoOpcionalCms('Agregar finalización', 'Indicá cuándo termina únicamente si necesitás registrar su duración.', fin, Boolean(evento?.fecha_fin))
+    const organizacion = grupoOpcionalCms('Organización y seguimiento', 'Equipo, programa, proyecto, responsable y estado.', contexto, Boolean(evento?.equipo_id || evento?.unidad_id || evento?.proyecto_id || evento?.responsable_correo || (evento?.estado && evento.estado !== 'planificado')))
+    const recurrencia = !evento
+      ? grupoOpcionalCms('Repetición', 'Creá todas las fechas de una serie en una sola acción.', [campoCms('Frecuencia', frecuencia), repetirHasta])
+      : document.createDocumentFragment()
+    const contenidoDescripcion = elemento('div', ['cms-formulario-opcional-campo-completo'])
+    contenidoDescripcion.append(campoCms('Descripción', descripcion, 'Objetivo, público o materiales que conviene preparar.'))
+    const descripcionOpcional = grupoOpcionalCms('Descripción y preparación', 'Agregá contexto solo cuando sea útil para el equipo.', contenidoDescripcion, Boolean(evento?.descripcion))
+    forma.append(elemento('h3', [], evento ? `Editar actividad: ${evento.titulo}` : 'Nueva actividad o evento'), elemento('p', ['ayuda'], 'Completá lo esencial. Las reuniones usan un recorrido propio para conservar minutas y decisiones.'), esenciales, finalizacion, organizacion, recurrencia, descripcionOpcional, accionesFormulario(() => {
       if (!forma.reportValidity() || guardando) return; guardando = true
       pedir(evento ? `/api/cms/eventos/${evento.id}` : '/api/cms/eventos', { method: evento ? 'PATCH' : 'POST', body: JSON.stringify({ titulo: titulo.value, tipo: tipo.value, descripcion: descripcion.value, fecha_hora: inicio.value, fecha_fin: fin.value || null, lugar: lugar.value, equipo_id: equipo.value || null, unidad_id: unidad.value || null, proyecto_id: proyecto.value || null, responsable_correo: responsable.value || null, estado: estado.value, frecuencia_evento: frecuencia.value || null, repetir_hasta: repetirHasta.value || null }) })
         .then(() => { formularioAbierto = null; eventoAEditar = null; proyectoPreseleccionado = null; return cargar() }).catch((fallo) => { error = fallo.message; guardando = false; dibujar() })
@@ -1983,15 +2038,24 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
     frecuencia.addEventListener('change', revisarRecurrencia)
     fechaHora.addEventListener('input', revisarRecurrencia)
     revisarRecurrencia()
-    const detalles = elemento('div', ['cms-captura-detalles'])
-    detalles.append(fechaHora, campoCms('Seguimiento previo', seguimiento, 'Elegí cuándo querés volver a verla para preparar materiales, una presentación o confirmar avances.'), lugar, equipo, unidad, proyecto, campoCms('Repetición', frecuencia, 'Crea todas las reuniones de la serie. La minuta y las decisiones se registran por separado en cada fecha.'), repetirHasta)
-    detalles.appendChild(vincularClasificacion({ equipo, unidad, proyecto }))
+    const esenciales = elemento('div', ['cms-formulario-esencial', 'cms-formulario-esencial-reunion'])
+    const tituloEsencial = campoCms('Título de la reunión', titulo)
+    tituloEsencial.classList.add('cms-formulario-ancho')
+    fechaHora.classList.add('cms-formulario-ancho')
+    esenciales.append(tituloEsencial, fechaHora, campoCms('Lugar, opcional', lugar))
+    const contexto = elemento('div', ['cms-captura-detalles'])
+    contexto.append(campoCms('Equipo', equipo), campoCms('Programa o espacio', unidad), campoCms('Proyecto', proyecto), vincularClasificacion({ equipo, unidad, proyecto }))
+    const preparacionContenido = elemento('div', ['cms-captura-detalles', 'cms-formulario-preparacion-reunion'])
+    preparacionContenido.append(campoCms('Objetivo', objetivo), campoCms('Seguimiento previo', seguimiento, 'Elegí cuándo querés volver a verla para preparar materiales o confirmar avances.'), campoCms('Preparación', preparacion))
+    const recurrenciaContenido = elemento('div', ['cms-captura-detalles'])
+    recurrenciaContenido.append(campoCms('Frecuencia', frecuencia, 'La minuta y las decisiones se registran por separado en cada fecha.'), repetirHasta)
     forma.append(
       elemento('h3', [], 'Nueva reunión'),
-      titulo,
-      objetivo,
-      detalles,
-      preparacion,
+      elemento('p', ['ayuda'], 'Indicá el encuentro. El objetivo, la preparación y la organización se pueden completar cuando hagan falta.'),
+      esenciales,
+      grupoOpcionalCms('Objetivo y preparación', 'Temas, materiales y fecha para retomar la preparación.', preparacionContenido),
+      grupoOpcionalCms('Organización', 'Equipo, programa o proyecto relacionado.', contexto, Boolean(capturaOrientada?.equipo_id)),
+      grupoOpcionalCms('Repetición', 'Creá todas las reuniones de una serie en una sola acción.', recurrenciaContenido),
       accionesFormulario(() => {
         if (!forma.reportValidity() || guardando) return
         guardando = true
@@ -6041,11 +6105,13 @@ export function crearPantallaCMS(raiz, { sesion, alIrA, area = 'control', contex
         panelActivo.classList.add('cms-captura-con-acciones-fijas')
         const formularioEditable = panelActivo.matches('form') || Boolean(panelActivo.querySelector('form'))
         if (formularioEditable) {
-          const estadoCambios = elemento('span', ['cms-cambios-pendientes'], 'Sin cambios')
+          const estadoCambios = elemento('span', ['cms-cambios-pendientes'])
           estadoCambios.setAttribute('role', 'status')
+          estadoCambios.hidden = true
           accionesPanel.prepend(estadoCambios)
           const marcarCambios = () => {
             panelActivo.dataset.cambiosSinGuardar = 'true'
+            estadoCambios.hidden = false
             estadoCambios.textContent = 'Cambios pendientes'
             estadoCambios.classList.add('activo')
             const indicador = document.querySelector('[data-estado-guardado]')

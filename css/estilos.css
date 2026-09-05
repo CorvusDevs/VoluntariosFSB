@@ -2504,6 +2504,20 @@ textarea:focus-visible {
 .cms-fecha-hora > input { width: 100%; }
 .cms-captura-detalles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; align-items: start; }
 .cms-captura-detalles > * { min-width: 0; }
+.cms-formulario-esencial { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.cms-formulario-esencial > * { min-width: 0; }
+.cms-formulario-esencial .cms-formulario-ancho { grid-column: 1 / -1; }
+.cms-formulario-opcional { overflow: clip; border: 1px solid #E3D8E7; border-radius: 13px; background: #FBF9FC; }
+.cms-formulario-opcional-resumen { position: relative; display: grid; gap: 2px; min-height: 54px; padding: 11px 46px 11px 14px; cursor: pointer; list-style: none; }
+.cms-formulario-opcional-resumen::-webkit-details-marker { display: none; }
+.cms-formulario-opcional-resumen::after { position: absolute; top: 50%; right: 18px; width: 9px; height: 9px; border-right: 2px solid var(--violeta); border-bottom: 2px solid var(--violeta); content: ''; transform: translateY(-70%) rotate(45deg); transition: transform .18s ease; }
+.cms-formulario-opcional[open] > .cms-formulario-opcional-resumen::after { transform: translateY(-30%) rotate(225deg); }
+.cms-formulario-opcional-resumen strong { color: var(--violeta); font-size: 14px; }
+.cms-formulario-opcional-resumen small { color: var(--texto-suave); font-size: 12px; font-weight: 500; line-height: 1.35; }
+.cms-formulario-opcional-contenido { padding: 14px; border-top: 1px solid #E8DFEB; background: #FFF; }
+.cms-formulario-opcional-contenido > .cms-captura-detalles { margin: 0; }
+.cms-formulario-opcional-campo-completo, .cms-formulario-opcional-campo-completo > .cms-campo { display: grid; gap: 7px; }
+.cms-formulario-preparacion-reunion > .cms-campo:has(textarea) { grid-column: 1 / -1; }
 .cms-recursos-tarea { display: grid; gap: 10px; padding: 14px; border: 1px solid #D7EDEA; border-radius: 14px; background: #F5FCFB; }
 .cms-recursos-tarea h4, .cms-recursos-tarea p { margin: 0; }
 .cms-recursos-tarea-campos { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr); gap: 10px; }
@@ -4868,6 +4882,10 @@ input[aria-invalid="true"] { border-color: var(--magenta); box-shadow: 0 0 0 3px
 @media (max-width: 680px) {
   .app-cms > .cuerpo { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
   .cms { gap: 12px; padding: 12px 12px calc(92px + env(safe-area-inset-bottom)); }
+  .cms-formulario-esencial { grid-template-columns: minmax(0, 1fr); }
+  .cms-formulario-esencial .cms-formulario-ancho { grid-column: auto; }
+  .cms-formulario-opcional-resumen { min-height: 58px; padding: 10px 42px 10px 12px; }
+  .cms-formulario-opcional-contenido { padding: 12px; }
   .cms h1 { font-size: clamp(1.85rem, 9vw, 2.45rem); line-height: 1; }
   .cms h2 { font-size: clamp(1.35rem, 6vw, 1.75rem); }
   .cms-encabezado { gap: 12px; padding: 18px; border-radius: 18px; }

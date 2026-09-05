@@ -67,6 +67,12 @@ describe('desplazamiento de popups', () => {
     expect(estilos).toMatch(/\.cms-con-panel > \.cms-captura > \.cms-captura-acciones \.boton \{ width: 100%; min-width: 0; \}/)
   })
 
+  it('apila los datos esenciales y conserva opciones desplegables completas en celular', () => {
+    expect(estilos).toMatch(/@media \(max-width: 680px\) \{[\s\S]*?\.cms-formulario-esencial \{ grid-template-columns: minmax\(0, 1fr\); \}/)
+    expect(estilos).toMatch(/\.cms-formulario-opcional \{[^}]*overflow: clip;[^}]*border-radius: 13px;/)
+    expect(estilos).toMatch(/\.cms-formulario-opcional-contenido \{[^}]*padding: 14px;[^}]*border-top:/)
+  })
+
   it('cambia las pestañas por un selector antes de que los botones puedan cortarse', () => {
     expect(estilos).toMatch(/@media \(max-width: 720px\) \{[\s\S]*?\.cms-unidad-selector-pestanas \{ display: block; \}[\s\S]*?\.cms-unidad-pestanas \{ display: none; \}/)
   })
