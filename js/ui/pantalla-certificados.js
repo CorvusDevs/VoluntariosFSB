@@ -3,7 +3,7 @@ import {
   actualizarValidacionParticipantes, advertenciasLoteCertificados, crearConfiguracionCertificado,
   formatearCedulaUruguay, importarParticipantesCertificados, sugerirCapacitacionLote, TIPOS_CERTIFICADO,
 } from '../modelo/certificados.js'
-import { archivosSvgCertificados, crearSvgCertificado, imprimirLoteCertificados, MEDIDAS_CERTIFICADO } from '../imagen/certificados.js'
+import { archivosSvgCertificados, crearSvgCertificado, imprimirLoteCertificados, limitesContenidoFirma, MEDIDAS_CERTIFICADO } from '../imagen/certificados.js'
 import { crearZip } from '../util/zip.js'
 
 function leerTextoArchivo(archivo) {
@@ -22,6 +22,43 @@ function leerImagenArchivo(archivo) {
     lector.onerror = () => rechazar(new Error('No pudimos leer el logotipo.'))
     lector.readAsDataURL(archivo)
   })
+}
+
+function cargarImagen(fuente) {
+  return new Promise((resolver, rechazar) => {
+    const imagen = new Image()
+    imagen.onload = () => resolver(imagen)
+    imagen.onerror = () => rechazar(new Error('No pudimos abrir la imagen.'))
+    imagen.src = fuente
+  })
+}
+
+function esquinaClara(datos, ancho, x, y) {
+  const indice = (y * ancho + x) * 4
+  return datos[indice + 3] > 245 && datos[indice] > 242 && datos[indice + 1] > 242 && datos[indice + 2] > 242
+}
+
+async function leerFirmaRecortada(archivo) {
+  const fuente = await leerImagenArchivo(archivo)
+  const imagen = await cargarImagen(fuente)
+  const lienzo = document.createElement('canvas'); lienzo.width = imagen.naturalWidth || imagen.width; lienzo.height = imagen.naturalHeight || imagen.height
+  const contexto = lienzo.getContext('2d', { willReadFrequently: true })
+  if (!contexto) return { fuente, advertencias: ['No pudimos recortar los márgenes automáticamente.'] }
+  contexto.drawImage(imagen, 0, 0)
+  const datos = contexto.getImageData(0, 0, lienzo.width, lienzo.height).data
+  const esquinas = [[0, 0], [lienzo.width - 1, 0], [0, lienzo.height - 1], [lienzo.width - 1, lienzo.height - 1]]
+  const advertencias = []
+  if (esquinas.filter(([x, y]) => esquinaClara(datos, lienzo.width, x, y)).length >= 3) advertencias.push('El PNG parece tener fondo blanco. Usá uno transparente para un resultado limpio.')
+  const limites = limitesContenidoFirma(datos, lienzo.width, lienzo.height)
+  if (!limites) return { fuente, advertencias: ['No encontramos trazos visibles en el PNG.'] }
+  if (limites.ancho < 280 || limites.alto < 80) advertencias.push('La firma tiene poca resolución y podría verse borrosa al imprimir.')
+  const margen = Math.max(4, Math.round(Math.min(lienzo.width, lienzo.height) * .012))
+  const x = Math.max(0, limites.x - margen); const y = Math.max(0, limites.y - margen)
+  const ancho = Math.min(lienzo.width - x, limites.ancho + margen * 2); const alto = Math.min(lienzo.height - y, limites.alto + margen * 2)
+  const recorte = document.createElement('canvas'); recorte.width = ancho; recorte.height = alto
+  recorte.getContext('2d').drawImage(lienzo, x, y, ancho, alto, 0, 0, ancho, alto)
+  const recortada = x > 0 || y > 0 || ancho < lienzo.width || alto < lienzo.height
+  return { fuente: recorte.toDataURL('image/png'), advertencias, recortada, ancho, alto }
 }
 
 async function cargarLogoAletea() {
@@ -63,7 +100,7 @@ export function crearPantallaCertificados(raiz, opciones = {}) {
   const descargar = opciones.descargar ?? descargarBlob
   const leerArchivo = opciones.leerArchivo ?? leerTextoArchivo
   const leerLogo = opciones.leerLogo ?? leerImagenArchivo
-  const leerFirma = opciones.leerFirma ?? leerImagenArchivo
+  const leerFirma = opciones.leerFirma ?? leerFirmaRecortada
   const cargarLogoPredeterminado = opciones.cargarLogoPredeterminado ?? cargarLogoAletea
   const cargarFuentePredeterminada = opciones.cargarFuentePredeterminada ?? cargarFuenteMontserrat
   let configuracion = crearConfiguracionCertificado('participacion')
@@ -73,6 +110,7 @@ export function crearPantallaCertificados(raiz, opciones = {}) {
   let logoInstitucional = ''
   let capacitacionEditada = false
   let temaEditado = false
+  const metadatosFirmas = { firma1: null, firma2: null }
 
   const pantalla = elemento('section', ['certificados'])
   raiz.appendChild(pantalla)
@@ -254,12 +292,20 @@ export function crearPantallaCertificados(raiz, opciones = {}) {
     ajustes.appendChild(lote)
 
     const firmas = elemento('section', ['certificados-ajustes-grupo', 'certificados-firmas'])
-    firmas.append(
-      elemento('h3', [], 'Firmas'),
-      elemento('p', ['ayuda'], 'Opcional. Usá archivos PNG con fondo transparente para ver la firma sobre la línea.'),
-      selectorFirma('Firma PNG del primer firmante', 'firma1', configuracion.firmante1),
-      selectorFirma('Firma PNG del segundo firmante', 'firma2', configuracion.firmante2),
-    )
+    firmas.append(elemento('h3', [], 'Firmas'), elemento('p', ['ayuda'], 'Usá archivos PNG transparentes. El gestor recorta los márgenes vacíos y mantiene la proporción.'))
+    const sincronizar = elemento('label', ['certificados-sincronizar'])
+    const sincronizarControl = document.createElement('input'); sincronizarControl.type = 'checkbox'; sincronizarControl.checked = Boolean(configuracion.sincronizarFirmas)
+    sincronizarControl.addEventListener('change', () => {
+      configuracion.sincronizarFirmas = sincronizarControl.checked
+      if (sincronizarControl.checked) {
+        const origen = configuracion.firma1 || !configuracion.firma2 ? 1 : 2; const destino = origen === 1 ? 2 : 1
+        configuracion[`firma${destino}Tamano`] = configuracion[`firma${origen}Tamano`]
+        configuracion[`firma${destino}Y`] = configuracion[`firma${origen}Y`]
+      }
+      pintarAjustes(); pintarVista()
+    })
+    sincronizar.append(sincronizarControl, elemento('span', [], 'Usar el mismo tamaño y altura en ambas firmas'))
+    firmas.append(sincronizar, selectorFirma('Primera firma', 'firma1', configuracion.firmante1), selectorFirma('Segunda firma', 'firma2', configuracion.firmante2))
     ajustes.appendChild(firmas)
 
     const avanzado = document.createElement('details'); avanzado.className = 'certificados-avanzado'
@@ -302,26 +348,98 @@ export function crearPantallaCertificados(raiz, opciones = {}) {
     return (valor) => { configuracion[clave] = Number(valor); pintarVista() }
   }
 
+  function controlRangoFirma(etiqueta, clave, opciones) {
+    const envoltorio = elemento('label', ['certificados-firma-control'])
+    const cabeceraControl = elemento('span', [])
+    const nombre = elemento('span', [], etiqueta); const salida = elemento('output', [], opciones.formato(configuracion[clave]))
+    cabeceraControl.append(nombre, salida)
+    const control = document.createElement('input'); control.type = 'range'; control.min = opciones.min; control.max = opciones.max; control.step = opciones.step
+    control.value = configuracion[clave]; control.dataset.ajusteFirma = clave
+    control.addEventListener('input', () => {
+      const valor = Number(control.value); configuracion[clave] = valor; salida.textContent = opciones.formato(valor)
+      const coincidencia = clave.match(/^firma([12])(Tamano|Y)$/)
+      if (configuracion.sincronizarFirmas && coincidencia) {
+        const otro = `firma${coincidencia[1] === '1' ? '2' : '1'}${coincidencia[2]}`
+        configuracion[otro] = valor
+        const otroControl = ajustes.querySelector(`[data-ajuste-firma="${otro}"]`)
+        if (otroControl) { otroControl.value = String(valor); otroControl.closest('label')?.querySelector('output')?.replaceChildren(opciones.formato(valor)) }
+      }
+      pintarVista()
+    })
+    envoltorio.append(cabeceraControl, control)
+    return envoltorio
+  }
+
+  function restablecerAjustesFirma(indice) {
+    configuracion[`firma${indice}Tamano`] = 1; configuracion[`firma${indice}X`] = 0; configuracion[`firma${indice}Y`] = 0
+    configuracion[`firma${indice}Grosor`] = 0; configuracion[`firma${indice}Intensidad`] = 1
+    if (configuracion.sincronizarFirmas) {
+      const otro = indice === 1 ? 2 : 1
+      configuracion[`firma${otro}Tamano`] = 1; configuracion[`firma${otro}Y`] = 0
+    }
+    pintarAjustes(); pintarVista()
+  }
+
   function selectorFirma(etiqueta, clave, nombreFirmante) {
+    const indice = clave === 'firma1' ? 1 : 2
     const contenedor = elemento('div', ['certificados-firma'])
-    contenedor.appendChild(elemento('strong', [], etiqueta))
+    contenedor.append(elemento('strong', [], etiqueta), elemento('span', ['certificados-firma-nombre'], nombreFirmante || 'Firmante'))
     const entrada = document.createElement('input')
     entrada.type = 'file'; entrada.accept = 'image/png'; entrada.hidden = true
-    const estadoFirma = elemento('small', [], configuracion[clave] ? 'Firma agregada' : 'Sin firma agregada')
-    const agregar = boton(`Agregar firma de ${nombreFirmante || 'firmante'}`, () => entrada.click())
+    const datosFirma = metadatosFirmas[clave]
+    const estadoFirma = elemento('small', ['certificados-firma-estado'], configuracion[clave] ? (datosFirma?.nombre || 'Firma agregada') : 'Sin firma agregada')
+    const agregar = boton(configuracion[clave] ? 'Cambiar PNG' : `Agregar firma de ${nombreFirmante || 'firmante'}`, () => entrada.click())
     const quitar = boton('Quitar firma', () => {
-      configuracion[clave] = ''; entrada.value = ''; estadoFirma.textContent = 'Sin firma agregada'; quitar.disabled = true; pintarVista()
+      configuracion[clave] = ''; metadatosFirmas[clave] = null; entrada.value = ''; pintarAjustes(); pintarVista()
     })
     quitar.disabled = !configuracion[clave]
     entrada.addEventListener('change', async () => {
       const archivo = entrada.files?.[0]
       if (!archivo) return
-      configuracion[clave] = await leerFirma(archivo)
-      estadoFirma.textContent = archivo.name || 'Firma agregada'
-      quitar.disabled = false
-      pintarVista()
+      try {
+        estadoFirma.textContent = 'Preparando firma...'
+        const resultado = await leerFirma(archivo)
+        configuracion[clave] = typeof resultado === 'string' ? resultado : resultado.fuente
+        metadatosFirmas[clave] = { ...(typeof resultado === 'string' ? {} : resultado), nombre: archivo.name || 'Firma agregada' }
+        pintarAjustes(); pintarVista()
+      } catch (error) {
+        estadoFirma.textContent = error?.message || 'No pudimos preparar esta firma.'
+      }
     })
-    contenedor.append(agregar, quitar, entrada, estadoFirma)
+    const acciones = elemento('div', ['certificados-firma-acciones']); acciones.append(agregar, quitar, entrada)
+    contenedor.append(acciones, estadoFirma)
+    if (datosFirma?.recortada) contenedor.appendChild(elemento('small', ['certificados-firma-confirmacion'], 'Márgenes transparentes recortados automáticamente.'))
+    ;(datosFirma?.advertencias || []).forEach((mensaje) => contenedor.appendChild(elemento('small', ['certificados-firma-advertencia'], mensaje)))
+    if (configuracion[clave]) {
+      const principales = elemento('div', ['certificados-firma-controles'])
+      principales.append(
+        controlRangoFirma('Tamaño', `firma${indice}Tamano`, { min: .6, max: 1.5, step: .05, formato: (valor) => `${Math.round(Number(valor) * 100)}%` }),
+        controlRangoFirma('Altura sobre la línea', `firma${indice}Y`, { min: -100, max: 35, step: 5, formato: (valor) => `${Number(valor) > 0 ? '+' : ''}${valor}` }),
+      )
+      const centrar = boton('Centrar', () => {
+        configuracion[`firma${indice}X`] = 0; configuracion[`firma${indice}Y`] = 0
+        if (configuracion.sincronizarFirmas) configuracion[`firma${indice === 1 ? 2 : 1}Y`] = 0
+        pintarAjustes(); pintarVista()
+      })
+      const restaurar = boton('Restablecer', () => restablecerAjustesFirma(indice))
+      const finos = document.createElement('details'); finos.className = 'certificados-firma-finos'
+      finos.appendChild(elemento('summary', [], 'Ajustes finos'))
+      const panelFino = elemento('div', ['certificados-firma-finos-panel'])
+      const grosor = elemento('label', ['certificados-firma-control'])
+      grosor.appendChild(elemento('span', [], 'Grosor del trazo'))
+      const selectorGrosor = document.createElement('select'); selectorGrosor.dataset.ajusteFirma = `firma${indice}Grosor`
+      ;[['-1', 'Fino'], ['0', 'Original'], ['1', 'Reforzado'], ['2', 'Marcado']].forEach(([valor, texto]) => { const opcion = document.createElement('option'); opcion.value = valor; opcion.textContent = texto; selectorGrosor.appendChild(opcion) })
+      selectorGrosor.value = String(configuracion[`firma${indice}Grosor`]); selectorGrosor.addEventListener('change', () => { configuracion[`firma${indice}Grosor`] = Number(selectorGrosor.value); pintarVista() })
+      grosor.appendChild(selectorGrosor)
+      panelFino.append(
+        controlRangoFirma('Posición lateral', `firma${indice}X`, { min: -150, max: 150, step: 5, formato: (valor) => `${Number(valor) > 0 ? '+' : ''}${valor}` }),
+        controlRangoFirma('Intensidad', `firma${indice}Intensidad`, { min: .45, max: 1, step: .05, formato: (valor) => `${Math.round(Number(valor) * 100)}%` }),
+        grosor,
+      )
+      finos.appendChild(panelFino)
+      const ajustesAcciones = elemento('div', ['certificados-firma-ajustes-acciones']); ajustesAcciones.append(centrar, restaurar)
+      contenedor.append(principales, finos, ajustesAcciones)
+    }
     return contenedor
   }
 

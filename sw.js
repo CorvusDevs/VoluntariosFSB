@@ -15,7 +15,7 @@
 // Si algo sale mal, abrir la aplicacion con ?sw=off la desregistra y vuelve
 // todo al comportamiento anterior.
 
-const VERSION = '2026-09-05.1942-d77a782fae'
+const VERSION = '2026-09-05.2018-94689c9d78'
 const CACHE = `voluntarios-fsb-${VERSION}`
 
 // Tomar el control apenas se instala, sin esperar a que se cierren las pestanas

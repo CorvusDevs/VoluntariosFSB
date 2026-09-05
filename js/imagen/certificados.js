@@ -53,8 +53,38 @@ function lineasCargo(texto, x, y, colorTexto) {
   return textoMultilinea(String(texto ?? '').split('\n'), x, y, { tamano: 42, alto: 55, color: colorTexto })
 }
 
-function firmaImagen(fuente, x) {
-  return fuente ? `<image href="${xml(fuente)}" x="${x - 245}" y="2040" width="490" height="180" preserveAspectRatio="xMidYMid meet"/>` : ''
+export function limitesContenidoFirma(pixeles, ancho, alto, umbral = 8) {
+  if (!pixeles || ancho < 1 || alto < 1 || pixeles.length < ancho * alto * 4) return null
+  let izquierda = ancho; let derecha = -1; let arriba = alto; let abajo = -1
+  for (let y = 0; y < alto; y += 1) {
+    for (let x = 0; x < ancho; x += 1) {
+      if (pixeles[(y * ancho + x) * 4 + 3] <= umbral) continue
+      izquierda = Math.min(izquierda, x); derecha = Math.max(derecha, x)
+      arriba = Math.min(arriba, y); abajo = Math.max(abajo, y)
+    }
+  }
+  return derecha < izquierda ? null : { x: izquierda, y: arriba, ancho: derecha - izquierda + 1, alto: abajo - arriba + 1 }
+}
+
+function numeroAcotado(valor, minimo, maximo, inicial) {
+  const numero = Number(valor)
+  return Number.isFinite(numero) ? Math.max(minimo, Math.min(maximo, numero)) : inicial
+}
+
+function firmaImagen(fuente, x, configuracion, indice) {
+  if (!fuente) return ''
+  const prefijo = `firma${indice}`
+  const escala = numeroAcotado(configuracion[`${prefijo}Tamano`], .6, 1.5, 1)
+  const desplazamientoX = numeroAcotado(configuracion[`${prefijo}X`], -150, 150, 0)
+  const desplazamientoY = numeroAcotado(configuracion[`${prefijo}Y`], -100, 35, 0)
+  const grosor = numeroAcotado(configuracion[`${prefijo}Grosor`], -1, 2, 0)
+  const intensidad = numeroAcotado(configuracion[`${prefijo}Intensidad`], .45, 1, 1)
+  const ancho = Math.round(490 * escala); const alto = Math.round(180 * escala)
+  const izquierda = Math.round(x + desplazamientoX - ancho / 2)
+  const arriba = Math.round(2220 + desplazamientoY - alto)
+  const idFiltro = `trazo-${prefijo}`
+  const filtro = grosor === 0 ? '' : `<filter id="${idFiltro}" x="-15%" y="-25%" width="130%" height="150%"><feMorphology in="SourceGraphic" operator="${grosor < 0 ? 'erode' : 'dilate'}" radius="${Math.abs(grosor)}"/></filter>`
+  return `${filtro}<image data-firma="${indice}" href="${xml(fuente)}" x="${izquierda}" y="${arriba}" width="${ancho}" height="${alto}" opacity="${intensidad}" preserveAspectRatio="xMidYMid meet"${filtro ? ` filter="url(#${idFiltro})"` : ''}/>`
 }
 
 function definicionFuente(configuracion) {
@@ -133,7 +163,7 @@ export function crearSvgCertificado(persona = {}, configuracion = {}) {
     ${textoMultilinea([persona.cedula || 'cédula identidad'], CENTRO, trazado.cedulaY + (nombreLineas.length - 1) * Math.round(nombreTamanoBase * 1.04 * escala), { tamano: Math.round(92 * escala), color: texto })}
     ${cuerpo}
     ${textoMultilinea([configuracion.lugarFecha || plantilla.lugarFecha], CENTRO, trazado.fechaY, { tamano: Math.round(62 * escala), peso: 500, color: texto })}
-    ${firmaImagen(configuracion.firma1, 1345)}${firmaImagen(configuracion.firma2, 2173)}
+    ${firmaImagen(configuracion.firma1, 1345, configuracion, 1)}${firmaImagen(configuracion.firma2, 2173, configuracion, 2)}
     <line x1="1080" y1="2230" x2="1610" y2="2230" stroke="${texto}" stroke-width="5" stroke-dasharray="5 5"/>
     <line x1="1905" y1="2230" x2="2440" y2="2230" stroke="${texto}" stroke-width="5" stroke-dasharray="5 5"/>
     ${textoMultilinea([configuracion.firmante1], 1345, 2298, { tamano: 42, peso: 700, color: texto })}

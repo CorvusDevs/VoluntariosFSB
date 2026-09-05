@@ -2539,10 +2539,26 @@ textarea:focus-visible {
 .certificados-logo { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding-top: 4px; }
 .certificados-logo strong { width: 100%; color: var(--violeta); font-size: 11px; }
 .certificados-logo .boton { min-height: 36px; margin: 0; padding: 7px 9px; font-size: 10px; }
-.certificados-firma { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; padding: 9px; border: 1px solid #E8DFEB; border-radius: 10px; background: #FCFAFD; }
-.certificados-firma strong { width: 100%; color: var(--violeta); font-size: 11px; }
+.certificados-sincronizar { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border-radius: 9px; background: #EFFAF8; color: var(--texto); font-size: 10px; font-weight: 650; line-height: 1.4; }
+.certificados-sincronizar input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--violeta); }
+.certificados-firma { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 10px; padding: 11px; border: 1px solid #E8DFEB; border-radius: 12px; background: #FCFAFD; }
+.certificados-firma strong { color: var(--violeta); font-size: 11px; }
+.certificados-firma-nombre { overflow: hidden; color: var(--texto-suave); font-size: 9px; font-weight: 700; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.certificados-firma-acciones, .certificados-firma-ajustes-acciones { display: flex; flex-wrap: wrap; gap: 7px; grid-column: 1 / -1; }
 .certificados-firma .boton { min-height: 36px; margin: 0; padding: 7px 9px; font-size: 10px; }
-.certificados-firma small { color: var(--texto-suave); font-size: 10px; }
+.certificados-firma small { grid-column: 1 / -1; color: var(--texto-suave); font-size: 10px; line-height: 1.4; }
+.certificados-firma-confirmacion { color: #16745F !important; }
+.certificados-firma-advertencia { padding: 7px 9px; border-left: 3px solid var(--magenta); border-radius: 4px 8px 8px 4px; background: #FFF3F8; color: #8D174B !important; }
+.certificados-firma-controles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; grid-column: 1 / -1; padding-top: 3px; }
+.certificados-firma-control { display: grid; gap: 5px; min-width: 0; color: var(--texto); font-size: 10px; font-weight: 650; }
+.certificados-firma-control > span { display: flex; justify-content: space-between; gap: 6px; }
+.certificados-firma-control output { color: var(--violeta); font-weight: 800; }
+.certificados-firma-control input[type="range"] { width: 100%; min-height: 28px; margin: 0; accent-color: var(--magenta); }
+.certificados-firma-control select { min-height: 38px; padding: 7px 9px; border: 1px solid #DCD3DF; border-radius: 8px; background: white; color: var(--texto); font: 600 10px Poppins, sans-serif; }
+.certificados-firma-finos { grid-column: 1 / -1; overflow: hidden; border: 1px solid #E6DDE8; border-radius: 9px; background: white; }
+.certificados-firma-finos summary { padding: 9px 10px; color: var(--violeta); font-size: 10px; font-weight: 750; cursor: pointer; }
+.certificados-firma-finos-panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding: 10px; border-top: 1px solid #E8DFEB; }
+.certificados-firma-finos-panel .certificados-firma-control:last-child { grid-column: 1 / -1; }
 .certificados-pie { position: sticky; z-index: 4; bottom: 0; display: grid; grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.2fr) auto; align-items: center; gap: 14px; margin-top: 18px; padding: 12px 16px; border: 1px solid #D9CBDD; border-radius: 15px; background: rgba(255, 255, 255, .96); box-shadow: 0 -8px 26px rgba(67, 31, 81, .1); backdrop-filter: blur(10px); }
 .certificados-estado { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--texto-suave); font-size: 12px; line-height: 1.4; }
 .certificados-estado .certificados-revisar { min-height: 34px; margin: 0; padding: 7px 11px; border-color: #D27A9F; background: #FFF7FA; color: #8D174B; font-size: 11px; }
@@ -2596,6 +2612,9 @@ textarea:focus-visible {
   .certificados-ajustes { order: 3; width: 100%; }
   .certificados-hoja { min-height: 0; padding: 12px; }
   .certificados-personas-lista { max-height: 330px; }
+  .certificados-firma-controles, .certificados-firma-finos-panel { grid-template-columns: 1fr; }
+  .certificados-firma-finos-panel .certificados-firma-control:last-child { grid-column: auto; }
+  .certificados-firma-acciones .boton, .certificados-firma-ajustes-acciones .boton { flex: 1 1 120px; }
   .certificados-pie { align-items: stretch; }
   .certificados-pie, .certificados-acciones-finales { display: grid; }
   .certificados-acciones-finales .boton { width: 100%; min-width: 0; }

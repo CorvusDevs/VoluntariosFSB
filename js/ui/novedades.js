@@ -1,7 +1,28 @@
-export const VERSION_NOVEDADES = '2.2.0'
+export const VERSION_NOVEDADES = '2.2.1'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.2.1', estado: 'Preparada el 5 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Comunicación visual', 'Certificados', 'Firmas'],
+    resumen: ['Firmas proporcionadas y centradas', 'Controles visibles por firmante', 'Avisos de calidad antes de descargar'],
+    descripcion: 'Los certificados permiten preparar cada firma PNG directamente sobre la vista previa, con límites seguros para conservar la composición A4.',
+    actualizaciones: [
+      'Cada firma conserva su proporción y recorta automáticamente los márgenes transparentes al cargarla.',
+      'Tamaño y altura se ajustan por separado con una lectura visible del valor aplicado.',
+      'La vista previa, el PDF y los SVG profesionales usan exactamente la misma configuración.',
+    ],
+    adiciones: [
+      'Ajustes finos para posición lateral, intensidad y grosor del trazo.',
+      'Acciones para centrar o restablecer una firma sin volver a cargar el archivo.',
+      'Opción para mantener iguales el tamaño y la altura de ambas firmas.',
+      'Avisos cuando el PNG parece tener fondo blanco o resolución insuficiente.',
+    ],
+    arreglos: [
+      'Los márgenes transparentes de archivos diferentes ya no hacen que firmas equivalentes parezcan desalineadas.',
+      'El movimiento queda limitado a la zona segura y no altera nombres, cargos ni el formato A4.',
+    ],
+  },
   {
     version: '2.2.0', estado: 'Preparada el 5 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Comunicación visual', 'Carruseles', 'Ayuda'],

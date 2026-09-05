@@ -65,6 +65,9 @@ export const CONFIGURACION_CERTIFICADO_INICIAL = Object.freeze({
   firmante1: 'CLAUDIA CRAVEA', cargo1: 'Co-coordinadora\nDirección ejecutiva Aletea',
   firmante2: 'IRENE PELUSO', cargo2: 'Co-coordinadora\nPresidenta Aletea',
   firma1: '', firma2: '', logo: '', marcaInstitucional: '', fuenteMontserrat: '',
+  firma1Tamano: 1, firma1X: 0, firma1Y: 0, firma1Grosor: 0, firma1Intensidad: 1,
+  firma2Tamano: 1, firma2X: 0, firma2Y: 0, firma2Grosor: 0, firma2Intensidad: 1,
+  sincronizarFirmas: false,
 })
 
 export function crearConfiguracionCertificado(tipo = 'participacion') {
