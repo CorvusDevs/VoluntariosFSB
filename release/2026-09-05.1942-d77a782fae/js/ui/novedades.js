@@ -1,7 +1,30 @@
-export const VERSION_NOVEDADES = '2.1.5'
+export const VERSION_NOVEDADES = '2.2.0'
 export const CLAVE_NOVEDADES_VISTAS = 'aletea:novedades:vista'
 
 export const NOVEDADES = Object.freeze([
+  {
+    version: '2.2.0', estado: 'Preparada el 5 de septiembre de 2026', autor: 'Alejandro Estol',
+    ambitos: ['Comunicación visual', 'Carruseles', 'Ayuda'],
+    resumen: ['Carruseles con sistema editorial', 'Fotografías sin deformación', 'Piezas más simples y alineadas'],
+    descripcion: 'El Editor de piezas adopta la grilla visual de las referencias institucionales y guía la creación de una serie completa, desde la portada hasta el cierre.',
+    actualizaciones: [
+      'Cada página del carrusel puede funcionar como Portada con foto, Idea con foto o Cierre para compartir.',
+      'Los títulos permiten resaltar una palabra o frase concreta en magenta o turquesa.',
+      'Las fotografías mantienen su proporción y permiten ajustar el encuadre horizontal y vertical.',
+    ],
+    adiciones: [
+      'Agregar cierre crea una página final preparada para invitar a compartir el contenido.',
+      'Las páginas se pueden mover, duplicar o eliminar sin salir del recorrido del carrusel.',
+      'Red social y sitio web se actualizan de forma consistente en todas las páginas de la serie.',
+      'La ayuda explica las nuevas composiciones, el resaltado y el encuadre de fotografías.',
+    ],
+    arreglos: [
+      'La etiqueta inclinada y sus controles se retiraron de las piezas de eventos y campañas.',
+      'Los iconos de calendario y modalidad comparten una grilla y quedan alineados con sus textos.',
+      'Las imágenes dejan de estirarse para llenar el espacio disponible.',
+      'El pie, el logotipo y la franja lateral conservan una posición constante entre páginas.',
+    ],
+  },
   {
     version: '2.1.5', estado: 'Preparada el 5 de septiembre de 2026', autor: 'Alejandro Estol',
     ambitos: ['Comunicación visual', 'Certificados', 'Google Forms'],

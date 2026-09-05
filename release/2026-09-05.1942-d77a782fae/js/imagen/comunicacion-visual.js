@@ -16,12 +16,18 @@ export const FUENTES_COMUNICACION = Object.freeze({
   leagueGothic: { nombre: 'League Gothic', familia: "'League Gothic', sans-serif", pesoNormal: 400, pesoDestacado: 400 },
 })
 
+export const TIPOS_PAGINA_CARRUSEL = Object.freeze({
+  portada: { nombre: 'Portada con foto', descripcion: 'Abre el tema con una frase breve.' },
+  contenido: { nombre: 'Idea con foto', descripcion: 'Desarrolla una idea y mantiene la grilla.' },
+  cierre: { nombre: 'Cierre para compartir', descripcion: 'Termina el carrusel con una llamada clara.' },
+})
+
 export const PLANTILLAS_COMUNICACION = Object.freeze({
   apoyo: {
     nombre: 'Actividad o evento', descripcion: 'Fecha, modalidad y contacto', categoria: 'Evento', paleta: 'institucional', composicion: 'evento',
     datos: {
       red: '@aleteauy', sitio: 'www.aletea.org', fondoTitulo: 'NUEVA FECHA',
-      titulo: 'GRUPOS DE APOYO\nPARA FAMILIAS', etiqueta: 'VIRTUAL',
+      titulo: 'GRUPOS DE APOYO\nPARA FAMILIAS', etiqueta: '',
       descripcion: 'Dirigido a padres, madres y otros familiares que tengan a su cargo personas dentro del Espectro Autista. Los grupos se dividen por edades.',
       destacado: 'Solo se inscriben las familias nuevas. Actividad gratuita.',
       fecha: 'Jueves 27 de agosto', hora: '19 a 21 hs', modalidad: 'Vía Zoom', contacto: '099 29 44 21',
@@ -31,7 +37,7 @@ export const PLANTILLAS_COMUNICACION = Object.freeze({
     nombre: 'Convocatoria', descripcion: 'Invitación para participar', categoria: 'Convocatoria', paleta: 'turquesa', composicion: 'evento',
     datos: {
       red: '@aleteauy', sitio: 'www.aletea.org', fondoTitulo: 'SUMATE',
-      titulo: 'CONSTRUIMOS\nCOMUNIDAD', etiqueta: 'PARTICIPÁ',
+      titulo: 'CONSTRUIMOS\nCOMUNIDAD', etiqueta: '',
       descripcion: 'Abrimos un nuevo espacio para encontrarnos, compartir experiencias y seguir construyendo redes.',
       destacado: 'Tu participación hace la diferencia.',
       fecha: 'Próximo encuentro', hora: 'Hora a confirmar', modalidad: 'Modalidad a confirmar', contacto: 'Contacto de Aletea',
@@ -41,7 +47,7 @@ export const PLANTILLAS_COMUNICACION = Object.freeze({
     nombre: 'Campaña', descripcion: 'Mensaje institucional de impacto', categoria: 'Campaña', paleta: 'magenta', composicion: 'evento',
     datos: {
       red: '@aleteauy', sitio: 'www.aletea.org', fondoTitulo: 'INCLUSIÓN',
-      titulo: 'UNA SOCIEDAD\nPARA TODAS LAS PERSONAS', etiqueta: 'ALEtEA',
+      titulo: 'UNA SOCIEDAD\nPARA TODAS LAS PERSONAS', etiqueta: '',
       descripcion: 'Tejemos redes entre familias, generamos espacios inclusivos y compartimos herramientas para construir comunidad.',
       destacado: 'Una sociedad que no resulte discapacitante para nadie.',
       fecha: '', hora: '', modalidad: '', contacto: 'www.aletea.org',
@@ -56,9 +62,10 @@ export const PLANTILLAS_COMUNICACION = Object.freeze({
       destacado: '', fecha: '', hora: '', modalidad: '', contacto: '',
     },
     diapositivas: [
-      { titulo: 'NO TODOS LOS\nAPOYOS SON IGUALES', descripcion: 'Cuando pensamos en apoyo, solemos imaginar a alguien acompañando físicamente. Pero hay muchas formas, y todas cuentan.', destacado: '' },
-      { titulo: 'HUMANOS:\nACOMPAÑANTES, REFERENTES, DOCENTES DE APOYO', descripcion: 'El apoyo humano puede acompañar, anticipar, facilitar la participación y construir autonomía.', destacado: '' },
-      { titulo: 'TÉCNICOS:\nAGENDAS VISUALES, TECNOLOGÍA, PICTOGRAMAS, RECORDATORIOS', descripcion: 'Las herramientas adecuadas ayudan a comprender, organizarse y participar con mayor autonomía.', destacado: '' },
+      { tipoPagina: 'portada', titulo: 'NO TODOS LOS\nAPOYOS SON IGUALES', resaltadoTitulo: 'APOYOS', tonoResaltado: 'acento', descripcion: 'Cuando pensamos en apoyo, solemos imaginar a alguien acompañando físicamente. Pero hay muchas formas, y todas cuentan.', destacado: '', fotoPosicionX: 50, fotoPosicionY: 50 },
+      { tipoPagina: 'contenido', titulo: 'EL APOYO HUMANO\nACOMPAÑA Y CONSTRUYE\nAUTONOMÍA', resaltadoTitulo: 'APOYO HUMANO', tonoResaltado: 'acento', descripcion: 'Acompañantes, referentes y docentes de apoyo pueden anticipar, facilitar la participación y construir autonomía.', destacado: '', fotoPosicionX: 50, fotoPosicionY: 50 },
+      { tipoPagina: 'contenido', titulo: 'LAS HERRAMIENTAS\nTAMBIÉN PUEDEN SER\nUN APOYO', resaltadoTitulo: 'HERRAMIENTAS', tonoResaltado: 'apoyo', descripcion: 'Agendas visuales, tecnología, pictogramas y recordatorios ayudan a comprender, organizarse y participar.', destacado: '', fotoPosicionX: 50, fotoPosicionY: 50 },
+      { tipoPagina: 'cierre', titulo: '¿TE GUSTA\nNUESTRO\nCONTENIDO?', resaltadoTitulo: 'CONTENIDO', tonoResaltado: 'apoyo', descripcion: 'AYUDANOS A DIFUNDIRLO', destacado: '', fotoPosicionX: 50, fotoPosicionY: 50 },
     ],
   },
   mensaje: {
@@ -85,7 +92,7 @@ export const PLANTILLAS_COMUNICACION = Object.freeze({
 
 export const DISENO_COMUNICACION_INICIAL = Object.freeze({
   formato: 'vertical', paleta: 'institucional', fuente: 'leagueGothic', composicion: 'evento', paginaActiva: 0,
-  escalaTitulo: 1, escalaTexto: 1, giroEtiqueta: -8, tituloMulticolor: false, justificarTexto: true,
+  escalaTitulo: 1, escalaTexto: 1, tituloMulticolor: false, justificarTexto: true,
   mostrarRedes: true, mostrarFondoTitulo: true, mostrarEtiqueta: true,
   mostrarDetalles: true, mostrarLogo: true, mostrarBanda: true, mostrarDesliza: false, mostrarFoto: false,
   mostrarContacto: true, mostrarFirma: true, mostrarNumeroPagina: true,
@@ -96,12 +103,12 @@ export const ESCALA_TITULO_MAXIMA = 2
 export function crearDisenoComunicacion(plantilla = 'apoyo') {
   const elegida = PLANTILLAS_COMUNICACION[plantilla] ?? PLANTILLAS_COMUNICACION.apoyo
   const ajustes = elegida.composicion === 'editorial'
-    ? { mostrarFondoTitulo: false, mostrarEtiqueta: false, mostrarDetalles: false, mostrarDesliza: true, mostrarFoto: true, tituloMulticolor: true }
+    ? { mostrarFondoTitulo: false, mostrarEtiqueta: false, mostrarDetalles: false, mostrarDesliza: true, mostrarFoto: true, tituloMulticolor: false }
     : elegida.composicion === 'mensaje'
       ? { mostrarFondoTitulo: false, mostrarDetalles: false, mostrarBanda: true, tituloMulticolor: true }
       : elegida.composicion === 'carta'
         ? { formato: 'a4', fuente: 'poppins', mostrarRedes: false, mostrarFondoTitulo: false, mostrarEtiqueta: false, mostrarDetalles: false, mostrarFoto: true, tituloMulticolor: false }
-      : {}
+      : { mostrarEtiqueta: false }
   const datos = { ...elegida.datos }
   if (elegida.composicion === 'carta' && !datos.lugarFecha) datos.lugarFecha = fechaCartaActual()
   return {
@@ -115,13 +122,21 @@ export function crearDisenoComunicacion(plantilla = 'apoyo') {
 
 export function normalizarDisenoComunicacion(valor) {
   const base = crearDisenoComunicacion(valor?.plantilla)
+  const { giroEtiqueta: _giroEtiquetaAnterior, ...disenoSolicitado } = valor?.diseno ?? {}
   const formatoSolicitado = FORMATOS_COMUNICACION[valor?.diseno?.formato] ? valor.diseno.formato : base.diseno.formato
   const formato = base.diseno.composicion === 'carta' ? 'a4' : formatoSolicitado === 'a4' ? base.diseno.formato : formatoSolicitado
   const paleta = PALETAS_COMUNICACION[valor?.diseno?.paleta] ? valor.diseno.paleta : base.diseno.paleta
   const fuenteSolicitada = FUENTES_COMUNICACION[valor?.diseno?.fuente] ? valor.diseno.fuente : base.diseno.fuente
   const fuente = base.diseno.composicion === 'carta' ? 'poppins' : fuenteSolicitada
   const diapositivas = Array.isArray(valor?.diapositivas)
-    ? valor.diapositivas.slice(0, 10).map((datos) => ({ ...base.datos, ...(datos ?? {}) }))
+    ? valor.diapositivas.slice(0, 10).map((datos) => {
+      const pagina = { ...base.datos, ...(datos ?? {}) }
+      pagina.tipoPagina = TIPOS_PAGINA_CARRUSEL[pagina.tipoPagina] ? pagina.tipoPagina : 'contenido'
+      pagina.tonoResaltado = ['acento', 'apoyo'].includes(pagina.tonoResaltado) ? pagina.tonoResaltado : 'acento'
+      pagina.fotoPosicionX = Math.min(100, Math.max(0, Number(pagina.fotoPosicionX ?? 50)))
+      pagina.fotoPosicionY = Math.min(100, Math.max(0, Number(pagina.fotoPosicionY ?? 50)))
+      return pagina
+    })
     : base.diapositivas
   const paginaActiva = Math.min(Math.max(0, Number(valor?.diseno?.paginaActiva) || 0), Math.max(0, diapositivas.length - 1))
   return {
@@ -129,10 +144,10 @@ export function normalizarDisenoComunicacion(valor) {
     datos: { ...base.datos, ...(valor?.datos ?? {}) },
     diapositivas,
     diseno: {
-      ...base.diseno, ...(valor?.diseno ?? {}), formato, paleta, fuente, paginaActiva,
+      ...base.diseno, ...disenoSolicitado, formato, paleta, fuente, paginaActiva,
       escalaTitulo: Math.min(ESCALA_TITULO_MAXIMA, Math.max(.72, Number(valor?.diseno?.escalaTitulo ?? 1))),
       escalaTexto: Math.min(1.3, Math.max(.82, Number(valor?.diseno?.escalaTexto ?? 1))),
-      giroEtiqueta: Math.min(20, Math.max(-20, Number(valor?.diseno?.giroEtiqueta ?? -8))),
+      mostrarEtiqueta: base.diseno.composicion === 'evento' ? false : Boolean(disenoSolicitado.mostrarEtiqueta ?? base.diseno.mostrarEtiqueta),
     },
   }
 }
@@ -224,6 +239,26 @@ function pintarImagenContenida(ctx, imagen, x, y, anchoMaximo, altoMaximo) {
   ctx.drawImage(imagen, x + anchoMaximo - ancho, y + (altoMaximo - alto) / 2, ancho, alto)
 }
 
+function pintarImagenCubierta(ctx, imagen, x, y, ancho, alto, posicionX = 50, posicionY = 50) {
+  const anchoOriginal = Number(imagen?.naturalWidth || imagen?.videoWidth || imagen?.width)
+  const altoOriginal = Number(imagen?.naturalHeight || imagen?.videoHeight || imagen?.height)
+  if (!(anchoOriginal > 0 && altoOriginal > 0)) {
+    ctx.drawImage(imagen, x, y, ancho, alto)
+    return
+  }
+  const proporcionDestino = ancho / alto
+  const proporcionImagen = anchoOriginal / altoOriginal
+  let sx = 0; let sy = 0; let sw = anchoOriginal; let sh = altoOriginal
+  if (proporcionImagen > proporcionDestino) {
+    sw = altoOriginal * proporcionDestino
+    sx = (anchoOriginal - sw) * posicionX / 100
+  } else {
+    sh = anchoOriginal / proporcionDestino
+    sy = (altoOriginal - sh) * posicionY / 100
+  }
+  ctx.drawImage(imagen, sx, sy, sw, sh, x, y, ancho, alto)
+}
+
 function iconoCalendario(ctx, x, y, color) {
   ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = 5
   ctx.beginPath(); ctx.roundRect(x, y, 54, 54, 8); ctx.stroke()
@@ -239,58 +274,98 @@ function iconoVideo(ctx, x, y, color) {
   ctx.restore()
 }
 
-function pintarTituloPorLineas(ctx, lineas, diseno, color, { x, y, tamano, interlineado, escalaX = .76, centrado = false }) {
+function pintarTituloPorLineas(ctx, lineas, diseno, color, { x, y, tamano, interlineado, escalaX = .76, centrado = false, resaltado = '', tonoResaltado = 'acento' }) {
   ctx.save(); ctx.textAlign = centrado ? 'center' : 'left'; ctx.font = fuenteCanvas(diseno, 500, tamano, true)
   ctx.translate(x, y); ctx.scale(escalaX, 1)
   lineas.forEach((linea, indice) => {
-    ctx.fillStyle = diseno.tituloMulticolor ? [color.principal, color.acento, color.apoyo][indice % 3] : color.principal
-    ctx.fillText(linea, 0, indice * interlineado)
+    const buscado = String(resaltado || '').trim().toLocaleUpperCase('es-UY')
+    const posicion = buscado ? linea.toLocaleUpperCase('es-UY').indexOf(buscado) : -1
+    if (posicion < 0 || centrado) {
+      ctx.fillStyle = diseno.tituloMulticolor ? [color.principal, color.acento, color.apoyo][indice % 3] : color.principal
+      ctx.fillText(linea, 0, indice * interlineado)
+      return
+    }
+    const partes = [linea.slice(0, posicion), linea.slice(posicion, posicion + buscado.length), linea.slice(posicion + buscado.length)]
+    let cursor = 0
+    partes.forEach((parte, parteIndice) => {
+      if (!parte) return
+      ctx.fillStyle = parteIndice === 1 ? color[tonoResaltado] : color.principal
+      ctx.fillText(parte, cursor, indice * interlineado)
+      cursor += ctx.measureText(parte).width
+    })
   })
   ctx.restore()
 }
 
-function pintarEditorial(ctx, estado, color, logo, foto, zonas) {
+function pintarEditorial(ctx, estado, color, logo, foto, zonas, logoClaro = null) {
   const datos = datosComunicacionActivos(estado)
+  const tipoPagina = TIPOS_PAGINA_CARRUSEL[datos.tipoPagina] ? datos.tipoPagina : 'contenido'
+  if (tipoPagina === 'cierre') {
+    ctx.fillStyle = color.principal; ctx.fillRect(0, 0, 1016, 1350)
+    if (estado.diseno.mostrarRedes) {
+      ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'left'; ctx.font = fuenteCanvas(estado.diseno, 500, 28)
+      ctx.fillText(datos.red, 82, 108); ctx.fillText(datos.sitio, 82, 140)
+    }
+    const lineasCierre = String(datos.titulo || '').toUpperCase().split('\n').slice(0, 4)
+    const tamanoCierre = Math.min(178, 160 * estado.diseno.escalaTitulo)
+    pintarTituloPorLineas(ctx, lineasCierre, estado.diseno, { ...color, principal: '#FFFFFF' }, { x: 135, y: 420, tamano: tamanoCierre, interlineado: tamanoCierre * .9, escalaX: .82, resaltado: datos.resaltadoTitulo, tonoResaltado: datos.tonoResaltado })
+    zonas.push({ campo: 'titulo', x: 120, y: 285, ancho: 780, alto: 390 })
+    ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.font = fuenteCanvas(estado.diseno, 500, 39)
+    ctx.fillText(String(datos.descripcion || 'AYUDANOS A DIFUNDIRLO').toUpperCase(), 508, 795)
+    zonas.push({ campo: 'descripcion', x: 175, y: 735, ancho: 665, alto: 80 })
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 4; ctx.beginPath(); ctx.roundRect(250, 850, 516, 140, 70); ctx.stroke()
+    ctx.font = fuenteCanvas({ ...estado.diseno, fuente: 'poppins' }, 400, 67); ctx.fillText('♡   ◯   △   ▯', 508, 944)
+    if (estado.diseno.mostrarLogo && (logoClaro || logo)) {
+      if (logoClaro) pintarImagenContenida(ctx, logoClaro, 810, 1115, 165, 88)
+      else {
+        ctx.fillStyle = '#FFFFFF'; rectanguloRedondeado(ctx, 790, 1100, 205, 118, 28)
+        pintarImagenContenida(ctx, logo, 810, 1115, 165, 88)
+      }
+    }
+    if (estado.diseno.mostrarBanda) {
+      ctx.fillStyle = color.principal; ctx.fillRect(1000, 0, 80, 450)
+      ctx.fillStyle = color.apoyo; ctx.fillRect(1000, 450, 80, 450)
+      ctx.fillStyle = color.acento; ctx.fillRect(1000, 900, 80, 450)
+    }
+    return
+  }
+  if (estado.diseno.mostrarRedes) {
+    ctx.fillStyle = color.principal; ctx.textAlign = 'left'; ctx.font = fuenteCanvas(estado.diseno, 500, 28)
+    ctx.fillText(datos.red, 82, 108); ctx.fillText(datos.sitio, 82, 140)
+    zonas.push({ campo: 'red', x: 70, y: 70, ancho: 300, alto: 42 }, { campo: 'sitio', x: 70, y: 108, ancho: 300, alto: 42 })
+  }
   const lineas = String(datos.titulo || '').toUpperCase().split('\n').slice(0, 4)
   const limitePorLineas = lineas.length >= 4 ? 140 : 188
-  const tamano = Math.min(limitePorLineas, 94 * estado.diseno.escalaTitulo)
-  pintarTituloPorLineas(ctx, lineas, estado.diseno, color, { x: 82, y: 260, tamano, interlineado: tamano * .94, escalaX: .82 })
+  const tamano = Math.min(limitePorLineas, 150 * estado.diseno.escalaTitulo)
+  pintarTituloPorLineas(ctx, lineas, estado.diseno, color, { x: 82, y: 260, tamano, interlineado: tamano * .94, escalaX: .82, resaltado: datos.resaltadoTitulo, tonoResaltado: datos.tonoResaltado })
   zonas.push({ campo: 'titulo', x: 70, y: 145, ancho: 900, alto: Math.max(170, lineas.length * tamano) })
 
-  const fotoY = Math.min(655, 290 + lineas.length * tamano)
+  const fotoY = Math.min(655, Math.max(545, 290 + lineas.length * tamano))
   if (estado.diseno.mostrarFoto) {
-    ctx.fillStyle = color.suave; ctx.fillRect(0, fotoY, 1016, 380)
-    if (foto) ctx.drawImage(foto, 0, fotoY, 1016, 380)
+    const fotoAlto = 1125 - fotoY
+    ctx.fillStyle = color.suave; ctx.fillRect(0, fotoY, 1000, fotoAlto)
+    if (foto) pintarImagenCubierta(ctx, foto, 0, fotoY, 1000, fotoAlto, datos.fotoPosicionX, datos.fotoPosicionY)
     else {
       ctx.fillStyle = color.principal; ctx.textAlign = 'center'; ctx.font = fuenteCanvas(estado.diseno, 500, 25)
-      ctx.fillText('AGREGÁ UNA FOTO DESDE EL PANEL DE ELEMENTOS', 508, fotoY + 195)
+      ctx.fillText('AGREGÁ UNA FOTO DESDE EL PANEL DE ELEMENTOS', 508, fotoY + fotoAlto / 2)
     }
-    zonas.push({ campo: 'foto', x: 0, y: fotoY, ancho: 1016, alto: 380 })
-  }
-
-  const textoY = estado.diseno.mostrarFoto ? fotoY + 430 : fotoY + 45
-  ctx.fillStyle = color.principal; ctx.textAlign = 'left'; ctx.font = fuenteCanvas(estado.diseno, 400, 30)
-  const cantidad = textoEnLineas(ctx, datos.descripcion, 82, textoY, 875, 43, estado.diseno.mostrarFoto ? 3 : 6)
-  zonas.push({ campo: 'descripcion', x: 70, y: textoY - 34, ancho: 900, alto: Math.max(72, cantidad * 43) })
-  if (datos.destacado) {
-    ctx.font = fuenteCanvas(estado.diseno, 500, 30)
-    textoEnLineas(ctx, datos.destacado, 82, textoY + cantidad * 43 + 15, 875, 42, 3)
+    zonas.push({ campo: 'foto', x: 0, y: fotoY, ancho: 1000, alto: fotoAlto })
   }
 
   if (estado.diseno.mostrarDesliza) {
-    ctx.fillStyle = color.principal; rectanguloRedondeado(ctx, 82, 1200, 205, 48, 24)
+    ctx.fillStyle = color.principal; rectanguloRedondeado(ctx, 82, 1178, 205, 48, 24)
     ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center'; ctx.font = fuenteCanvas(estado.diseno, 500, 21)
-    ctx.fillText('DESLIZÁ  →', 184, 1232)
+    ctx.fillText('DESLIZÁ  →', 184, 1210)
   }
   if (estado.diapositivas.length > 1) {
     ctx.fillStyle = color.principal; ctx.textAlign = 'right'; ctx.font = fuenteCanvas(estado.diseno, 500, 22)
-    ctx.fillText(`${estado.diseno.paginaActiva + 1} / ${estado.diapositivas.length}`, 940, 1232)
+    ctx.fillText(`${estado.diseno.paginaActiva + 1} / ${estado.diapositivas.length}`, 940, 1210)
   }
-  if (estado.diseno.mostrarLogo && logo) pintarImagenContenida(ctx, logo, 855, 1248, 140, 82)
+  if (estado.diseno.mostrarLogo && logo) pintarImagenContenida(ctx, logo, 835, 1238, 160, 92)
   if (estado.diseno.mostrarBanda) {
-    ctx.fillStyle = color.principal; ctx.fillRect(1016, 0, 64, 450)
-    ctx.fillStyle = color.apoyo; ctx.fillRect(1016, 450, 64, 450)
-    ctx.fillStyle = color.acento; ctx.fillRect(1016, 900, 64, 450)
+    ctx.fillStyle = color.principal; ctx.fillRect(1000, 0, 80, 450)
+    ctx.fillStyle = color.apoyo; ctx.fillRect(1000, 450, 80, 450)
+    ctx.fillStyle = color.acento; ctx.fillRect(1000, 900, 80, 450)
   }
 }
 
@@ -405,7 +480,7 @@ function pintarCarta(ctx, estado, color, logo, firma, zonas) {
   }
 }
 
-export function pintarComunicacionVisual(ctx, valor, logo = null, foto = null) {
+export function pintarComunicacionVisual(ctx, valor, logo = null, foto = null, logoClaro = null) {
   const estado = normalizarDisenoComunicacion(valor)
   const formato = FORMATOS_COMUNICACION[estado.diseno.formato]
   const color = PALETAS_COMUNICACION[estado.diseno.paleta]
@@ -429,14 +504,14 @@ export function pintarComunicacionVisual(ctx, valor, logo = null, foto = null) {
   ctx.textBaseline = 'alphabetic'
 
   const zonas = []
-  if (diseno.mostrarRedes) {
+  if (diseno.mostrarRedes && diseno.composicion !== 'editorial') {
     ctx.fillStyle = color.principal; ctx.textAlign = 'center'; ctx.font = fuenteCanvas(diseno, 500, 28)
     ctx.fillText(datos.red, 540, 70); ctx.fillText(datos.sitio, 540, 102)
     zonas.push({ campo: 'red', x: 350, y: 35, ancho: 380, alto: 40 }, { campo: 'sitio', x: 350, y: 72, ancho: 380, alto: 42 })
   }
 
   if (diseno.composicion === 'editorial') {
-    pintarEditorial(ctx, estado, color, logo, foto, zonas)
+    pintarEditorial(ctx, estado, color, logo, foto, zonas, logoClaro)
     ctx.setTransform?.(1, 0, 0, 1, 0, 0)
     return { estado, formato, zonas, transformacion: { escala, ox, oy } }
   }
@@ -453,31 +528,24 @@ export function pintarComunicacionVisual(ctx, valor, logo = null, foto = null) {
   }
 
   const lineasTitulo = String(datos.titulo).toUpperCase().split('\n').slice(0, 3)
-  const tamanoTitulo = Math.min(lineasTitulo.length >= 3 ? 130 : 226, 113 * diseno.escalaTitulo)
+  const tamanoTitulo = Math.min(lineasTitulo.length >= 3 ? 130 : 226, 150 * diseno.escalaTitulo)
   pintarTituloPorLineas(ctx, lineasTitulo, diseno, color, { x: 82, y: 445, tamano: tamanoTitulo, interlineado: tamanoTitulo * .98 })
   zonas.push({ campo: 'titulo', x: 70, y: 330, ancho: 900, alto: 270 })
 
-  if (diseno.mostrarEtiqueta) {
-    ctx.save(); ctx.translate(840, 590); ctx.rotate(diseno.giroEtiqueta * Math.PI / 180)
-    ctx.fillStyle = color.apoyo; rectanguloRedondeado(ctx, -145, -65, 290, 130, 58)
-    ctx.fillStyle = color.acento; ctx.textAlign = 'center'; ctx.font = fuenteCanvas(diseno, 500, 58, true); ctx.fillText(datos.etiqueta.toUpperCase(), 0, 20); ctx.restore()
-    zonas.push({ campo: 'etiqueta', x: 680, y: 500, ancho: 320, alto: 180 })
-  }
-
   ctx.textAlign = 'left'; ctx.fillStyle = color.principal; ctx.font = fuenteCanvas(diseno, 400, 31)
-  const cantidad = textoEnLineas(ctx, datos.descripcion, 102, 735, 870, 45, 5)
-  zonas.push({ campo: 'descripcion', x: 90, y: 700, ancho: 890, alto: Math.max(80, cantidad * 45) })
+  const cantidad = textoEnLineas(ctx, datos.descripcion, 102, 685, 870, 45, 5)
+  zonas.push({ campo: 'descripcion', x: 90, y: 650, ancho: 890, alto: Math.max(80, cantidad * 45) })
   ctx.font = fuenteCanvas(diseno, 500, 31)
-  const yDestacado = 735 + cantidad * 45 + 12
+  const yDestacado = 685 + cantidad * 45 + 12
   const cantidadDestacada = textoEnLineas(ctx, datos.destacado, 102, yDestacado, 870, 44, 4)
   zonas.push({ campo: 'destacado', x: 90, y: yDestacado - 36, ancho: 890, alto: Math.max(70, cantidadDestacada * 44) })
 
   if (diseno.mostrarDetalles) {
-    const y = 1100
-    iconoCalendario(ctx, 105, y - 47, color.acento)
-    ctx.fillStyle = color.principal; ctx.textAlign = 'left'; ctx.font = fuenteCanvas(diseno, 400, 29); ctx.fillText(datos.fecha, 180, y - 12); ctx.fillText(datos.hora, 180, y + 31)
-    iconoVideo(ctx, 650, y - 50, color.acento); ctx.fillText(datos.modalidad, 735, y + 4)
-    zonas.push({ campo: 'fecha', x: 95, y: y - 65, ancho: 500, alto: 55 }, { campo: 'hora', x: 160, y: y, ancho: 380, alto: 50 }, { campo: 'modalidad', x: 635, y: y - 65, ancho: 360, alto: 90 })
+    const y = 1042
+    iconoCalendario(ctx, 102, y, color.acento)
+    ctx.fillStyle = color.principal; ctx.textAlign = 'left'; ctx.font = fuenteCanvas(diseno, 400, 29); ctx.fillText(datos.fecha, 180, y + 22); ctx.fillText(datos.hora, 180, y + 62)
+    iconoVideo(ctx, 610, y + 6, color.acento); ctx.fillText(datos.modalidad, 700, y + 38)
+    zonas.push({ campo: 'fecha', x: 92, y: y - 10, ancho: 470, alto: 48 }, { campo: 'hora', x: 160, y: y + 34, ancho: 380, alto: 48 }, { campo: 'modalidad', x: 600, y: y - 10, ancho: 385, alto: 90 })
   }
 
   if (datos.contacto) {

@@ -3,7 +3,7 @@ import { cargarImagen, descargar } from '../imagen/exportar.js'
 import { cargarImagenRemota } from '../imagen/cargar-remota.js'
 import { puedeCrearCartaMembretada, puedeUsarComunicacionVisual } from '../acceso/permisos-funciones.js'
 import {
-  FORMATOS_COMUNICACION, FUENTES_COMUNICACION, PALETAS_COMUNICACION, PLANTILLAS_COMUNICACION,
+  FORMATOS_COMUNICACION, FUENTES_COMUNICACION, PALETAS_COMUNICACION, PLANTILLAS_COMUNICACION, TIPOS_PAGINA_CARRUSEL,
   advertenciasComunicacion, crearDisenoComunicacion, datosComunicacionActivos, normalizarDisenoComunicacion,
   ESCALA_TITULO_MAXIMA, pintarComunicacionVisual, svgDesdeLienzo, textoPublicacionComunicacion,
 } from '../imagen/comunicacion-visual.js'
@@ -104,6 +104,38 @@ function controlRango(estado, configuracion, alCambiar) {
   return envoltorio
 }
 
+function controlRangoDato(datos, configuracion, alCambiar) {
+  const { campo, etiqueta, min, max, step, sufijo = '' } = configuracion
+  const envoltorio = elemento('label', ['comunicacion-visual-rango'])
+  const rotulo = elemento('span', [])
+  const valor = elemento('strong', [], `${datos[campo]}${sufijo}`)
+  rotulo.append(document.createTextNode(etiqueta), valor)
+  const control = document.createElement('input')
+  control.type = 'range'; control.min = min; control.max = max; control.step = step; control.value = datos[campo]
+  control.dataset.campo = campo
+  control.addEventListener('input', () => {
+    const siguiente = Number(control.value)
+    valor.textContent = `${siguiente}${sufijo}`
+    alCambiar(campo, siguiente)
+  })
+  envoltorio.append(rotulo, control)
+  return envoltorio
+}
+
+function campoSeleccion(datos, configuracion, alCambiar) {
+  const envoltorio = elemento('label', ['comunicacion-visual-campo'])
+  envoltorio.dataset.campoContenedor = configuracion.campo
+  envoltorio.appendChild(elemento('span', ['comunicacion-visual-campo-rotulo'], configuracion.etiqueta))
+  const control = document.createElement('select'); control.dataset.campo = configuracion.campo
+  Object.entries(configuracion.opciones).forEach(([valor, etiqueta]) => {
+    const opcion = new Option(etiqueta, valor); opcion.selected = valor === datos[configuracion.campo]; control.add(opcion)
+  })
+  control.addEventListener('change', () => alCambiar(configuracion.campo, control.value))
+  envoltorio.appendChild(control)
+  if (configuracion.ayuda) envoltorio.appendChild(elemento('small', [], configuracion.ayuda))
+  return envoltorio
+}
+
 function interruptor(estado, campo, etiqueta, alCambiar) {
   const envoltorio = elemento('label', ['comunicacion-visual-interruptor'])
   const control = document.createElement('input')
@@ -123,6 +155,7 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
   const almacen = opciones.almacen ?? globalThis.localStorage
   const crearContexto = opciones.crearContexto ?? ((canvas) => canvas.getContext('2d'))
   const cargarLogo = opciones.cargarLogo ?? (() => cargarImagen('assets/logo-aletea-violeta.png'))
+  const cargarLogoClaro = opciones.cargarLogoClaro ?? (opciones.cargarLogo ? (() => Promise.resolve(null)) : (() => cargarImagen('assets/logo-aletea.png')))
   const descargarPNG = opciones.descargarPNG ?? descargar
   const descargarSVG = opciones.descargarSVG ?? descargarTexto
   const imprimirCarta = opciones.imprimirCarta ?? imprimirCartaDesdeLienzo
@@ -135,6 +168,7 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
   }))
   let estado = leerBorradorComunicacion(sesion, almacen)
   let logo = null
+  let logoClaro = null
   let foto = null
   let vivo = true
   let pestana = 'texto'
@@ -165,7 +199,7 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
       ? 'Privacidad activa: la carta y la firma se eliminan al cerrar esta pestaña'
       : (persistido ? mensaje : 'No se pudo guardar el borrador en este dispositivo')
     const ctx = crearContexto(canvas)
-    if (ctx) ultimoPlano = pintarComunicacionVisual(ctx, estado, logo, foto)
+    if (ctx) ultimoPlano = pintarComunicacionVisual(ctx, estado, logo, foto, logoClaro)
     const estadoEl = contenedor.querySelector('[data-comunicacion-estado]')
     if (estadoEl) estadoEl.textContent = aviso
   }
@@ -231,7 +265,7 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
       control.type = 'button'; control.dataset.plantilla = clave
       control.setAttribute('aria-pressed', estado.plantilla === clave ? 'true' : 'false')
       if (estado.plantilla === clave) control.classList.add('activa')
-      const muestra = elemento('span', ['comunicacion-visual-plantilla-muestra', `comunicacion-visual-plantilla-${plantilla.paleta}`], plantilla.datos.etiqueta)
+      const muestra = elemento('span', ['comunicacion-visual-plantilla-muestra', `comunicacion-visual-plantilla-${plantilla.paleta}`], plantilla.composicion === 'editorial' ? '1/4' : plantilla.composicion === 'mensaje' ? 'Aa' : plantilla.composicion === 'carta' ? 'A4' : '1080')
       control.append(muestra, elemento('strong', [], plantilla.nombre), elemento('small', [], `${plantilla.categoria} · ${plantilla.descripcion}`))
       control.addEventListener('click', () => { estado = crearDisenoComunicacion(clave); foto = null; pestana = 'texto'; guardarBorradorComunicacion(estado, sesion, almacen); dibujar() })
       listaPlantillas.appendChild(control)
@@ -252,22 +286,38 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
       const paginasTitulo = elemento('div', [])
       paginasTitulo.append(elemento('strong', [], 'Carrusel'), elemento('small', [], 'Cada tarjeta es una imagen independiente.'))
       paginasCabecera.appendChild(paginasTitulo)
+      const accionesPaginas = elemento('div', ['comunicacion-visual-paginas-acciones'])
       const duplicar = boton('Duplicar página', () => {
         if (estado.diapositivas.length >= 10) return
         const indice = estado.diseno.paginaActiva
         const siguientes = estado.diapositivas.slice(); siguientes.splice(indice + 1, 0, { ...siguientes[indice], titulo: `${siguientes[indice].titulo}\n` })
         estado = { ...estado, diapositivas: siguientes, diseno: { ...estado.diseno, paginaActiva: indice + 1 } }; foto = null; dibujar()
       })
-      paginasCabecera.appendChild(duplicar); paginas.appendChild(paginasCabecera)
+      const agregarCierre = boton('Agregar cierre', () => {
+        if (estado.diapositivas.length >= 10) return
+        const compartidos = datosComunicacionActivos(estado)
+        const cierre = { ...compartidos, tipoPagina: 'cierre', titulo: '¿TE GUSTA\nNUESTRO\nCONTENIDO?', resaltadoTitulo: 'CONTENIDO', tonoResaltado: 'apoyo', descripcion: 'AYUDANOS A DIFUNDIRLO', destacado: '', foto: '', fotoPosicionX: 50, fotoPosicionY: 50 }
+        estado = { ...estado, diapositivas: [...estado.diapositivas, cierre], diseno: { ...estado.diseno, paginaActiva: estado.diapositivas.length } }; foto = null; dibujar()
+      })
+      accionesPaginas.append(duplicar, agregarCierre); paginasCabecera.appendChild(accionesPaginas); paginas.appendChild(paginasCabecera)
       const tira = elemento('div', ['comunicacion-visual-paginas-tira'])
       estado.diapositivas.forEach((pagina, indice) => {
         const paginaBoton = elemento('button', ['comunicacion-visual-pagina'])
         paginaBoton.type = 'button'; paginaBoton.setAttribute('aria-pressed', indice === estado.diseno.paginaActiva ? 'true' : 'false')
-        paginaBoton.append(elemento('span', [], String(indice + 1).padStart(2, '0')), elemento('strong', [], String(pagina.titulo || 'Sin título').replace(/\n/g, ' ').slice(0, 40)))
+        const descripcionPagina = elemento('span', ['comunicacion-visual-pagina-textos'])
+        descripcionPagina.append(elemento('strong', [], String(pagina.titulo || 'Sin título').replace(/\n/g, ' ').slice(0, 40)), elemento('small', [], TIPOS_PAGINA_CARRUSEL[pagina.tipoPagina]?.nombre ?? 'Idea con foto'))
+        paginaBoton.append(elemento('span', ['comunicacion-visual-pagina-numero'], String(indice + 1).padStart(2, '0')), descripcionPagina)
         paginaBoton.addEventListener('click', () => { estado = { ...estado, diseno: { ...estado.diseno, paginaActiva: indice } }; foto = null; dibujar() })
         tira.appendChild(paginaBoton)
       })
       if (estado.diapositivas.length > 1) {
+        const mover = (direccion) => {
+          const indice = estado.diseno.paginaActiva; const destino = indice + direccion
+          if (destino < 0 || destino >= estado.diapositivas.length) return
+          const siguientes = estado.diapositivas.slice(); [siguientes[indice], siguientes[destino]] = [siguientes[destino], siguientes[indice]]
+          estado = { ...estado, diapositivas: siguientes, diseno: { ...estado.diseno, paginaActiva: destino } }; dibujar()
+        }
+        tira.append(boton('Mover antes', () => mover(-1)), boton('Mover después', () => mover(1)))
         const eliminar = boton('Eliminar página', () => {
           const siguientes = estado.diapositivas.filter((_, indice) => indice !== estado.diseno.paginaActiva)
           estado = { ...estado, diapositivas: siguientes, diseno: { ...estado.diseno, paginaActiva: Math.max(0, estado.diseno.paginaActiva - 1) } }; foto = null; dibujar()
@@ -321,7 +371,8 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
 
     function cambiarDato(campo, valor) {
       if (estado.diapositivas.length) {
-        const diapositivas = estado.diapositivas.map((datos, indice) => indice === estado.diseno.paginaActiva ? { ...datos, [campo]: valor } : datos)
+        const globalCarrusel = ['red', 'sitio'].includes(campo)
+        const diapositivas = estado.diapositivas.map((datos, indice) => globalCarrusel || indice === estado.diseno.paginaActiva ? { ...datos, [campo]: valor } : datos)
         estado = { ...estado, diapositivas }
       } else estado = { ...estado, datos: { ...estado.datos, [campo]: valor } }
       guardarYRepintar(lienzo)
@@ -344,17 +395,23 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
         const camposEvento = [
           { campo: 'fondoTitulo', etiqueta: 'Mensaje de fondo' },
           { campo: 'titulo', etiqueta: 'Título principal', multilinea: true, ayuda: 'Usá Enter para elegir dónde corta la línea.' },
-          { campo: 'etiqueta', etiqueta: 'Etiqueta destacada' },
           { campo: 'descripcion', etiqueta: 'Descripción', multilinea: true },
           { campo: 'destacado', etiqueta: 'Texto destacado', multilinea: true },
           { campo: 'fecha', etiqueta: 'Fecha' }, { campo: 'hora', etiqueta: 'Hora' },
           { campo: 'modalidad', etiqueta: 'Modalidad o lugar' }, { campo: 'contacto', etiqueta: 'Contacto' },
         ]
-        const camposEditorial = [
-          { campo: 'titulo', etiqueta: 'Título de esta página', multilinea: true, ayuda: 'Usá Enter para marcar los cortes del titular.' },
-          { campo: 'descripcion', etiqueta: 'Texto de apoyo', multilinea: true },
-          { campo: 'destacado', etiqueta: 'Cierre destacado', multilinea: true },
-        ]
+        const esCierre = datos.tipoPagina === 'cierre'
+        const camposEditorial = esCierre
+          ? [
+            { campo: 'titulo', etiqueta: 'Mensaje final', multilinea: true, ayuda: 'Usá dos o tres líneas breves.' },
+            { campo: 'resaltadoTitulo', etiqueta: 'Palabra o frase en color', ayuda: 'Escribila exactamente como aparece en el título.' },
+            { campo: 'descripcion', etiqueta: 'Invitación a compartir' },
+          ]
+          : [
+            { campo: 'titulo', etiqueta: 'Título de esta página', multilinea: true, ayuda: 'Usá Enter para marcar los cortes del titular.' },
+            { campo: 'resaltadoTitulo', etiqueta: 'Palabra o frase en color', ayuda: 'Escribila exactamente como aparece en el título.' },
+            { campo: 'descripcion', etiqueta: 'Texto para la publicación', multilinea: true, ayuda: 'Acompaña la descarga, pero no ocupa espacio sobre la fotografía.' },
+          ]
         const camposMensaje = [
           { campo: 'titulo', etiqueta: 'Mensaje principal', multilinea: true, ayuda: 'Tres líneas breves suelen funcionar mejor.' },
           { campo: 'etiqueta', etiqueta: 'Saludo o cierre' },
@@ -376,7 +433,11 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
         ]
         const camposVisibles = estado.diseno.composicion === 'carta' ? camposCarta : estado.diseno.composicion === 'editorial' ? camposEditorial : estado.diseno.composicion === 'mensaje' ? camposMensaje : camposEvento
         panel.appendChild(elemento('p', ['comunicacion-visual-panel-ayuda'], 'Los cambios aparecen en la imagen mientras escribís.'))
+        if (estado.diseno.composicion === 'editorial') {
+          panel.appendChild(campoSeleccion(datos, { campo: 'tipoPagina', etiqueta: 'Composición de esta página', opciones: Object.fromEntries(Object.entries(TIPOS_PAGINA_CARRUSEL).map(([clave, tipo]) => [clave, tipo.nombre])), ayuda: TIPOS_PAGINA_CARRUSEL[datos.tipoPagina]?.descripcion }, (campo, valor) => { cambiarDato(campo, valor); pintarPanel() }))
+        }
         camposVisibles.forEach((configuracion) => panel.appendChild(campoTexto(datos, configuracion, cambiarDato)))
+        if (estado.diseno.composicion === 'editorial') panel.appendChild(campoSeleccion(datos, { campo: 'tonoResaltado', etiqueta: 'Color del resaltado', opciones: { acento: 'Magenta', apoyo: 'Turquesa' } }, cambiarDato))
         const secundarios = document.createElement('details'); secundarios.className = 'comunicacion-visual-avanzado'
         secundarios.appendChild(elemento('summary', [], 'Redes y sitio web'))
         const secundariosCampos = elemento('div', ['comunicacion-visual-campos-secundarios'])
@@ -417,14 +478,13 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
           panel.append(formato, paletas, controlRango(estado, { campo: 'escalaTexto', etiqueta: 'Tamaño del texto', min: .82, max: 1.3, step: .01, sufijo: '×' }, cambiarDiseno), interruptor(estado, 'justificarTexto', 'Justificar el cuerpo de la carta', cambiarDiseno))
         } else {
           panel.append(formato, tipografias, paletas, controlRango(estado, { campo: 'escalaTitulo', etiqueta: 'Tamaño del título', min: .72, max: ESCALA_TITULO_MAXIMA, step: .01, sufijo: '×' }, cambiarDiseno))
-          if (estado.diseno.composicion === 'evento') panel.appendChild(controlRango(estado, { campo: 'giroEtiqueta', etiqueta: 'Giro de la etiqueta', min: -20, max: 20, step: 1, sufijo: '°' }, cambiarDiseno))
-          panel.appendChild(interruptor(estado, 'tituloMulticolor', 'Alternar colores del título', cambiarDiseno))
+          if (estado.diseno.composicion === 'mensaje') panel.appendChild(interruptor(estado, 'tituloMulticolor', 'Alternar colores del título', cambiarDiseno))
         }
       } else if (pestana === 'elementos') {
         const lista = elemento('div', ['comunicacion-visual-interruptores'])
         const elementosEvento = [
           ['mostrarRedes', 'Red social y sitio'], ['mostrarFondoTitulo', 'Mensaje grande de fondo'],
-          ['mostrarEtiqueta', 'Etiqueta inclinada'], ['mostrarDetalles', 'Fecha, hora y modalidad'],
+          ['mostrarDetalles', 'Fecha, hora y modalidad'],
           ['mostrarLogo', 'Logo de Aletea'], ['mostrarBanda', 'Banda tricolor'],
         ]
         const elementosEditorial = [['mostrarRedes', 'Red social y sitio'], ['mostrarFoto', 'Espacio para fotografía'], ['mostrarDesliza', 'Indicador Deslizá'], ['mostrarLogo', 'Logo de Aletea'], ['mostrarBanda', 'Barra tricolor lateral']]
@@ -433,7 +493,7 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
         const elementosVisibles = estado.diseno.composicion === 'carta' ? elementosCarta : estado.diseno.composicion === 'editorial' ? elementosEditorial : estado.diseno.composicion === 'mensaje' ? elementosMensaje : elementosEvento
         elementosVisibles.forEach(([campo, etiqueta]) => lista.appendChild(interruptor(estado, campo, etiqueta, cambiarDiseno)))
         const fotoCampo = elemento('section', ['comunicacion-visual-foto'])
-        fotoCampo.append(elemento('strong', [], esCarta ? 'Firma' : 'Fotografía'), elemento('small', [], esCarta ? 'Usá una firma en PNG con fondo transparente o una imagen clara. Se guarda solo en este dispositivo.' : 'Usá una imagen horizontal, clara y con permiso de uso. Se guarda solo en este dispositivo.'))
+        fotoCampo.append(elemento('strong', [], esCarta ? 'Firma' : 'Fotografía'), elemento('small', [], esCarta ? 'Usá una firma en PNG con fondo transparente o una imagen clara. Se guarda solo en este dispositivo.' : 'La imagen conserva sus proporciones. Ajustá el encuadre después de cargarla.'))
         const entradaFoto = document.createElement('input'); entradaFoto.type = 'file'; entradaFoto.accept = 'image/png,image/jpeg,image/webp'; entradaFoto.hidden = true; entradaFoto.tabIndex = -1
         const elegirFoto = boton(esCarta ? 'Elegir firma' : 'Elegir imagen', () => entradaFoto.click(), ['comunicacion-visual-elegir-foto'])
         elegirFoto.dataset.campo = 'foto'
@@ -471,9 +531,18 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
         accionesEnlace.append(cargarUrl, elemento('small', [], 'En Drive, elegí Compartir y permití acceso a cualquier persona con el enlace.'))
         enlace.append(campoUrl, accionesEnlace)
         fotoCampo.append(selectorArchivo, enlace)
+        if (estado.diseno.composicion === 'editorial' && datosComunicacionActivos(estado).tipoPagina !== 'cierre') {
+          const datos = datosComunicacionActivos(estado)
+          const encuadre = elemento('div', ['comunicacion-visual-encuadre'])
+          encuadre.append(
+            controlRangoDato(datos, { campo: 'fotoPosicionX', etiqueta: 'Encuadre horizontal', min: 0, max: 100, step: 1, sufijo: '%' }, cambiarDato),
+            controlRangoDato(datos, { campo: 'fotoPosicionY', etiqueta: 'Encuadre vertical', min: 0, max: 100, step: 1, sufijo: '%' }, cambiarDato),
+          )
+          fotoCampo.appendChild(encuadre)
+        }
         const quitarFoto = boton(esCarta ? 'Quitar firma' : 'Quitar foto', () => { cambiarDato('foto', ''); foto = null; nombreFoto = ''; guardarYRepintar(lienzo, esCarta ? 'Firma quitada' : 'Foto quitada'); pintarPanel() })
         panel.appendChild(elemento('p', ['comunicacion-visual-panel-ayuda'], 'Mostrá solo los elementos que ayudan a comunicar.'))
-        if (estado.diseno.composicion === 'editorial' || esCarta) panel.append(fotoCampo, quitarFoto)
+        if ((estado.diseno.composicion === 'editorial' && datosComunicacionActivos(estado).tipoPagina !== 'cierre') || esCarta) panel.append(fotoCampo, quitarFoto)
         panel.appendChild(lista)
       } else {
         const texto = textoPublicacionComunicacion(estado)
@@ -500,6 +569,12 @@ export function crearPantallaComunicacionVisual(raiz, opciones = {}) {
   Promise.resolve(cargarLogo()).then((imagen) => {
     if (!vivo || !imagen) return
     logo = imagen
+    const lienzo = contenedor.querySelector('canvas')
+    if (lienzo) guardarYRepintar(lienzo, aviso || 'Borrador guardado en este dispositivo')
+  })
+  Promise.resolve(cargarLogoClaro()).then((imagen) => {
+    if (!vivo || !imagen) return
+    logoClaro = imagen
     const lienzo = contenedor.querySelector('canvas')
     if (lienzo) guardarYRepintar(lienzo, aviso || 'Borrador guardado en este dispositivo')
   })
