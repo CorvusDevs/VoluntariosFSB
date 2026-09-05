@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Actualizando Aletea</title>
+</head>
+<body>
+<main>
+  <h1>Actualizando el gestor</h1>
+  <p>Estamos descartando la copia anterior. Esto demora solo unos segundos.</p>
+</main>
+<script>
+(async () => {
+  const version = '2026-09-05.1846-c863c2a733'
+  try {
+    if (navigator.serviceWorker) {
+      // Reemplazar el registro no basta si el worker anterior sigue sirviendo
+      // su HTML guardado. Lo retiramos primero y abandonamos este documento:
+      // el siguiente pedido ya no puede ser interceptado por ese controlador.
+      const registros = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(registros.map((registro) => registro.unregister()))
+    }
+  } catch {}
+  try {
+    const nombres = await caches?.keys?.() || []
+    await Promise.all(nombres
+      .filter((nombre) => nombre.startsWith('voluntarios-fsb-'))
+      .map((nombre) => caches.delete(nombre)))
+  } catch {}
+  const destino = new URL('/', location.origin)
+  destino.searchParams.set('actualizada', version)
+  destino.searchParams.set('v', version)
+  location.replace(destino.href)
+})()
+</script>
+</body>
+</html>

@@ -1,0 +1,806 @@
+{
+  "versionContrato": 1,
+  "aparienciaSitio": {
+    "movimiento": "suave",
+    "mostrarListon": true,
+    "mostrarOrbita": true,
+    "mostrarRedAreas": true
+  },
+  "demostracion": {
+    "activa": true,
+    "titulo": "Sitio de prueba",
+    "aviso": "El contenido marcado como ejemplo demuestra la propuesta de corto plazo. Fechas, precios, cupos y disponibilidad no están confirmados."
+  },
+  "tipografia": {
+    "portada": "institucional",
+    "cifrasTitulo": "institucional",
+    "cifrasNumeros": "expresiva",
+    "participacion": "expresiva",
+    "areas": "institucional",
+    "institucion": "institucional",
+    "actividades": "institucional",
+    "familias": "institucional",
+    "formacion": "institucional",
+    "biblioteca": "institucional",
+    "recursos": "institucional",
+    "tienda": "institucional",
+    "actualidad": "expresiva",
+    "donaciones": "institucional",
+    "contacto": "institucional",
+    "orientacion": "institucional",
+    "redes": "institucional"
+  },
+  "editorial": {
+    "estado": "publicado",
+    "revision": 1,
+    "actualizadoEn": "2026-08-23T00:00:00.000Z"
+  },
+  "seo": {
+    "titulo": "Aletea | Inclusión, comunidad y oportunidades",
+    "descripcion": "Asociación civil uruguaya que trabaja por la inclusión social de personas autistas."
+  },
+  "organizacion": {
+    "nombre": "Aletea",
+    "descripcion": "Asociación civil uruguaya que trabaja por la inclusión social de personas autistas.",
+    "correo": "info@aletea.org",
+    "whatsapp": "099 29 44 21",
+    "instagram": "https://www.instagram.com/aleteauy/",
+    "redes": [
+      {"red":"instagram","etiqueta":"Instagram","enlace":"https://www.instagram.com/aleteauy/","visible":true,"color":"marca"},
+      {"red":"facebook","etiqueta":"Facebook","enlace":"https://www.facebook.com/aleteauy","visible":true,"color":"marca"},
+      {"red":"youtube","etiqueta":"YouTube","enlace":"","visible":false,"color":"marca"},
+      {"red":"tiktok","etiqueta":"TikTok","enlace":"","visible":false,"color":"marca"},
+      {"red":"linkedin","etiqueta":"LinkedIn","enlace":"","visible":false,"color":"marca"},
+      {"red":"x","etiqueta":"X","enlace":"","visible":false,"color":"marca"},
+      {"red":"threads","etiqueta":"Threads","enlace":"","visible":false,"color":"marca"},
+      {"red":"bluesky","etiqueta":"Bluesky","enlace":"","visible":false,"color":"marca"},
+      {"red":"whatsapp","etiqueta":"WhatsApp","enlace":"https://wa.me/59899294421","visible":true,"color":"institucional"},
+      {"red":"spotify","etiqueta":"Spotify","enlace":"","visible":false,"color":"marca"}
+    ]
+  },
+  "operacionWeb": {
+    "analitica": {
+      "activa": false,
+      "proveedor": "Cloudflare Web Analytics",
+      "retencionDias": 90,
+      "revisarCada": "Mensual",
+      "responsable": "Comunicación",
+      "datosPersonales": false
+    },
+    "privacidad": {
+      "avisoEnlace": "/privacidad/",
+      "correo": "info@aletea.org",
+      "conservarConsultasMeses": 12,
+      "responsable": "Administración"
+    },
+    "inventario": {
+      "modo": "Estados manuales",
+      "estados": ["Disponible", "Pocas unidades", "Agotado", "Por encargo"],
+      "responsable": "Administración",
+      "fecha": ""
+    },
+    "pagos": {
+      "proveedor": "Mercado Pago",
+      "modalidad": "Enlaces externos",
+      "confirmarStockAntesDeCobrar": true,
+      "guardarDatosTarjeta": false
+    }
+  },
+  "navegacion": [
+    {
+      "etiqueta": "Aletea",
+      "enlace": "/quienes-somos/",
+      "visible": true,
+      "orden": 1
+    },
+    {
+      "etiqueta": "Qué hacemos",
+      "enlace": "/actividades/",
+      "visible": true,
+      "orden": 2
+    },
+    {
+      "etiqueta": "Para familias",
+      "enlace": "/familias/",
+      "visible": true,
+      "orden": 3
+    },
+    {
+      "etiqueta": "Recursos",
+      "enlace": "/recursos/",
+      "visible": true,
+      "orden": 4
+    },
+    {
+      "etiqueta": "Participá",
+      "enlace": "/contacto/",
+      "visible": true,
+      "orden": 5
+    }
+  ],
+  "portada": {
+    "etiqueta": "Asociación civil uruguaya",
+    "tituloAntes": "Transformamos barreras.",
+    "tituloDestacado": "Construimos comunidad.",
+    "tituloDespues": "Junto a vos.",
+    "bajada": "Trabajamos junto a personas autistas, familias y comunidades para generar apoyos, oportunidades y espacios donde todas las personas puedan participar y desarrollar su proyecto de vida.",
+    "imagen": {
+      "src": "/assets/images/aletea/comunidad-aletea.webp",
+      "textoAlternativo": "Personas autistas, familias, profesionales y voluntariado reunidos en una actividad de Aletea",
+      "focoX": 50,
+      "focoY": 54
+    },
+    "accionPrincipal": {
+      "etiqueta": "Conocé lo que hacemos",
+      "enlace": "/actividades/"
+    },
+    "accionSecundaria": {
+      "etiqueta": "Acercate a Aletea",
+      "enlace": "/contacto/"
+    },
+    "notaTitulo": "Comunidad Aletea",
+    "notaTexto": "Personas, familias y equipos que transforman barreras en comunidad."
+  },
+  "proposito": {
+    "antes": "Apoyamos.",
+    "destacado": "Conectamos.",
+    "despues": "Transformamos."
+  },
+  "impacto": {
+    "etiqueta": "Aletea en cifras",
+    "titulo": "Una red que sigue creciendo.",
+    "nota": "Cifras institucionales de referencia, abril de 2025.",
+    "animacion": {
+      "duracionMs": 1900,
+      "escalonadoMs": 140,
+      "desplazamientoPx": 8,
+      "mostrarHilo": true,
+      "reproducirUnaVez": true
+    },
+    "cifras": [
+      {
+        "valor": 400,
+        "prefijo": "+",
+        "etiqueta": "familias conectadas",
+        "detalle": "En cuatro grupos de apoyo y comunidad"
+      },
+      {
+        "valor": 130,
+        "prefijo": "+",
+        "etiqueta": "acompañantes formados",
+        "detalle": "Desde el inicio del curso de formación"
+      },
+      {
+        "valor": 50,
+        "etiqueta": "estudiantes activos",
+        "detalle": "En la séptima edición del curso"
+      }
+    ]
+  },
+  "mapaAreas": {
+    "etiqueta": "Una red que se mueve",
+    "titulo": "Encontrá tu lugar en Aletea.",
+    "texto": "Cada área tiene su propio objetivo, pero ninguna trabaja aislada.",
+    "centroTexto": "Una comunidad conectada"
+  },
+  "areas": [
+    {
+      "id": "familias",
+      "nombre": "Familias",
+      "resumen": "Acompañamiento, orientación y comunidad para familias de todo el país.",
+      "color": "turquesa",
+      "enlace": "/familias/",
+      "visible": true,
+      "orden": 1
+    },
+    {
+      "id": "adultos-autistas",
+      "nombre": "Adultos autistas",
+      "resumen": "Encuentro, orientación, participación y recursos para la vida adulta.",
+      "color": "magenta",
+      "enlace": "/adultos-autistas/",
+      "visible": true,
+      "orden": 2
+    },
+    {
+      "id": "capacitaciones",
+      "nombre": "Capacitaciones",
+      "resumen": "Diplomatura, talleres y recursos para aprender y transformar prácticas.",
+      "color": "amarillo",
+      "enlace": "/formacion/",
+      "visible": true,
+      "orden": 3
+    },
+    {
+      "id": "cuerpo-expresion",
+      "nombre": "Cuerpo y expresión",
+      "resumen": "Movimiento, recreación, arte y propuestas de expresión para desarrollar habilidades y pertenencia.",
+      "color": "magenta",
+      "enlace": "/actividades/#cuerpo-expresion",
+      "visible": true,
+      "orden": 4
+    },
+    {
+      "id": "activismo",
+      "nombre": "Activismo",
+      "resumen": "Trabajo por derechos, políticas públicas y una sociedad más accesible.",
+      "color": "violeta",
+      "enlace": "/quienes-somos/#mision",
+      "visible": true,
+      "orden": 5
+    },
+    {
+      "id": "materiales",
+      "nombre": "Materiales",
+      "resumen": "Información y herramientas para personas autistas, familias e instituciones.",
+      "color": "azul",
+      "enlace": "/biblioteca/",
+      "visible": true,
+      "orden": 6
+    }
+  ],
+  "historia": {
+    "etiqueta": "Quiénes somos",
+    "titulo": "La inclusión se construye en red.",
+    "texto": "Aletea reúne personas autistas, familias, profesionales y personas voluntarias. Creamos espacios donde cada persona pueda participar, aprender y desarrollar vínculos con apoyos respetuosos.",
+    "imagen": {
+      "src": "/assets/images/aletea/acompanamiento-familias.webp",
+      "textoAlternativo": "Una persona adulta y un niño comparten un momento de afecto en una actividad de Aletea",
+      "focoX": 50,
+      "focoY": 48
+    },
+    "accion": {
+      "etiqueta": "Conocé nuestra historia",
+      "enlace": "/quienes-somos/"
+    }
+  },
+  "participacion": {
+    "etiqueta": "Participá",
+    "titulo": "Hay muchas formas de ser parte.",
+    "texto": "Podés acercarte a una actividad, sumarte como voluntario, proponer una alianza o apoyar el trabajo de Aletea.",
+    "acciones": [
+      {
+        "etiqueta": "Quiero participar",
+        "enlace": "/contacto/"
+      },
+      {
+        "etiqueta": "Hacer una donación",
+        "enlace": "/donaciones/"
+      }
+    ]
+  },
+  "orientacion": {"visible":true,"etiqueta":"¿Qué necesitás hoy?","titulo":"Un camino posible para cada persona.","texto":"Encontrá orientación para personas autistas, familias, actividades, formación y recursos.","acciones":[{"etiqueta":"Soy familiar","enlace":"/familias/"},{"etiqueta":"Soy una persona adulta autista","enlace":"/adultos-autistas/"},{"etiqueta":"Busco una actividad","enlace":"/actividades/"},{"etiqueta":"Busco formación","enlace":"/actividades/#capacitaciones"},{"etiqueta":"Busco recursos","enlace":"/biblioteca/"}]},
+  "actualidad": {"visible":false,"etiqueta":"Actualidad","titulo":"Novedades de Aletea","texto":"Activá esta sección cuando haya noticias vigentes y confirmadas.","acciones":[]},
+  "tienda": {"visible":false,"etiqueta":"Tienda","titulo":"Productos que sostienen nuestra tarea","texto":"Activá esta sección cuando el catálogo y la disponibilidad estén confirmados.","acciones":[]},
+  "redes": {"visible":true,"etiqueta":"Seguinos","titulo":"La comunidad también se encuentra en redes.","texto":"Noticias, actividades y recursos compartidos por Aletea."},
+  "paginas": {
+    "institucion": {
+      "etiqueta": "Quiénes somos",
+      "titulo": "Una asociación construida en comunidad.",
+      "introduccion": "Aletea trabaja por una mejor calidad de vida de las personas autistas y sus familias, desde el paradigma de la neurodiversidad y el modelo social de la discapacidad.",
+      "imagen": {
+        "src": "/assets/images/aletea/equipo-aletea.webp",
+        "textoAlternativo": "Cuatro integrantes de Aletea reunidas con las camisetas de la organización",
+        "focoX": 50,
+        "focoY": 20
+      },
+      "bloques": [
+        {
+          "id": "mision",
+          "titulo": "Misión",
+          "texto": "Trabajar por una mejor calidad de vida de las personas autistas y sus familias, desde el paradigma de la neurodiversidad."
+        },
+        {
+          "id": "vision",
+          "titulo": "Visión",
+          "texto": "Ser una asociación referente para el colectivo autista en todo el territorio nacional y trabajar junto a organizaciones que compartan el paradigma de la neurodiversidad y el modelo social de la discapacidad."
+        }
+      ],
+      "equipo": [
+        {
+          "grupo": "Comisión Directiva, titulares",
+          "integrantes": [
+            "Irene Peluso, presidenta",
+            "Isabel Amondarain, vicepresidenta",
+            "Magdalena Martínez, secretaria",
+            "Maximiliano Zelayeta, prosecretario",
+            "Valeria Bagnasco, tesorera"
+          ]
+        },
+        {
+          "grupo": "Comisión Directiva, suplentes",
+          "integrantes": [
+            "Eduardo Suárez",
+            "Rosemary Rivero",
+            "Margarita Joya",
+            "Elizabeth Ascune",
+            "Jennifer Scavino"
+          ]
+        },
+        {
+          "grupo": "Comisión Fiscal, titulares",
+          "integrantes": [
+            "Matías Rodríguez",
+            "Patricia Quintana",
+            "Natalie Cravea"
+          ]
+        },
+        {
+          "grupo": "Comisión Fiscal, suplentes",
+          "integrantes": [
+            "María Guillen",
+            "Yarelis Santos",
+            "María de los Ángeles Sasia"
+          ]
+        },
+        {
+          "grupo": "Equipo",
+          "integrantes": [
+            "Claudia Cravea, Dirección Ejecutiva",
+            "Yoana Rodríguez, Área Administrativa",
+            "Leida Román, Área Contable",
+            "Dra. Andrea Catalá, asesoramiento legal"
+          ]
+        }
+      ]
+    },
+    "actividades": {
+      "etiqueta": "Qué hacemos",
+      "titulo": "Apoyos, aprendizaje y espacios para participar.",
+      "introduccion": "Las propuestas de Aletea conectan a familias, personas autistas, profesionales y comunidad mediante actividades concretas.",
+      "imagen": {
+        "src": "/assets/images/aletea/cuerpo-expresion.webp",
+        "textoAlternativo": "Un niño participa en una actividad de movimiento atravesando un túnel de juego",
+        "focoX": 50,
+        "focoY": 52
+      },
+      "propuestas": [
+        {
+          "id": "ejemplo-actividad-vigente",
+          "titulo": "Actividad vigente, ejemplo para completar",
+          "queEs": "Modelo de ficha para mostrar una propuesta actual con toda la información importante en un solo lugar.",
+          "paraQuien": "Indicá aquí a quién está dirigida.",
+          "area": "Deportes",
+          "edad": "Edad a confirmar",
+          "dia": "Día a confirmar",
+          "cuando": "Fecha y horario a confirmar",
+          "donde": "Lugar a confirmar",
+          "modalidad": "Presencial",
+          "costo": "A confirmar",
+          "cupos": "A confirmar",
+          "comoParticipar": "Reemplazá este texto por los pasos reales para participar.",
+          "estadoInscripcion": "Próximamente",
+          "vigencia": "Vigente",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 1,
+          "accion": {"etiqueta": "Consultar", "enlace": "/contacto/?motivo=Actividades"}
+        },
+        {
+          "id": "ejemplo-actividad-historica",
+          "titulo": "Actividad anterior, ejemplo histórico",
+          "queEs": "Modelo para conservar una experiencia pasada sin confundirla con una inscripción abierta.",
+          "paraQuien": "Público de la actividad anterior.",
+          "area": "Familias",
+          "edad": "No corresponde",
+          "dia": "Finalizada",
+          "cuando": "Año a completar",
+          "donde": "Lugar a completar",
+          "modalidad": "Presencial",
+          "costo": "Finalizada",
+          "cupos": "Cerrados",
+          "comoParticipar": "Esta actividad se conserva como parte de la historia de Aletea.",
+          "estadoInscripcion": "Cerrada",
+          "vigencia": "Histórica",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 2,
+          "accion": {"etiqueta": "", "enlace": ""}
+        }
+      ],
+      "bloques": [
+        {
+          "id": "familias",
+          "titulo": "Familias",
+          "texto": "Espacios de acompañamiento, orientación y encuentro para familias.",
+          "elementos": [
+            "Talleres para hermanos y hermanas",
+            "Información sobre el propósito y la metodología de estos talleres"
+          ]
+        },
+        {
+          "id": "adultos-autistas",
+          "titulo": "Adultos autistas",
+          "texto": "Espacios de encuentro, orientación y participación construidos desde la experiencia de las personas adultas autistas.",
+          "elementos": [
+            "Encuentro entre pares",
+            "Orientación y derechos",
+            "Proyectos y participación comunitaria"
+          ]
+        },
+        {
+          "id": "capacitaciones",
+          "titulo": "Capacitaciones",
+          "texto": "Instancias de formación para compartir herramientas y transformar prácticas desde la neurodiversidad."
+        },
+        {
+          "id": "cuerpo-expresion",
+          "titulo": "Cuerpo y expresión",
+          "texto": "Deporte, movimiento, recreación, arte y expresión para desarrollar habilidades, vínculos y sentido de pertenencia.",
+          "elementos": [
+            "Fútbol sin Barreras, escuelita inclusiva",
+            "Estimulación motriz a través de la plástica",
+            "Actividades abiertas a la comunidad"
+          ]
+        }
+      ]
+    },
+    "familias": {
+      "visible": true,
+      "etiqueta": "Familias",
+      "titulo": "Orientación y comunidad para cada etapa.",
+      "introduccion": "Un espacio para encontrar acompañamiento, grupos, actividades y recursos según lo que cada familia necesita.",
+      "imagen": {
+        "src": "/assets/images/aletea/encuentro-familias.webp",
+        "textoAlternativo": "Una niña abraza a una persona adulta durante una actividad comunitaria de Aletea",
+        "focoX": 52,
+        "focoY": 48
+      },
+      "bloques": [
+        {
+          "id": "orientacion",
+          "titulo": "Orientación",
+          "texto": "Información clara para encontrar el apoyo o la propuesta adecuada.",
+          "elementos": ["Primeros pasos y consultas", "Recursos y derechos", "Contacto con el equipo"]
+        },
+        {
+          "id": "grupos",
+          "titulo": "Grupos y comunidad",
+          "texto": "Espacios de encuentro e intercambio entre familias.",
+          "elementos": ["Grupos de apoyo", "Familias en Red", "Actividades para familias"]
+        },
+        {
+          "id": "preguntas",
+          "titulo": "Preguntas frecuentes",
+          "texto": "Respuestas breves a las consultas más comunes y un canal directo para pedir orientación."
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Necesito orientación", "enlace": "/contacto/?motivo=Familias"},
+        {"etiqueta": "Ver actividades", "enlace": "/actividades/#familias"}
+      ]
+    },
+    "adultosAutistas": {
+      "visible": true,
+      "etiqueta": "Adultos autistas",
+      "titulo": "Vida adulta, participación y comunidad.",
+      "introduccion": "Un espacio propio para encontrarse, compartir experiencias y acceder a orientación y oportunidades con apoyos respetuosos.",
+      "imagen": {
+        "src": "/assets/images/aletea/acompanamiento-familias.webp",
+        "textoAlternativo": "Dos personas comparten un momento cercano durante una actividad de Aletea",
+        "focoX": 50,
+        "focoY": 40
+      },
+      "bloques": [
+        {
+          "id": "encuentro",
+          "titulo": "Encuentro entre pares",
+          "texto": "Espacios para conversar, construir vínculos y participar desde los propios intereses.",
+          "elementos": ["Grupos y actividades", "Intercambio de experiencias", "Participación comunitaria"]
+        },
+        {
+          "id": "orientacion-adulta",
+          "titulo": "Orientación para la vida adulta",
+          "texto": "Información clara sobre derechos, apoyos y recursos para tomar decisiones con mayor autonomía.",
+          "elementos": ["Derechos y trámites", "Apoyos cotidianos", "Derivación a recursos"]
+        },
+        {
+          "id": "oportunidades",
+          "titulo": "Proyectos y oportunidades",
+          "texto": "Propuestas de formación, expresión, voluntariado y participación social."
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Consultar al equipo", "enlace": "/contacto/?motivo=Adultos%20autistas"},
+        {"etiqueta": "Explorar actividades", "enlace": "/actividades/"}
+      ]
+    },
+    "formacion": {
+      "visible": true,
+      "etiqueta": "Formación",
+      "titulo": "Herramientas para transformar prácticas.",
+      "introduccion": "Cursos, talleres y propuestas para profesionales, instituciones, familias y comunidad.",
+      "imagen": {
+        "src": "/assets/images/reunion-cierre.webp",
+        "textoAlternativo": "Encuentro de formación de la comunidad de Aletea"
+      },
+      "bloques": [
+        {
+          "id": "profesional",
+          "titulo": "Formación profesional",
+          "texto": "Cursos y especializaciones con enfoque de neurodiversidad."
+        },
+        {
+          "id": "instituciones",
+          "titulo": "Formación para instituciones",
+          "texto": "Propuestas para centros educativos, organizaciones y empresas."
+        },
+        {
+          "id": "abierta",
+          "titulo": "Talleres y actividades abiertas",
+          "texto": "Instancias para familias, comunidad y público general."
+        }
+      ],
+      "propuestasFormativas": [
+        {
+          "id": "ejemplo-formacion",
+          "titulo": "Propuesta formativa, ejemplo para completar",
+          "categoriaFormacion": "Taller abierto",
+          "proximaEdicion": "Fecha a confirmar",
+          "modalidad": "Híbrida",
+          "duracion": "Duración a confirmar",
+          "horarios": "Horarios a confirmar",
+          "precio": "A confirmar",
+          "estadoInscripcion": "Próximamente",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 1,
+          "accion": {"etiqueta": "Consultar", "enlace": "/contacto/?motivo=Formación"}
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Consultar próximas propuestas", "enlace": "/contacto/?motivo=Formación"},
+        {"etiqueta": "Ver actividades", "enlace": "/actividades/#capacitaciones"}
+      ]
+    },
+    "recursos": {
+      "visible": true,
+      "etiqueta": "Recursos",
+      "titulo": "Herramientas para acompañar y decidir.",
+      "introduccion": "Una selección visual de guías, materiales y enlaces para familias, profesionales e instituciones.",
+      "imagen": {
+        "src": "/assets/images/comunidad.webp",
+        "textoAlternativo": "Personas de la comunidad de Aletea compartiendo recursos"
+      },
+      "recursos": [
+        {
+          "categoria": "Guías",
+          "titulo": "Guía de Recursos y Manual de Información",
+          "descripcion": "Material de consulta reunido por Aletea.",
+          "enlace": "https://drive.google.com/file/d/1Sl0dP8QzhSpcLw4Rcl4MxFecjKeZvpi8/view"
+        },
+        {
+          "categoria": "Inclusión",
+          "titulo": "Protocolo de Inclusión",
+          "descripcion": "Documento de referencia para prácticas inclusivas.",
+          "enlace": "https://drive.google.com/file/d/1Yh7RKGD2-yFK0vUMjAJnGm5ivqTz-2HJ/view?usp=sharing"
+        },
+        {
+          "categoria": "Publicaciones",
+          "titulo": "Boletín Conectad@s N.º 1",
+          "descripcion": "Primera edición del boletín de Aletea, julio de 2025.",
+          "enlace": "https://bit.ly/Conectados-Boletin1-Aletea"
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Ver toda la biblioteca", "enlace": "/biblioteca/"},
+        {"etiqueta": "Consultar al equipo", "enlace": "/contacto/?motivo=Recursos"}
+      ]
+    },
+    "tienda": {
+      "visible": true,
+      "etiqueta": "Tienda",
+      "titulo": "Productos que sostienen nuestra tarea.",
+      "introduccion": "Un espacio para conocer productos de Aletea y consultar disponibilidad directamente con el equipo.",
+      "imagen": {
+        "src": "/assets/images/reunion-cierre.webp",
+        "textoAlternativo": "Actividad comunitaria de Aletea"
+      },
+      "productos": [
+        {
+          "id": "ejemplo-producto",
+          "nombre": "Producto de ejemplo para reemplazar",
+          "descripcion": "Completá la descripción, la foto, el precio y la disponibilidad antes de mostrarlo.",
+          "precio": "A confirmar",
+          "disponibilidad": "Por encargo",
+          "imagen": {"src": "/assets/images/reunion-cierre.webp", "textoAlternativo": "Imagen provisoria para reemplazar por la foto del producto"},
+          "enlace": "/contacto/?motivo=Tienda",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 1
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Consultar a Aletea", "enlace": "/contacto/?motivo=Tienda"}
+      ]
+    },
+    "actualidad": {
+      "visible": true,
+      "etiqueta": "Actualidad",
+      "titulo": "Noticias, campañas y proyectos de Aletea.",
+      "introduccion": "Un espacio para compartir novedades institucionales con fecha, contexto e imágenes accesibles.",
+      "novedades": [
+        {
+          "id": "ejemplo-novedad",
+          "fecha": "2026-08-26",
+          "categoria": "Ejemplo",
+          "titulo": "Publicación de ejemplo para reemplazar",
+          "resumen": "Este modelo permite revisar cómo se verá una noticia antes de cargar información real.",
+          "contenido": "Reemplazá este texto por la noticia, campaña o proyecto confirmado. Revisá la fecha, la imagen y el texto alternativo antes de mostrarlo.",
+          "imagen": {"src": "/assets/images/aletea/identidad-aletea.webp", "textoAlternativo": "Prendedores con la identidad visual de Aletea preparados para una actividad"},
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 1
+        }
+      ]
+    },
+    "biblioteca": {
+      "etiqueta": "Biblioteca Digital",
+      "titulo": "Información para comprender, acompañar y transformar.",
+      "introduccion": "Publicaciones, materiales y sitios de referencia reunidos por Aletea.",
+      "recursos": [
+        {
+          "categoria": "Boletín Conectad@s",
+          "titulo": "Boletín N.º 1, julio de 2025",
+          "enlace": "https://bit.ly/Conectados-Boletin1-Aletea"
+        },
+        {
+          "categoria": "Publicaciones",
+          "titulo": "Guía de Recursos y Manual de Información",
+          "enlace": "https://drive.google.com/file/d/1Sl0dP8QzhSpcLw4Rcl4MxFecjKeZvpi8/view"
+        },
+        {
+          "categoria": "Publicaciones",
+          "titulo": "Protocolo de Inclusión",
+          "enlace": "https://drive.google.com/file/d/1Yh7RKGD2-yFK0vUMjAJnGm5ivqTz-2HJ/view?usp=sharing"
+        },
+        {
+          "categoria": "Publicaciones",
+          "titulo": "Propuesta Amandú",
+          "enlace": "https://drive.google.com/file/d/13iUw5dF4mJKl6X6IHYHPj70uWph11623/view?usp=sharing"
+        },
+        {
+          "categoria": "Publicaciones",
+          "titulo": "Sésamo y el Autismo",
+          "enlace": "https://plazasesamo.com/autismo/"
+        },
+        {
+          "categoria": "Multimedia",
+          "titulo": "Entrevista a Claudia y Matías en Desayunos Informales"
+        },
+        {
+          "categoria": "Multimedia",
+          "titulo": "Entrevista a Matías Rodríguez, presidente de Aletea"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "PANAACEA",
+          "enlace": "https://www.panaacea.org/index.php"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "Fundación Brincar",
+          "enlace": "https://www.brincar.org.ar/"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "Autismo Diario",
+          "enlace": "https://autismodiario.com/"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "ARASAAC",
+          "enlace": "https://arasaac.org/"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "Soy Visual",
+          "enlace": "https://www.soyvisual.org/"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "Doctor TEA",
+          "enlace": "https://www.doctortea.org/"
+        },
+        {
+          "categoria": "Sitios de interés",
+          "titulo": "Neurodiversidad ONG",
+          "enlace": "https://www.neurodiversidad.org.ar/"
+        }
+      ]
+    },
+    "donaciones": {
+      "etiqueta": "Donaciones",
+      "titulo": "Tu aporte se convierte en apoyo.",
+      "introduccion": "Tu aporte es destinado a brindar apoyos a familias que conviven con el autismo a través de diferentes formas y medios.",
+      "opciones": [
+        {
+          "monto": "$200",
+          "enlace": "https://mpago.la/2deCW16"
+        },
+        {
+          "monto": "$500",
+          "enlace": "https://mpago.la/1EzDm5b"
+        },
+        {
+          "monto": "$1.000",
+          "enlace": "https://mpago.la/1qtv94F"
+        }
+      ]
+    },
+    "contacto": {
+      "etiqueta": "Contacto",
+      "titulo": "Conversemos.",
+      "introduccion": "Elegí el tema de tu consulta y escribinos. El equipo de Aletea podrá orientarte hacia el espacio adecuado.",
+      "motivos": [
+        "Voluntariado",
+        "Familias",
+        "Capacitaciones",
+        "Deportes",
+        "Otros"
+      ],
+      "formularios": [
+        {
+          "id": "ejemplo-orientacion-familias",
+          "titulo": "Orientación para familias, ejemplo",
+          "descripcion": "Vinculá aquí un formulario público activo para dirigir la consulta al equipo correcto.",
+          "categoria": "Familias",
+          "responsable": "Familias",
+          "enlace": "",
+          "accionEtiqueta": "Pedir orientación",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 1
+        },
+        {
+          "id": "ejemplo-voluntariado",
+          "titulo": "Sumate como voluntario, ejemplo",
+          "descripcion": "Vinculá el formulario real de voluntariado y confirmá el equipo responsable antes de mostrarlo.",
+          "categoria": "Voluntariado",
+          "responsable": "Voluntariado",
+          "enlace": "",
+          "accionEtiqueta": "Quiero sumarme",
+          "esEjemplo": true,
+          "visible": true,
+          "orden": 2
+        }
+      ]
+    },
+    "privacidad": {
+      "visible": true,
+      "etiqueta": "Privacidad",
+      "titulo": "Cómo cuidamos tu información.",
+      "introduccion": "Aletea solicita únicamente los datos necesarios para responder consultas, recibir inscripciones y dar seguimiento a cada solicitud.",
+      "bloques": [
+        {
+          "id": "datos",
+          "titulo": "Qué información podemos recibir",
+          "texto": "Nombre o referencia, un medio de contacto y la información que decidas incluir en el formulario. No solicitamos diagnósticos ni información médica en los formularios generales."
+        },
+        {
+          "id": "finalidad",
+          "titulo": "Para qué la usamos",
+          "texto": "Para responder tu consulta, derivarla al equipo correspondiente y registrar el seguimiento necesario. Cada formulario explica su finalidad antes del envío."
+        },
+        {
+          "id": "acceso",
+          "titulo": "Quién puede acceder",
+          "texto": "Solo las personas de Aletea que necesitan intervenir en la consulta o actividad, según sus permisos dentro del gestor institucional."
+        },
+        {
+          "id": "conservacion",
+          "titulo": "Cuánto tiempo la conservamos",
+          "texto": "El plazo se informa en cada formulario. Las consultas sin seguimiento se revisan para su eliminación al finalizar el período configurado."
+        },
+        {
+          "id": "derechos",
+          "titulo": "Consultas, correcciones o eliminación",
+          "texto": "Podés pedir información, corregir datos o solicitar su eliminación escribiendo al contacto institucional. Aletea revisará cada solicitud antes de responder."
+        }
+      ],
+      "acciones": [
+        {"etiqueta": "Escribir a Aletea", "enlace": "mailto:info@aletea.org"}
+      ]
+    }
+  }
+}
