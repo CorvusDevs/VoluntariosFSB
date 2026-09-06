@@ -1,4 +1,4 @@
-const VERSION="fsb-20260906.1509-410c8dd94f";const CACHE='voluntarios-fsb-'+VERSION;
+const VERSION="fsb-20260906.1636-ab0b7c6072";const CACHE='voluntarios-fsb-'+VERSION;
 self.addEventListener('install',e=>e.waitUntil(self.skipWaiting()));
 self.addEventListener('activate',e=>e.waitUntil((async()=>{const nombres=await caches.keys();await Promise.all(nombres.filter(n=>n!==CACHE&&n.startsWith('voluntarios-fsb-')).map(n=>caches.delete(n)));await self.clients.claim()})()));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin!==self.location.origin||u.pathname.endsWith('/version.json')||u.pathname.endsWith('/usuarios.json'))return;e.respondWith((async()=>{try{const r=await fetch(e.request,{cache:'reload'});if(r?.ok&&r.type==='basic'){const c=await caches.open(CACHE);c.put(e.request,r.clone())}return r}catch(error){const guardada=await caches.match(e.request);if(guardada)return guardada;throw error}})())});
