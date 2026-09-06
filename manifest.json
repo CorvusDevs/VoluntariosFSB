@@ -1,13 +1,13 @@
 {
   "producto": "futbol-sin-barreras",
-  "version": "fsb-20260906.0240-d184d93852",
+  "version": "fsb-20260906.1315-e609f123ca",
   "archivos": {
-    "index.html": "03ffdb74120b2aff74aba07b95608e1729b38d6832798f799b3c550d8ee9bc9a",
-    "actualizar.html": "1c335ca29006868efe2505583e9f39577e6006ec088897c02e613c92a1f00302",
-    "sw.js": "9338496f9f67d264d12174c5ff1f92f723c0b4bcebfee436727bbc62039ec1c5",
-    "version.json": "86b6315f9a6ccaf3fe001de5ba0a81b1d26cb5e286066266b6e4922a08a83091",
+    "index.html": "d0eb58d5471098ff0499492b4ac62a8bab045c01030758d5d832aaa77b27d4e5",
+    "actualizar.html": "d431561d26c4d3158821201e1337778d3e8ef9620d0103180b251a54fdf14ee8",
+    "sw.js": "134ce20bc862bf1d54693ded7b42d4818d23ed10524e63e7340c9a4f1347a1a7",
+    "version.json": "f2d62350e5f693a5d352fce176c4b12d0242bd7f386016b63f3506d0030dabd9",
     "usuarios.json": "1151684dbf2cf2cd37833722d36b27dcf7abde74c597bc91af768d28b300e5b8",
-    "js/app.js": "b4fb7033125c1719684c8aaa387542a795fdbec05e14a025c5f07cdc392c6b46",
-    "css/estilos.css": "25ea866173fe49f40b0c4446e29257f7d0377c09045e329e5b01ba0c3433b977"
+    "js/app.js": "070017bde072133bfbdee63c9cd2f024510255111b078bb289a5e4a1540eeeeb",
+    "css/estilos.css": "4c679be4fd0fcd7d214079eb9906e3332c1e2b61a63d7b8e5c77ff8e3a8a1116"
   }
 }
