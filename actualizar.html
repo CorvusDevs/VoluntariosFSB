@@ -1,38 +1,5 @@
 <!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Actualizando Aletea</title>
-</head>
-<body>
-<main>
-  <h1>Actualizando el gestor</h1>
-  <p>Estamos descartando la copia anterior. Esto demora solo unos segundos.</p>
-</main>
-<script>
-(async () => {
-  const version = '2026-09-05.2018-94689c9d78'
-  try {
-    if (navigator.serviceWorker) {
-      // Reemplazar el registro no basta si el worker anterior sigue sirviendo
-      // su HTML guardado. Lo retiramos primero y abandonamos este documento:
-      // el siguiente pedido ya no puede ser interceptado por ese controlador.
-      const registros = await navigator.serviceWorker.getRegistrations()
-      await Promise.all(registros.map((registro) => registro.unregister()))
-    }
-  } catch {}
-  try {
-    const nombres = await caches?.keys?.() || []
-    await Promise.all(nombres
-      .filter((nombre) => nombre.startsWith('voluntarios-fsb-'))
-      .map((nombre) => caches.delete(nombre)))
-  } catch {}
-  const destino = new URL('/', location.origin)
-  destino.searchParams.set('actualizada', version)
-  destino.searchParams.set('v', version)
-  location.replace(destino.href)
-})()
-</script>
-</body>
-</html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Actualizar Fútbol sin Barreras</title></head>
+<body><main><h1>Actualizar Fútbol sin Barreras</h1><p>Estamos limpiando la copia anterior.</p></main><script>
+(async()=>{for(const registro of await navigator.serviceWorker?.getRegistrations?.()||[])await registro.unregister();for(const nombre of await caches.keys())if(nombre.startsWith('voluntarios-fsb-'))await caches.delete(nombre);location.replace('./?actualizada=fsb-20260906.0240-d184d93852')})()
+</script></body></html>

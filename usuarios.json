@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "usuarios": [
+    {
+      "usuario": "claudiacravea",
+      "nombre": "Claudia Cravea",
+      "rol": "admin",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "3H4+X4Qn6axJVOvxCgj1pw=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "hOg3tzAVmK48anXt",
+        "datos": "4g7ablGTe6krXILHUqY2b9oFuoYfTkkrfTOUZCADN6bx3RhbBQuj/e8b+FZqJqd++XOLt9eXQ6Q="
+      }
+    },
+    {
+      "usuario": "alejandroe",
+      "nombre": "Alejandro",
+      "rol": "admin",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "FF+p9pDEU9rqQAmlGneJPw=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "/S5uovZ56q+rA8AQ",
+        "datos": "JnBqYN21xYXZh0uxBhBarcYxXW+hW0HQI3bxwTY68fEtV9R/3ZmWWdPeKi33jV5cn0cuRSCdIn0="
+      }
+    },
+    {
+      "usuario": "mariajosetoribio",
+      "nombre": "Maria Jose Toribio",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "3NkW/f+iYMaTt4EVwWyNhg=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "yOacXlkRWTUyBMIl",
+        "datos": "qi9XIRAgk9F9qz/FNl20jI1+iyK8bHCfvtOD+rFVxzKER7wGnZqcUYBCEcCRhhjt6iu7zlLpllA="
+      }
+    },
+    {
+      "usuario": "renataperez",
+      "nombre": "Renata Pérez",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "PHofa7usZjEzeVXUMfVqQw=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "dKTsPd+srWOY/ZXL",
+        "datos": "LyqZfDGZVlmYxWegeiL2OEqyxT9BQwudhFVVtxqvgyO4W/ZOpNRm/U2NuCW/LuCOA4uFLxPczuA="
+      }
+    },
+    {
+      "usuario": "monicacarreno",
+      "nombre": "Mónica Carreño",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "Hi3v8cxdQFwlk1FtlHhHOQ=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "aq1iAfATY/XWukzY",
+        "datos": "b7694cRtQ7a+szU5ePDF53XJBFxeFWQSlkwQKG67xC38jiDBwKeARZbILjsw66ymZPDWoKyuS/s="
+      }
+    }
+  ]
+}
