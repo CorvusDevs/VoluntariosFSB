@@ -75,6 +75,21 @@
         "iv": "aq1iAfATY/XWukzY",
         "datos": "b7694cRtQ7a+szU5ePDF53XJBFxeFWQSlkwQKG67xC38jiDBwKeARZbILjsw66ymZPDWoKyuS/s="
       }
+    },
+    {
+      "usuario": "isabelamondarain",
+      "nombre": "isabel amondarain",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "nfGwwKMh4oND7hfXbzrbjA=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "bOZ2CIGwbzopOgB4",
+        "datos": "AAMIxNgpiGTlsKK/nMA60/Fk/3q0lol+t0IMYYmDyRCNN2euV3IsqLcui+9art9tLaiWLtGSdGg="
+      }
     }
   ]
 }
