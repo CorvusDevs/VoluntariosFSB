@@ -47,21 +47,6 @@
       }
     },
     {
-      "usuario": "renataperez",
-      "nombre": "Renata Pérez",
-      "rol": "coordinacion",
-      "kdf": {
-        "algoritmo": "PBKDF2-SHA256",
-        "iteraciones": 600000,
-        "sal": "PHofa7usZjEzeVXUMfVqQw=="
-      },
-      "cifrado": {
-        "algoritmo": "AES-GCM",
-        "iv": "dKTsPd+srWOY/ZXL",
-        "datos": "LyqZfDGZVlmYxWegeiL2OEqyxT9BQwudhFVVtxqvgyO4W/ZOpNRm/U2NuCW/LuCOA4uFLxPczuA="
-      }
-    },
-    {
       "usuario": "monicacarreno",
       "nombre": "Mónica Carreño",
       "rol": "coordinacion",
