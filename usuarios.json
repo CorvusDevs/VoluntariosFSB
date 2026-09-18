@@ -47,6 +47,21 @@
       }
     },
     {
+      "usuario": "renataperez",
+      "nombre": "Renata Pérez",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "PHofa7usZjEzeVXUMfVqQw=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "dKTsPd+srWOY/ZXL",
+        "datos": "LyqZfDGZVlmYxWegeiL2OEqyxT9BQwudhFVVtxqvgyO4W/ZOpNRm/U2NuCW/LuCOA4uFLxPczuA="
+      }
+    },
+    {
       "usuario": "monicacarreno",
       "nombre": "Mónica Carreño",
       "rol": "coordinacion",
@@ -74,6 +89,21 @@
         "algoritmo": "AES-GCM",
         "iv": "bOZ2CIGwbzopOgB4",
         "datos": "AAMIxNgpiGTlsKK/nMA60/Fk/3q0lol+t0IMYYmDyRCNN2euV3IsqLcui+9art9tLaiWLtGSdGg="
+      }
+    },
+    {
+      "usuario": "renaperez",
+      "nombre": "Rena Pérez",
+      "rol": "coordinacion",
+      "kdf": {
+        "algoritmo": "PBKDF2-SHA256",
+        "iteraciones": 600000,
+        "sal": "Y1pdi/jguUb2TkACMUbwbg=="
+      },
+      "cifrado": {
+        "algoritmo": "AES-GCM",
+        "iv": "ahad6+46wDzfY/AL",
+        "datos": "WErq8+NPgJ1V4QN10UNjBdm2QjcaVvpSfBrKrrmusX4tMitpjuVoYbcIzQSxH93veJ3ZmcT4cB4="
       }
     }
   ]
